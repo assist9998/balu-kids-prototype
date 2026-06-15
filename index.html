@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Balu Kids</title>
+<style>
+  :root {
+    --yellow: #F2A81D;
+    --yellow-light: #FDD97E;
+    --brown: #3E2510;
+    --brown-mid: #6B3F1A;
+    --cream: #FDF6E3;
+    --white: #FFFFFF;
+    --green: #3DAA6E;
+    --red: #E05555;
+    --gray: #A89070;
+    --gray-light: #EDE4D0;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+    background: #C8902A;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+  }
+
+  .phone {
+    width: 375px;
+    min-height: 100vh;
+    background: var(--cream);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    background: var(--brown);
+    padding: 20px 20px 24px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .header::before {
+    content: '';
+    position: absolute;
+    width: 200px;
+    height: 200px;
+    background: radial-gradient(circle, rgba(242,168,29,0.18) 0%, transparent 70%);
+    top: -60px;
+    right: -40px;
+    pointer-events: none;
+  }
+
+  .header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .brand-logo {
+    width: 38px;
+    height: 38px;
+    background: linear-gradient(135deg, var(--yellow) 0%, #E8920A 100%);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    box-shadow: 0 4px 12px rgba(242,168,29,0.4);
+  }
+
+  .brand-name {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--white);
+    letter-spacing: -0.3px;
+  }
+
+  .brand-sub {
+    font-size: 10px;
+    color: rgba(255,255,255,0.45);
+    font-weight: 500;
+    letter-spacing: 0.3px;
+  }
+
+  .lang-toggle {
+    display: flex;
+    background: rgba(255,255,255,0.1);
+    border-radius: 20px;
+    padding: 3px;
+    gap: 2px;
+  }
+
+  .lang-btn {
+    padding: 4px 11px;
+    border-radius: 16px;
+    border: none;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 700;
+    transition: all 0.2s;
+    background: transparent;
+    color: rgba(255,255,255,0.5);
+    letter-spacing: 0.3px;
+  }
+
+  .lang-btn.active {
+    background: var(--yellow);
+    color: var(--brown);
+  }
+
+  /* date pill in header */
+  .header-date {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 20px;
+    padding: 6px 12px;
+    font-size: 12px;
+    color: rgba(255,255,255,0.7);
+    font-weight: 500;
+  }
+
+  .header-date svg { opacity: 0.6; }
+
+  /* ── BOTTOM NAV ── */
+  .bottom-nav {
+    display: flex;
+    background: var(--white);
+    border-top: 1px solid var(--gray-light);
+    padding: 10px 8px 20px;
+    gap: 4px;
+    flex-shrink: 0;
+    position: sticky;
+    bottom: 0;
+  }
+
+  .nav-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 4px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    border-radius: 14px;
+    transition: background 0.15s;
+  }
+
+  .nav-dot {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 800;
+    color: white;
+    transition: transform 0.2s, opacity 0.2s;
+    opacity: 0.45;
+  }
+
+  .nav-btn.active .nav-dot { opacity: 1; transform: scale(1.1); }
+
+  .nav-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--gray);
+    transition: color 0.2s;
+    letter-spacing: 0.2px;
+  }
+
+  .nav-btn.active { background: rgba(242,168,29,0.08); }
+  .nav-btn.active .nav-label { color: var(--brown); font-weight: 700; }
+
+  /* ── CONTENT ── */
+  .content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 16px;
+  }
+
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  /* ── SECTION LABEL ── */
+  .section-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    margin-top: 20px;
+  }
+
+  .section-label:first-child { margin-top: 0; }
+
+  .section-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--yellow);
+    flex-shrink: 0;
+  }
+
+  .section-text {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--gray);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .section-count {
+    margin-left: auto;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--gray);
+    background: var(--gray-light);
+    padding: 2px 8px;
+    border-radius: 20px;
+  }
+
+  /* ── CHILD CARD ── */
+  .child-card {
+    background: var(--white);
+    border-radius: 18px;
+    padding: 14px 16px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    box-shadow: 0 2px 12px rgba(62,37,16,0.06);
+    transition: transform 0.1s;
+  }
+
+  .child-card:active { transform: scale(0.98); }
+
+  .avatar {
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+
+  .child-info { flex: 1; min-width: 0; }
+
+  .child-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--brown);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .child-meta {
+    font-size: 12px;
+    color: var(--gray);
+    margin-top: 2px;
+  }
+
+  .child-tag {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+    letter-spacing: 0.2px;
+  }
+
+  .tag-active { background: #D6F0E2; color: #1D7A4A; }
+  .tag-trial  { background: #FEF3CC; color: #92690A; }
+
+  /* ── ATTENDANCE ── */
+  .attend-header {
+    background: var(--white);
+    border-radius: 18px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 12px rgba(62,37,16,0.06);
+  }
+
+  .date-nav {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    border: none;
+    background: var(--gray-light);
+    color: var(--brown);
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  .date-center { text-align: center; }
+
+  .date-main {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--brown);
+  }
+
+  .date-sub {
+    font-size: 11px;
+    color: var(--gray);
+    margin-top: 1px;
+  }
+
+  .attend-item {
+    background: var(--white);
+    border-radius: 16px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 2px 8px rgba(62,37,16,0.05);
+  }
+
+  .attend-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .attend-info { flex: 1; }
+  .attend-name { font-size: 14px; font-weight: 700; color: var(--brown); }
+  .attend-age  { font-size: 11px; color: var(--gray); margin-top: 1px; }
+
+  .toggle {
+    width: 50px;
+    height: 28px;
+    border-radius: 14px;
+    border: none;
+    cursor: pointer;
+    position: relative;
+    transition: background 0.25s;
+    flex-shrink: 0;
+  }
+
+  .toggle::after {
+    content: '';
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: white;
+    top: 3px;
+    transition: left 0.25s;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  }
+
+  .toggle.on { background: var(--green); }
+  .toggle.on::after { left: 25px; }
+  .toggle.off { background: #D8CDBE; }
+  .toggle.off::after { left: 3px; }
+
+  /* ── SUMMARY ── */
+  .summary-hero {
+    background: linear-gradient(135deg, var(--brown) 0%, var(--brown-mid) 100%);
+    border-radius: 22px;
+    padding: 20px;
+    margin-bottom: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .summary-hero::after {
+    content: '';
+    position: absolute;
+    width: 160px;
+    height: 160px;
+    background: radial-gradient(circle, rgba(242,168,29,0.2) 0%, transparent 70%);
+    bottom: -40px;
+    right: -20px;
+    pointer-events: none;
+  }
+
+  .hero-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.5);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+
+  .hero-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+
+  .hero-number {
+    font-size: 52px;
+    font-weight: 800;
+    color: var(--white);
+    line-height: 1;
+    letter-spacing: -2px;
+  }
+
+  .hero-of {
+    font-size: 20px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 8px;
+  }
+
+  .hero-pills {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .hero-pill {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(255,255,255,0.12);
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.85);
+  }
+
+  .pill-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+  }
+
+  .pill-dot.green { background: #5EE09A; }
+  .pill-dot.red   { background: #FF7E7E; }
+
+  .stats-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .stat-box {
+    background: var(--white);
+    border-radius: 18px;
+    padding: 16px;
+    box-shadow: 0 2px 12px rgba(62,37,16,0.06);
+  }
+
+  .stat-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 10px;
+    font-size: 15px;
+  }
+
+  .stat-icon.yellow { background: #FEF3CC; }
+  .stat-icon.green  { background: #D6F0E2; }
+  .stat-icon.red    { background: #FDDEDE; }
+  .stat-icon.blue   { background: #D8EEFF; }
+
+  .stat-num {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--brown);
+    letter-spacing: -1px;
+    line-height: 1;
+  }
+
+  .stat-lbl {
+    font-size: 11px;
+    color: var(--gray);
+    margin-top: 3px;
+    font-weight: 500;
+  }
+
+  .group-card {
+    background: var(--white);
+    border-radius: 18px;
+    padding: 16px;
+    margin-bottom: 10px;
+    box-shadow: 0 2px 12px rgba(62,37,16,0.06);
+  }
+
+  .group-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .group-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--brown);
+  }
+
+  .group-badge {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--brown-mid);
+    background: var(--gray-light);
+    padding: 3px 10px;
+    border-radius: 20px;
+  }
+
+  .progress-track {
+    height: 6px;
+    background: var(--gray-light);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 10px;
+  }
+
+  .progress-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.5s ease;
+  }
+
+  .fill-yellow { background: var(--yellow); }
+  .fill-green  { background: var(--green); }
+  .fill-red    { background: var(--red); }
+
+  .absent-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--gray);
+  }
+
+  .absent-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--red);
+    flex-shrink: 0;
+  }
+
+  /* FAB */
+  .fab {
+    position: fixed;
+    bottom: 90px;
+    right: calc(50% - 375px/2 + 16px);
+    width: 50px;
+    height: 50px;
+    border-radius: 16px;
+    background: var(--yellow);
+    color: var(--brown);
+    border: none;
+    font-size: 26px;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(242,168,29,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.15s;
+    font-weight: 300;
+    line-height: 1;
+  }
+
+  .fab:active { transform: scale(0.92); }
+  .fab.hidden { display: none; }
+
+  .spacer { height: 80px; }
+
+  /* ── DASHBOARD ── */
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    padding: 8px 4px;
+  }
+
+  .dash-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: transform 0.15s;
+  }
+
+  .dash-item:active { transform: scale(0.94); }
+
+  .dash-circle {
+    width: 110px;
+    height: 110px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 38px;
+    box-shadow: 0 6px 20px rgba(62,37,16,0.12);
+  }
+
+  .dash-circle.empty {
+    background: var(--gray-light);
+    border: 2.5px dashed #C8B89A;
+    font-size: 28px;
+    color: #C8B89A;
+  }
+
+  .dash-label {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--brown);
+    text-align: center;
+  }
+
+  .dash-item.empty .dash-label { color: var(--gray); }
+
+  /* back button */
+  .back-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: rgba(255,255,255,0.7);
+    font-size: 14px;
+    font-weight: 600;
+    padding: 0;
+    margin-bottom: 14px;
+  }
+
+  .back-btn svg { stroke: rgba(255,255,255,0.7); }
+</style>
+</head>
+<body>
+<div class="phone">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-top">
+      <div class="brand">
+        <div class="brand-logo">🐻</div>
+        <div>
+          <div class="brand-name">Balu Kids</div>
+          <div class="brand-sub" id="h-sub">INTERNATIONAL CHILDREN'S CENTER</div>
+        </div>
+      </div>
+      <div class="lang-toggle">
+        <button class="lang-btn active" onclick="setLang('ru')">RU</button>
+        <button class="lang-btn" onclick="setLang('en')">EN</button>
+      </div>
+    </div>
+    <button class="back-btn" id="back-btn" onclick="showScreen('dashboard')" style="display:none">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+      <span id="back-label">Назад</span>
+    </button>
+    <div class="header-date">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+      <span id="header-date-text">Воскресенье, 15 июня 2026</span>
+    </div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+
+    <!-- SCREEN: DASHBOARD -->
+    <div class="screen active" id="screen-dashboard">
+      <div class="dashboard-grid">
+
+        <div class="dash-item" onclick="showScreen('children')">
+          <div class="dash-circle" style="background:#FFF0CC">🧒</div>
+          <div class="dash-label" id="dash-label-children">Дети</div>
+        </div>
+
+        <div class="dash-item" onclick="showScreen('attendance')">
+          <div class="dash-circle" style="background:#D4EDFF">📋</div>
+          <div class="dash-label" id="dash-label-attendance">Посещаемость</div>
+        </div>
+
+        <div class="dash-item" onclick="showScreen('summary')">
+          <div class="dash-circle" style="background:#D6F0E2">🗞️</div>
+          <div class="dash-label" id="dash-label-summary">Сводка</div>
+        </div>
+
+        <div class="dash-item" onclick="showScreen('notifications')">
+          <div class="dash-circle" style="background:#FDDEDE">⭐</div>
+          <div class="dash-label" id="dash-label-notifications">Уведомления</div>
+        </div>
+
+        <div class="dash-item empty">
+          <div class="dash-circle empty">+</div>
+          <div class="dash-label">Скоро</div>
+        </div>
+
+        <div class="dash-item empty">
+          <div class="dash-circle empty">+</div>
+          <div class="dash-label">Скоро</div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- SCREEN: УВЕДОМЛЕНИЯ -->
+    <div class="screen" id="screen-notifications">
+      <div style="text-align:center;padding:60px 20px;color:var(--gray)">
+        <div style="font-size:48px;margin-bottom:16px">🔔</div>
+        <div style="font-size:16px;font-weight:700;color:var(--brown);margin-bottom:8px" id="notif-title">Уведомлений пока нет</div>
+        <div style="font-size:13px" id="notif-sub">Здесь будут появляться важные события</div>
+      </div>
+    </div>
+
+    <!-- SCREEN: ДЕТИ -->
+    <div class="screen active" id="screen-children">
+      <div class="section-label">
+        <div class="section-dot"></div>
+        <div class="section-text" id="s1-g1-label">Звёздочки · 3–5 лет</div>
+        <div class="section-count">3</div>
+      </div>
+
+      <div class="child-card">
+        <div class="avatar" style="background:#FFF0CC">🧒</div>
+        <div class="child-info">
+          <div class="child-name">Mia Smirnova</div>
+          <div class="child-meta" id="c1-meta">4 года · с 1 сент 2025</div>
+        </div>
+        <span class="child-tag tag-active" id="tag-active-1">Активен</span>
+      </div>
+
+      <div class="child-card">
+        <div class="avatar" style="background:#D4EDFF">👦</div>
+        <div class="child-info">
+          <div class="child-name">Liam Petrov</div>
+          <div class="child-meta" id="c2-meta">5 лет · с 3 февр 2025</div>
+        </div>
+        <span class="child-tag tag-active" id="tag-active-2">Активен</span>
+      </div>
+
+      <div class="child-card">
+        <div class="avatar" style="background:#FFE8E8">👧</div>
+        <div class="child-info">
+          <div class="child-name">Sofia Nguyen</div>
+          <div class="child-meta" id="c3-meta">3 года · пробный</div>
+        </div>
+        <span class="child-tag tag-trial" id="tag-trial-1">Пробный</span>
+      </div>
+
+      <div class="section-label">
+        <div class="section-dot" style="background:#C0A882"></div>
+        <div class="section-text" id="s1-g2-label">Радуга · 5–7 лет</div>
+        <div class="section-count">2</div>
+      </div>
+
+      <div class="child-card">
+        <div class="avatar" style="background:#E8FFE8">🧒</div>
+        <div class="child-info">
+          <div class="child-name">Artem Kozlov</div>
+          <div class="child-meta" id="c4-meta">6 лет · с 10 янв 2025</div>
+        </div>
+        <span class="child-tag tag-active" id="tag-active-3">Активен</span>
+      </div>
+
+      <div class="child-card">
+        <div class="avatar" style="background:#F0E8FF">👧</div>
+        <div class="child-info">
+          <div class="child-name">Emma Tran</div>
+          <div class="child-meta" id="c5-meta">7 лет · с 5 авг 2024</div>
+        </div>
+        <span class="child-tag tag-active" id="tag-active-4">Активен</span>
+      </div>
+
+      <div class="spacer"></div>
+    </div>
+
+    <!-- SCREEN: ПОСЕЩАЕМОСТЬ -->
+    <div class="screen" id="screen-attendance">
+      <div class="attend-header">
+        <button class="date-nav">‹</button>
+        <div class="date-center">
+          <div class="date-main" id="date-main">15 июня</div>
+          <div class="date-sub" id="date-sub">Воскресенье</div>
+        </div>
+        <button class="date-nav">›</button>
+      </div>
+
+      <div class="section-label">
+        <div class="section-dot"></div>
+        <div class="section-text" id="s2-g1-label">Звёздочки</div>
+      </div>
+
+      <div class="attend-item">
+        <div class="attend-avatar" style="background:#FFF0CC">🧒</div>
+        <div class="attend-info">
+          <div class="attend-name">Mia Smirnova</div>
+          <div class="attend-age" id="a1-age">4 года</div>
+        </div>
+        <button class="toggle on" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button>
+      </div>
+
+      <div class="attend-item">
+        <div class="attend-avatar" style="background:#D4EDFF">👦</div>
+        <div class="attend-info">
+          <div class="attend-name">Liam Petrov</div>
+          <div class="attend-age" id="a2-age">5 лет</div>
+        </div>
+        <button class="toggle on" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button>
+      </div>
+
+      <div class="attend-item">
+        <div class="attend-avatar" style="background:#FFE8E8">👧</div>
+        <div class="attend-info">
+          <div class="attend-name">Sofia Nguyen</div>
+          <div class="attend-age" id="a3-age">3 года</div>
+        </div>
+        <button class="toggle off" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button>
+      </div>
+
+      <div class="section-label">
+        <div class="section-dot" style="background:#C0A882"></div>
+        <div class="section-text" id="s2-g2-label">Радуга</div>
+      </div>
+
+      <div class="attend-item">
+        <div class="attend-avatar" style="background:#E8FFE8">🧒</div>
+        <div class="attend-info">
+          <div class="attend-name">Artem Kozlov</div>
+          <div class="attend-age" id="a4-age">6 лет</div>
+        </div>
+        <button class="toggle on" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button>
+      </div>
+
+      <div class="attend-item">
+        <div class="attend-avatar" style="background:#F0E8FF">👧</div>
+        <div class="attend-info">
+          <div class="attend-name">Emma Tran</div>
+          <div class="attend-age" id="a5-age">7 лет</div>
+        </div>
+        <button class="toggle off" onclick="this.classList.toggle('on');this.classList.toggle('off')"></button>
+      </div>
+
+      <div class="spacer"></div>
+    </div>
+
+    <!-- SCREEN: СВОДКА -->
+    <div class="screen" id="screen-summary">
+
+      <div class="summary-hero">
+        <div class="hero-label" id="hero-label">Сегодня пришли</div>
+        <div class="hero-row">
+          <div class="hero-number">3</div>
+          <div class="hero-of">/ 5</div>
+        </div>
+        <div class="hero-pills">
+          <div class="hero-pill">
+            <div class="pill-dot green"></div>
+            <span id="pill-present">3 пришли</span>
+          </div>
+          <div class="hero-pill">
+            <div class="pill-dot red"></div>
+            <span id="pill-absent">2 отсутствуют</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-box">
+          <div class="stat-icon yellow">👥</div>
+          <div class="stat-num">5</div>
+          <div class="stat-lbl" id="stat-total">Всего детей</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-icon blue">📋</div>
+          <div class="stat-num">2</div>
+          <div class="stat-lbl" id="stat-groups">Группы</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-icon green">✓</div>
+          <div class="stat-num" style="color:var(--green)">60%</div>
+          <div class="stat-lbl" id="stat-fill">Заполненность</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-icon red" style="font-size:14px">✕</div>
+          <div class="stat-num" style="color:var(--red)">2</div>
+          <div class="stat-lbl" id="stat-absent">Отсутствуют</div>
+        </div>
+      </div>
+
+      <div class="section-label">
+        <div class="section-dot"></div>
+        <div class="section-text" id="s3-label">По группам</div>
+      </div>
+
+      <div class="group-card">
+        <div class="group-top">
+          <div class="group-name" id="g1-name">Звёздочки · 3–5 лет</div>
+          <div class="group-badge">2 / 3</div>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill fill-yellow" style="width:67%"></div>
+        </div>
+        <div class="absent-row">
+          <div class="absent-dot"></div>
+          <span id="g1-absent-text">Отсутствует: Sofia Nguyen</span>
+        </div>
+      </div>
+
+      <div class="group-card">
+        <div class="group-top">
+          <div class="group-name" id="g2-name">Радуга · 5–7 лет</div>
+          <div class="group-badge">1 / 2</div>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill fill-red" style="width:50%"></div>
+        </div>
+        <div class="absent-row">
+          <div class="absent-dot"></div>
+          <span id="g2-absent-text">Отсутствует: Emma Tran</span>
+        </div>
+      </div>
+
+      <div class="spacer"></div>
+    </div>
+
+  </div>
+
+
+  <button class="fab" id="fab-btn">+</button>
+
+</div>
+
+<script>
+  const T = {
+    ru: {
+      sub: 'МЕЖДУНАРОДНЫЙ ДЕТСКИЙ ЦЕНТР',
+      headerDate: 'Воскресенье, 15 июня 2026',
+      tab1: 'Дети', tab2: 'Посещаемость', tab3: 'Сводка',
+      g1: 'Звёздочки · 3–5 лет', g2: 'Радуга · 5–7 лет',
+      g1s: 'Звёздочки', g2s: 'Радуга',
+      active: 'Активен', trial: 'Пробный',
+      c1: '4 года · с 1 сент 2025', c2: '5 лет · с 3 февр 2025',
+      c3: '3 года · пробный', c4: '6 лет · с 10 янв 2025', c5: '7 лет · с 5 авг 2024',
+      dateMain: '15 июня', dateSub: 'Воскресенье',
+      a1: '4 года', a2: '5 лет', a3: '3 года', a4: '6 лет', a5: '7 лет',
+      heroLabel: 'Сегодня пришли',
+      pillPresent: '3 пришли', pillAbsent: '2 отсутствуют',
+      total: 'Всего детей', groups: 'Группы', fill: 'Заполненность', absent: 'Отсутствуют',
+      byGroup: 'По группам',
+      g1absent: 'Отсутствует: Sofia Nguyen', g2absent: 'Отсутствует: Emma Tran',
+    },
+    en: {
+      sub: 'INTERNATIONAL CHILDREN\'S CENTER',
+      headerDate: 'Sunday, June 15, 2026',
+      tab1: 'Children', tab2: 'Attendance', tab3: 'Summary',
+      g1: 'Stars · 3–5 y.o.', g2: 'Rainbow · 5–7 y.o.',
+      g1s: 'Stars', g2s: 'Rainbow',
+      active: 'Active', trial: 'Trial',
+      c1: '4 y.o. · since Sep 1, 2025', c2: '5 y.o. · since Feb 3, 2025',
+      c3: '3 y.o. · trial', c4: '6 y.o. · since Jan 10, 2025', c5: '7 y.o. · since Aug 5, 2024',
+      dateMain: 'June 15', dateSub: 'Sunday',
+      a1: '4 y.o.', a2: '5 y.o.', a3: '3 y.o.', a4: '6 y.o.', a5: '7 y.o.',
+      heroLabel: 'Present today',
+      pillPresent: '3 present', pillAbsent: '2 absent',
+      total: 'Total children', groups: 'Groups', fill: 'Occupancy', absent: 'Absent',
+      byGroup: 'By group',
+      g1absent: 'Absent: Sofia Nguyen', g2absent: 'Absent: Emma Tran',
+    }
+  };
+
+  function setLang(l) {
+    document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+    const d = T[l];
+    document.getElementById('h-sub').textContent = d.sub;
+    document.getElementById('header-date-text').textContent = d.headerDate;
+    document.getElementById('tab1-label').textContent = d.tab1;
+    document.getElementById('tab2-label').textContent = d.tab2;
+    document.getElementById('tab3-label').textContent = d.tab3;
+    document.getElementById('s1-g1-label').textContent = d.g1;
+    document.getElementById('s1-g2-label').textContent = d.g2;
+    document.getElementById('s2-g1-label').textContent = d.g1s;
+    document.getElementById('s2-g2-label').textContent = d.g2s;
+    document.querySelectorAll('[id^="tag-active-"]').forEach(el => el.textContent = d.active);
+    document.querySelectorAll('[id^="tag-trial-"]').forEach(el => el.textContent = d.trial);
+    ['c1','c2','c3','c4','c5'].forEach(id => document.getElementById(id+'-meta').textContent = d[id]);
+    document.getElementById('date-main').textContent = d.dateMain;
+    document.getElementById('date-sub').textContent = d.dateSub;
+    ['a1','a2','a3','a4','a5'].forEach(id => document.getElementById(id+'-age').textContent = d[id]);
+    document.getElementById('hero-label').textContent = d.heroLabel;
+    document.getElementById('pill-present').textContent = d.pillPresent;
+    document.getElementById('pill-absent').textContent = d.pillAbsent;
+    document.getElementById('stat-total').textContent = d.total;
+    document.getElementById('stat-groups').textContent = d.groups;
+    document.getElementById('stat-fill').textContent = d.fill;
+    document.getElementById('stat-absent').textContent = d.absent;
+    document.getElementById('s3-label').textContent = d.byGroup;
+    document.getElementById('g1-name').textContent = d.g1;
+    document.getElementById('g2-name').textContent = d.g2;
+    document.getElementById('g1-absent-text').textContent = d.g1absent;
+    document.getElementById('g2-absent-text').textContent = d.g2absent;
+  }
+
+  function showScreen(name) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('screen-' + name).classList.add('active');
+    const isDash = name === 'dashboard';
+    document.getElementById('back-btn').style.display = isDash ? 'none' : 'flex';
+    document.querySelector('.bottom-nav').style.display = isDash ? 'none' : 'flex';
+    document.getElementById('fab-btn').classList.toggle('hidden', name !== 'children');
+    document.getElementById('header-date-text').style.display = isDash ? '' : 'none';
+    document.querySelector('.header-date').style.display = isDash ? '' : 'none';
+  }
+
+  function showTab(name, btn) {
+    showScreen(name);
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+</script>
+</body>
+</html>
