@@ -2040,21 +2040,21 @@ function App() {
     <div style={rootStyle}>
       {/* ── header ── */}
       <div style={{ flexShrink: 0, position: 'relative', zIndex: 8,
-        background: '#7D4E2D', paddingTop: 'env(safe-area-inset-top)',
-        boxShadow: '0 2px 8px rgba(60,40,20,0.15)' }}>
+        background: '#fff', paddingTop: 'env(safe-area-inset-top)',
+        boxShadow: '0 2px 8px rgba(60,40,20,0.1)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', padding: '2px 16px 10px', gap: 8 }}>
           {/* left: back or logo + title */}
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, flex: 1 }}>
             {stack.length > 1 ? (
               <button onClick={back} className="bk-press" style={{ display: 'flex', alignItems: 'center', gap: 4,
-                border: 'none', background: 'rgba(255,255,255,0.15)', cursor: 'pointer', fontFamily: 'inherit',
+                border: 'none', background: '#B07848', cursor: 'pointer', fontFamily: 'inherit',
                 color: '#fff', fontSize: 13, fontWeight: 800, padding: '5px 12px 5px 8px',
                 borderRadius: 999 }}>
                 <Chevron dir="left" size={16} color="#fff" />{t('back')}
               </button>
             ) : (
               <>
-                <div style={{ position: 'relative', display: 'inline-flex', background: 'rgba(255,255,255,0.15)', padding: '5px 14px', borderRadius: 999 }}>
+                <div style={{ position: 'relative', display: 'inline-flex', background: '#B07848', padding: '5px 14px', borderRadius: 999 }}>
                   <span style={{ fontSize: 15, fontWeight: 800, color: '#fff', fontFamily: 'var(--font-display)' }}>{title}</span>
                   <div style={{ position: 'absolute', bottom: -12, right: -26, background: 'var(--card)', color: 'var(--ink-soft)', fontSize: 9, fontWeight: 800, padding: '1px 4px', borderRadius: 999, boxShadow: '0 2px 6px -2px rgba(60,40,20,0.2)' }}>mini app</div>
                 </div>
@@ -2064,9 +2064,9 @@ function App() {
           {/* right: lang toggle only */}
           <button onClick={toggleLang} className="bk-press" style={{ display: 'flex', border: 'none', cursor: 'pointer',
             borderRadius: 999, overflow: 'hidden', fontFamily: 'inherit', fontSize: 12, fontWeight: 800,
-            background: 'rgba(255,255,255,0.15)', padding: 2, gap: 2 }}>
-            <span style={{ padding: '5px 10px', borderRadius: 999, background: lang === 'ru' ? '#F2A81D' : 'transparent', color: lang === 'ru' ? '#3E2510' : 'rgba(255,255,255,0.6)', transition: 'all 0.2s' }}>RU</span>
-            <span style={{ padding: '5px 10px', borderRadius: 999, background: lang === 'en' ? '#F2A81D' : 'transparent', color: lang === 'en' ? '#3E2510' : 'rgba(255,255,255,0.6)', transition: 'all 0.2s' }}>EN</span>
+            background: '#B07848', padding: 2, gap: 2 }}>
+            <span style={{ padding: '5px 10px', borderRadius: 999, background: lang === 'ru' ? '#F2A81D' : 'transparent', color: lang === 'ru' ? '#3E2510' : '#fff', transition: 'all 0.2s' }}>RU</span>
+            <span style={{ padding: '5px 10px', borderRadius: 999, background: lang === 'en' ? '#F2A81D' : 'transparent', color: lang === 'en' ? '#3E2510' : '#fff', transition: 'all 0.2s' }}>EN</span>
           </button>
         </div>
       </div>
