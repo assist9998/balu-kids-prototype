@@ -107,11 +107,11 @@
 
     // ── home tiles ─────────────────────────────────────────────
     children:        { ru: 'Дети',           en: 'Children' },
-    attendance:      { ru: 'Посещаемость',    en: 'Attendance' },
+    attendance:      { ru: 'Журнал',           en: 'Journal' },
     summary:         { ru: 'Сводка',          en: 'Summary' },
-    notifications:   { ru: 'Уведомления',     en: 'Notifications' },
+    notifications:   { ru: 'Уведомления',     en: 'Notifs' },
     payments:        { ru: 'Оплата',          en: 'Payments' },
-    activities:      { ru: 'Доп. занятия',    en: 'Activities' },
+    activities:      { ru: 'Кружки',           en: 'Clubs' },
     children_sub:    { ru: 'Профили и группы', en: 'Profiles & groups' },
     attendance_sub:  { ru: 'Отметки за день',  en: 'Daily check-in' },
     summary_sub:     { ru: 'Статистика дня',   en: 'Today at a glance' },
@@ -1385,7 +1385,7 @@ function HomeCircles({ tiles, go }) {
                 boxShadow: '0 2px 8px -2px rgba(60,40,20,0.25)' }}>{tile.badge}</span>
             )}
           </div>
-          <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{t(tile.key)}</div>
+          <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--ink-soft)', fontFamily: 'var(--font-display)' }}>{t(tile.key)}</div>
         </button>
       ))}
     </div>
@@ -2047,7 +2047,7 @@ function App() {
       <div style={{ flexShrink: 0, position: 'relative', zIndex: 8,
         background: '#3E2510',
         boxShadow: '0 2px 8px rgba(60,40,20,0.15)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', padding: '10px 16px 10px', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', padding: '10px 16px 10px', gap: 8 }}>
           {/* left: back or logo + title */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
             {stack.length > 1 ? (
@@ -2059,16 +2059,11 @@ function App() {
               </button>
             ) : (
               <>
-                <div style={{ lineHeight: 1.1 }}>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', fontFamily: 'var(--font-display)' }}>{title}</div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>{t('miniApp')}</div>
+                <div style={{ position: 'relative', display: 'inline-flex', background: 'rgba(255,255,255,0.15)', padding: '5px 14px', borderRadius: 999 }}>
+                  <span style={{ fontSize: 15, fontWeight: 800, color: '#fff', fontFamily: 'var(--font-display)' }}>{title}</span>
+                  <div style={{ position: 'absolute', bottom: -12, right: -26, background: 'var(--card)', color: 'var(--ink-soft)', fontSize: 9, fontWeight: 800, padding: '3px 7px', borderRadius: 999, boxShadow: '0 2px 6px -2px rgba(60,40,20,0.2)' }}>mini app</div>
                 </div>
               </>
-            )}
-            {stack.length > 1 && (
-              <div style={{ lineHeight: 1.1 }}>
-                <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', fontFamily: 'var(--font-display)' }}>{title}</div>
-              </div>
             )}
           </div>
           {/* right: lang toggle only */}
