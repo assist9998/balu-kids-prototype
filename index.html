@@ -1765,21 +1765,6 @@ function SummaryScreen({ statuses }) {
         <WeekChart />
       </Card>
 
-      {/* meals */}
-      <Card pad={18} style={{ background: '#FBF7F2' }}>
-        <SectionLabel>{t('meals')}</SectionLabel>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginTop: 2 }}>
-          {meals.map(m => (
-            <div key={m.key} style={{ textAlign: 'center', background: '#EDE8E0', borderRadius: 16, padding: '14px 6px' }}>
-              <div style={{ fontSize: 26 }}>{m.emoji}</div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--ink)', marginTop: 4, fontFamily: 'var(--font-display)' }}>{m.n}</div>
-              <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink-soft)' }}>{t(m.key)}</div>
-              <div style={{ fontSize: 10.5, color: 'var(--ink-faint)', fontWeight: 600 }}>{t('ate')}</div>
-            </div>
-          ))}
-        </div>
-      </Card>
-
       {/* naps + mood */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <Card pad={16} style={{ display: 'flex', flexDirection: 'column', gap: 4, background: '#FBF7F2' }}>
