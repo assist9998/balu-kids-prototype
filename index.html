@@ -1316,7 +1316,7 @@ function HomeScreen({ go, statuses, feed, homeStyle }) {
       badge: `${kids.length} ${t('kids')}` },
     { key: 'attendance',    emoji: '📋', color: '#CDE8FB', colorLight: '#E8F4FD', colorDark: '#A4BCE9', ink: '#1f5f86', go: 'attendance',
       badge: `${present}/${kids.length}` },
-    { key: 'payments',      emoji: '💲', color: '#FBE0C0', colorLight: '#FDF4EA', colorDark: '#C9A882', ink: '#8a5010', go: 'notifications',
+    { key: 'payments',      emoji: '💲', color: '#FBE0C0', colorLight: '#FDF4EA', colorDark: '#C9A882', ink: '#8a5010', go: 'payments',
       badge: null },
     { key: 'activities',    emoji: '🎨', color: '#E8D5FB', colorLight: '#F5EFFD', colorDark: '#B8A0D8', ink: '#5a2a86', go: 'notifications',
       badge: null },
@@ -1936,7 +1936,83 @@ function ComposeScreen({ back, actions }) {
   );
 }
 
-Object.assign(window, { AttendanceScreen, SummaryScreen, NotificationsScreen, ComposeScreen });
+function PaymentsScreen() {
+  const [filter, setFilter] = React.useState('all');
+  const [paid, setPaid] = React.useState(() => {
+    const m = {};
+    DATA.CHILDREN.forEach((k, i) => { m[k.id] = i % 3 !== 2; });
+    return m;
+  });
+
+  const AMOUNTS = { toddler: 400, middle: 450, big: 500, primary: 550 };
+  const chips = [{ id: 'all', label: t('all'), emoji: '🗂️' }, ...DATA.GROUPS.map(g => ({ id: g.id, label: Lo(g), emoji: g.emoji }))];
+  const kids = DATA.CHILDREN.filter(k => filter === 'all' || k.group === filter);
+  const countPaid   = kids.filter(k =>  paid[k.id]).length;
+  const countUnpaid = kids.filter(k => !paid[k.id]).length;
+  const totalPaid   = kids.filter(k =>  paid[k.id]).reduce((s, k) => s + AMOUNTS[k.group], 0);
+  const PALETTE = ['#FBE7A8','#CDE8FB','#D4F0DF','#FBD9E1','#FBE0C0','#E8D5FB'];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
+      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '4px 20px 14px', scrollbarWidth: 'none' }}>
+        {chips.map(c => (
+          <button key={c.id} onClick={() => setFilter(c.id)} className="bk-press" style={{
+            flexShrink: 0, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+            padding: '8px 14px', borderRadius: 999, fontSize: 13.5, fontWeight: 700,
+            background: filter === c.id ? '#B07848' : '#FBF7F2',
+            color: filter === c.id ? '#fff' : 'var(--ink-soft)',
+            boxShadow: filter === c.id ? '0 6px 14px -6px #B07848' : '0 1px 2px rgba(60,40,20,0.05)' }}>
+            {c.emoji} {c.label}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', gap: 10, padding: '0 20px 16px' }}>
+        <div style={{ flex: 1, background: '#FBF7F2', borderRadius: 18, padding: '12px 8px', textAlign: 'center' }}>
+          <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--ok)', lineHeight: 1, fontFamily: 'var(--font-display)' }}>{countPaid}</div>
+          <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 700, marginTop: 4 }}>{L('Оплатили', 'Paid')}</div>
+        </div>
+        <div style={{ flex: 1, background: '#FBF7F2', borderRadius: 18, padding: '12px 8px', textAlign: 'center' }}>
+          <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--no)', lineHeight: 1, fontFamily: 'var(--font-display)' }}>{countUnpaid}</div>
+          <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 700, marginTop: 4 }}>{L('Не оплатили', 'Unpaid')}</div>
+        </div>
+        <div style={{ flex: 1.4, background: '#FBF7F2', borderRadius: 18, padding: '12px 8px', textAlign: 'center' }}>
+          <div style={{ fontSize: 22, fontWeight: 800, color: '#B07848', lineHeight: 1, fontFamily: 'var(--font-display)' }}>${totalPaid}</div>
+          <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 700, marginTop: 4 }}>{L('Собрано', 'Collected')}</div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 9, padding: '0 20px' }}>
+        {kids.map(kid => {
+          const grp = DATA.GROUPS.find(g => g.id === kid.group);
+          const isPaid = paid[kid.id];
+          const amount = AMOUNTS[kid.group];
+          const kidIndex = DATA.CHILDREN.filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
+          return (
+            <Card key={kid.id} pad={12} onClick={() => setPaid(m => ({ ...m, [kid.id]: !m[kid.id] }))}
+              style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2' }}>
+              <Avatar emoji={kid.emoji} color={PALETTE[kidIndex % PALETTE.length]} size={44} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}</div>
+                <span style={{ background: grp.color, color: grp.ink, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999 }}>{grp.emoji} {Lo(grp)}</span>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--ink)', marginBottom: 4 }}>${amount}</div>
+                <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
+                  background: isPaid ? '#E6F7EE' : '#FEF0ED', color: isPaid ? '#1f7a55' : '#c0392b' }}>
+                  {isPaid ? L('✓ Оплачено', '✓ Paid') : L('Не оплачено', 'Unpaid')}
+                </span>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+      <div style={{ height: 30 }} />
+    </div>
+  );
+}
+
+Object.assign(window, { AttendanceScreen, SummaryScreen, NotificationsScreen, ComposeScreen, PaymentsScreen });
 
 </script>
 <script type="text/babel">
@@ -1962,7 +2038,7 @@ const FONTS = {
 
 const TITLES = {
   home: 'appName', children: 'children', attendance: 'markDay',
-  summary: 'daySummary', notifications: 'notifications', compose: 'compose',
+  payments: 'payments', summary: 'daySummary', notifications: 'notifications', compose: 'compose',
 };
 
 function App() {
@@ -2026,6 +2102,7 @@ function App() {
       case 'group':         return <GroupScreen params={p} go={go} statuses={statuses} />;
       case 'child':         return <ChildScreen params={p} statuses={statuses} />;
       case 'attendance':    return <AttendanceScreen statuses={statuses} actions={actions} />;
+      case 'payments':      return <PaymentsScreen />;
       case 'summary':       return <SummaryScreen statuses={statuses} />;
       case 'notifications': return <NotificationsScreen feed={feed} go={go} actions={actions} />;
       case 'compose':       return <ComposeScreen back={back} actions={actions} />;
