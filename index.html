@@ -1719,7 +1719,7 @@ function CountStat({ n, label, color }) {
 // ════════════════════════════════════════════════════════════════
 //  SUMMARY
 // ════════════════════════════════════════════════════════════════
-function SummaryScreen({ statuses }) {
+function SummaryScreen({ statuses, go }) {
   const kids = DATA.CHILDREN;
   const present = kids.filter(k => statuses[k.id] === 'present').length;
   const late    = kids.filter(k => statuses[k.id] === 'late').length;
@@ -1776,15 +1776,20 @@ function SummaryScreen({ statuses }) {
       <Card pad={18} style={{ background: '#FBF7F2' }}>
         <SectionLabel>{t('payments')}</SectionLabel>
         <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-          <div style={{ flex: 1, textAlign: 'center' }}>
-            <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--ok)', lineHeight: 1, fontFamily: 'var(--font-display)' }}>{payPaid}</div>
-            <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 700, marginTop: 4 }}>{L('Оплатили', 'Paid')}</div>
-          </div>
-          <div style={{ flex: 1, textAlign: 'center' }}>
-            <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--no)', lineHeight: 1, fontFamily: 'var(--font-display)' }}>{payUnpaid}</div>
-            <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 700, marginTop: 4 }}>{L('Не оплатили', 'Unpaid')}</div>
-          </div>
-          <div style={{ flex: 1.4, textAlign: 'center' }}>
+          {[
+            { count: payPaid,   label: L('Оплатили', 'Paid'),       color: 'var(--ok)', nav: 'payments' },
+            { count: payUnpaid, label: L('Не оплатили', 'Unpaid'),  color: 'var(--no)', nav: 'payments' },
+          ].map((s, i) => (
+            <div key={i} onClick={() => go(s.nav)} className="bk-press" style={{
+              flex: 1, textAlign: 'center', borderRadius: 14, padding: '12px 8px',
+              background: '#fff', cursor: 'pointer',
+              boxShadow: '0 1px 4px rgba(60,40,20,0.07)' }}>
+              <div style={{ fontSize: 26, fontWeight: 800, color: s.color, lineHeight: 1, fontFamily: 'var(--font-display)' }}>{s.count}</div>
+              <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 700, marginTop: 4 }}>{s.label}</div>
+            </div>
+          ))}
+          <div style={{ flex: 1.4, textAlign: 'center', borderRadius: 14, padding: '12px 8px',
+            background: '#fff', boxShadow: '0 1px 4px rgba(60,40,20,0.07)' }}>
             <div style={{ fontSize: 22, fontWeight: 800, color: '#B07848', lineHeight: 1, fontFamily: 'var(--font-display)' }}>${totalCollected}</div>
             <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 700, marginTop: 4 }}>{L('Собрано', 'Collected')}</div>
           </div>
@@ -2281,7 +2286,7 @@ function App() {
       case 'payments':      return <PaymentsScreen />;
       case 'activities':    return <ActivitiesScreen go={go} />;
       case 'club':          return <ClubScreen params={p} />;
-      case 'summary':       return <SummaryScreen statuses={statuses} />;
+      case 'summary':       return <SummaryScreen statuses={statuses} go={go} />;
       case 'notifications': return <NotificationsScreen feed={feed} go={go} actions={actions} />;
       case 'compose':       return <ComposeScreen back={back} actions={actions} />;
       default:              return null;
