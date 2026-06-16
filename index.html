@@ -1662,7 +1662,7 @@ function AttendanceScreen({ statuses, actions }) {
         <span style={{ fontSize: 12.5, color: 'var(--ink-faint)', fontWeight: 600 }}>{t('tapToCycle')}</span>
         <button onClick={() => actions.markAllPresent(kids.map(k => k.id))} className="bk-press" style={{
           border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 700,
-          color: '#B07848', background: '#FBF7F2', padding: '7px 12px', borderRadius: 999 }}>
+          color: '#fff', background: '#B07848', padding: '7px 12px', borderRadius: 999 }}>
           ✓ {t('markAll')}
         </button>
       </div>
