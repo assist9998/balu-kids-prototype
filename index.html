@@ -1384,7 +1384,7 @@ function HomeCircles({ tiles, go }) {
                 boxShadow: '0 2px 8px -2px rgba(60,40,20,0.25)' }}>{tile.badge}</span>
             )}
           </div>
-          <div style={{ fontSize: 16, fontWeight: 800, color: '#B07848', fontFamily: 'var(--font-display)' }}>{t(tile.key)}</div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: '#C49468', fontFamily: 'var(--font-display)' }}>{t(tile.key)}</div>
         </button>
       ))}
     </div>
@@ -1561,7 +1561,7 @@ function ChildScreen({ params, statuses }) {
 
       {/* attendance ring */}
       <Card pad={16} style={{ display: 'flex', alignItems: 'center', gap: 18, marginBottom: 16, background: '#FBF7F2' }}>
-        <Ring pct={kid.rate} size={92} stroke={11} color='#B07848'>
+        <Ring pct={kid.rate} size={92} stroke={11} color='#C49468'>
           <div>
             <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink)', lineHeight: 1 }}>{kid.rate}%</div>
           </div>
@@ -1605,8 +1605,8 @@ function ParentCard({ role, name, phone, emoji }) {
         <div style={{ fontSize: 13, color: 'var(--ink-soft)', fontWeight: 600 }}>{phone}</div>
       </div>
       <a href={`tel:${phone}`} className="bk-press" style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', cursor: 'pointer',
-        background: '#B07848', color: '#fff', fontSize: 17, display: 'grid', placeItems: 'center',
-        boxShadow: '0 6px 14px -6px #B07848', textDecoration: 'none', flexShrink: 0 }}>📞</a>
+        background: '#C49468', color: '#fff', fontSize: 17, display: 'grid', placeItems: 'center',
+        boxShadow: '0 6px 14px -6px #C49468', textDecoration: 'none', flexShrink: 0 }}>📞</a>
     </Card>
   );
 }
@@ -2047,14 +2047,14 @@ function App() {
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, flex: 1 }}>
             {stack.length > 1 ? (
               <button onClick={back} className="bk-press" style={{ display: 'flex', alignItems: 'center', gap: 4,
-                border: 'none', background: '#B07848', cursor: 'pointer', fontFamily: 'inherit',
+                border: 'none', background: '#C49468', cursor: 'pointer', fontFamily: 'inherit',
                 color: '#fff', fontSize: 13, fontWeight: 800, padding: '5px 12px 5px 8px',
                 borderRadius: 999 }}>
                 <Chevron dir="left" size={16} color="#fff" />{t('back')}
               </button>
             ) : (
               <>
-                <div style={{ position: 'relative', display: 'inline-flex', background: '#B07848', padding: '5px 14px', borderRadius: 999 }}>
+                <div style={{ position: 'relative', display: 'inline-flex', background: '#C49468', padding: '5px 14px', borderRadius: 999 }}>
                   <span style={{ fontSize: 15, fontWeight: 800, color: '#fff', fontFamily: 'var(--font-display)' }}>{title}</span>
                   <div style={{ position: 'absolute', bottom: -12, right: -26, background: '#F2A81D', color: '#3E2510', fontSize: 9, fontWeight: 800, padding: '1px 4px', borderRadius: 999, boxShadow: '0 2px 6px -2px rgba(60,40,20,0.2)' }}>mini app</div>
                 </div>
@@ -2064,7 +2064,7 @@ function App() {
           {/* right: lang toggle only */}
           <button onClick={toggleLang} className="bk-press" style={{ display: 'flex', border: 'none', cursor: 'pointer',
             borderRadius: 999, overflow: 'hidden', fontFamily: 'inherit', fontSize: 12, fontWeight: 800,
-            background: '#B07848', padding: 2, gap: 2 }}>
+            background: '#C49468', padding: 2, gap: 2 }}>
             <span style={{ padding: '5px 10px', borderRadius: 999, background: lang === 'ru' ? '#F2A81D' : 'transparent', color: lang === 'ru' ? '#3E2510' : '#fff', transition: 'all 0.2s' }}>RU</span>
             <span style={{ padding: '5px 10px', borderRadius: 999, background: lang === 'en' ? '#F2A81D' : 'transparent', color: lang === 'en' ? '#3E2510' : '#fff', transition: 'all 0.2s' }}>EN</span>
           </button>
