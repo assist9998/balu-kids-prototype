@@ -194,10 +194,10 @@
 (function () {
   // groups carry the reference pastel palette
   const GROUPS = [
-    { id: 'toddler', ru: 'Toddler',       en: 'Toddler',       emoji: '🐣', age: '1–2', color: '#FBE7A8', ink: '#8a6a14' },
-    { id: 'middle',  ru: 'Middle',        en: 'Middle',        emoji: '🐥', age: '3–4', color: '#CDE8FB', ink: '#1f5f86' },
-    { id: 'big',     ru: 'Big',           en: 'Big',           emoji: '🐻', age: '5–6', color: '#D4F0DF', ink: '#1f7a55' },
-    { id: 'primary', ru: 'Primary School',en: 'Primary School',emoji: '🎒', age: '6–8', color: '#FBD9E1', ink: '#a8456a' },
+    { id: 'toddler', ru: 'Toddler',       en: 'Toddler',       emoji: '🐣', age: '1–2', color: '#FBE7A8', colorLight: '#FEFCF2', ink: '#8a6a14' },
+    { id: 'middle',  ru: 'Middle',        en: 'Middle',        emoji: '🐥', age: '3–4', color: '#CDE8FB', colorLight: '#F0F8FF', ink: '#1f5f86' },
+    { id: 'big',     ru: 'Big',           en: 'Big',           emoji: '🐻', age: '5–6', color: '#D4F0DF', colorLight: '#F0FAF4', ink: '#1f7a55' },
+    { id: 'primary', ru: 'Primary School',en: 'Primary School',emoji: '🎒', age: '6–8', color: '#FBD9E1', colorLight: '#FEF5F8', ink: '#a8456a' },
   ];
 
   // status: 'present' | 'absent' | 'late'
@@ -205,62 +205,62 @@
 
   const CHILDREN = [
     // Солнышки
-    kid({ id: 1, group: 'toddler', emoji: '🧒', ru: 'Алиса Жумабаева', en: 'Alisa Zhumabayeva', dob: '12.04.2022', bday: '12 апр',
+    kid({ id: 1, group: 'toddler', emoji: '🧒🏻', ru: 'Алиса Жумабаева', en: 'Alisa Zhumabayeva', dob: '12.04.2022', bday: '12 апр',
       momRu: 'Айгуль', momEn: 'Aigul', momPhone: '+7 701 234 56 78', dadRu: 'Ербол', dadEn: 'Yerbol', checkin: '08:12',
       allergyRu: 'Орехи', allergyEn: 'Nuts', noteRu: 'Любит рисовать', noteEn: 'Loves drawing', rate: 96 }),
-    kid({ id: 2, group: 'toddler', emoji: '👦', ru: 'Тимур Сапаров', en: 'Timur Saparov', dob: '03.02.2022', bday: '3 фев',
+    kid({ id: 2, group: 'toddler', emoji: '👦🏻', ru: 'Тимур Сапаров', en: 'Timur Saparov', dob: '03.02.2022', bday: '3 фев',
       momRu: 'Динара', momEn: 'Dinara', momPhone: '+7 707 111 22 33', dadRu: 'Асхат', dadEn: 'Askhat', checkin: '08:40',
       status: 'late', rate: 88 }),
-    kid({ id: 3, group: 'toddler', emoji: '👧', ru: 'Сафия Нуржан', en: 'Safiya Nurzhan', dob: '21.06.2022', bday: '21 июн',
+    kid({ id: 3, group: 'toddler', emoji: '👧🏻', ru: 'Сафия Нуржан', en: 'Safiya Nurzhan', dob: '21.06.2022', bday: '21 июн',
       momRu: 'Мадина', momEn: 'Madina', momPhone: '+7 705 998 77 66', dadRu: 'Нуржан', dadEn: 'Nurzhan',
       status: 'absent', noteRu: 'Заболела, ОРВИ', noteEn: 'Sick — cold', rate: 81 }),
-    kid({ id: 4, group: 'toddler', emoji: '🧒', ru: 'Даниэль Ким', en: 'Daniel Kim', dob: '09.09.2022', bday: '9 сен',
+    kid({ id: 4, group: 'toddler', emoji: '🧒🏻', ru: 'Даниэль Ким', en: 'Daniel Kim', dob: '09.09.2022', bday: '9 сен',
       momRu: 'Елена', momEn: 'Elena', momPhone: '+7 700 555 44 33', dadRu: 'Виктор', dadEn: 'Victor', checkin: '08:05', rate: 99 }),
-    kid({ id: 5, group: 'toddler', emoji: '👦', ru: 'Арман Болат', en: 'Arman Bolat', dob: '17.11.2021', bday: '17 ноя',
+    kid({ id: 5, group: 'toddler', emoji: '👦🏻', ru: 'Арман Болат', en: 'Arman Bolat', dob: '17.11.2021', bday: '17 ноя',
       momRu: 'Сауле', momEn: 'Saule', momPhone: '+7 702 345 67 89', dadRu: 'Болат', dadEn: 'Bolat', checkin: '08:28',
       allergyRu: 'Лактоза', allergyEn: 'Lactose', rate: 92 }),
-    kid({ id: 6, group: 'toddler', emoji: '👧', ru: 'Зере Аман', en: 'Zere Aman', dob: '28.03.2022', bday: '28 мар',
+    kid({ id: 6, group: 'toddler', emoji: '👧🏻', ru: 'Зере Аман', en: 'Zere Aman', dob: '28.03.2022', bday: '28 мар',
       momRu: 'Гульнара', momEn: 'Gulnara', momPhone: '+7 708 222 11 00', dadRu: 'Аман', dadEn: 'Aman', checkin: '08:33', rate: 94 }),
 
     // Звёздочки
-    kid({ id: 7, group: 'middle', emoji: '👦', ru: 'Ислам Тлеу', en: 'Islam Tleu', dob: '14.01.2021', bday: '14 янв',
+    kid({ id: 7, group: 'middle', emoji: '👦🏻', ru: 'Ислам Тлеу', en: 'Islam Tleu', dob: '14.01.2021', bday: '14 янв',
       momRu: 'Жанна', momEn: 'Zhanna', momPhone: '+7 701 777 88 99', dadRu: 'Тлеухан', dadEn: 'Tleukhan', checkin: '08:02', rate: 97 }),
-    kid({ id: 8, group: 'middle', emoji: '👧', ru: 'Амина Серик', en: 'Amina Serik', dob: '06.07.2021', bday: '6 июл',
+    kid({ id: 8, group: 'middle', emoji: '👧🏻', ru: 'Амина Серик', en: 'Amina Serik', dob: '06.07.2021', bday: '6 июл',
       momRu: 'Алия', momEn: 'Aliya', momPhone: '+7 705 333 22 11', dadRu: 'Серик', dadEn: 'Serik', checkin: '08:19',
       allergyRu: 'Цитрусовые', allergyEn: 'Citrus', rate: 90 }),
-    kid({ id: 9, group: 'middle', emoji: '🧒', ru: 'Нурлан Касым', en: 'Nurlan Kasym', dob: '30.05.2021', bday: '30 мая',
+    kid({ id: 9, group: 'middle', emoji: '🧒🏻', ru: 'Нурлан Касым', en: 'Nurlan Kasym', dob: '30.05.2021', bday: '30 мая',
       momRu: 'Бакыт', momEn: 'Bakyt', momPhone: '+7 707 444 55 66', dadRu: 'Касым', dadEn: 'Kasym',
       status: 'late', checkin: '09:05', rate: 85 }),
-    kid({ id: 10, group: 'middle', emoji: '👧', ru: 'Лейла Омар', en: 'Leila Omar', dob: '11.10.2021', bday: '11 окт',
+    kid({ id: 10, group: 'middle', emoji: '👧🏻', ru: 'Лейла Омар', en: 'Leila Omar', dob: '11.10.2021', bday: '11 окт',
       momRu: 'Жулдыз', momEn: 'Zhuldyz', momPhone: '+7 700 121 31 41', dadRu: 'Омар', dadEn: 'Omar', checkin: '08:25', rate: 95 }),
-    kid({ id: 11, group: 'middle', emoji: '👦', ru: 'Дамир Аск', en: 'Damir Ask', dob: '22.12.2021', bday: '22 дек',
+    kid({ id: 11, group: 'middle', emoji: '👦🏻', ru: 'Дамир Аск', en: 'Damir Ask', dob: '22.12.2021', bday: '22 дек',
       momRu: 'Камила', momEn: 'Kamila', momPhone: '+7 701 989 78 67', dadRu: 'Аскар', dadEn: 'Askar',
       status: 'absent', noteRu: 'Семейные дела', noteEn: 'Family day', rate: 79 }),
 
     // Капельки
-    kid({ id: 12, group: 'big', emoji: '👶', ru: 'Адель Жан', en: 'Adel Zhan', dob: '04.08.2023', bday: '4 авг',
+    kid({ id: 12, group: 'big', emoji: '👶🏻', ru: 'Адель Жан', en: 'Adel Zhan', dob: '04.08.2023', bday: '4 авг',
       momRu: 'Назым', momEn: 'Nazym', momPhone: '+7 705 565 75 85', dadRu: 'Жанибек', dadEn: 'Zhanibek', checkin: '08:50',
       noteRu: 'Соска в шкафчике', noteEn: 'Pacifier in cubby', rate: 91 }),
-    kid({ id: 13, group: 'big', emoji: '🧒', ru: 'Мирас Кай', en: 'Miras Kai', dob: '19.09.2023', bday: '19 сен',
+    kid({ id: 13, group: 'big', emoji: '🧒🏻', ru: 'Мирас Кай', en: 'Miras Kai', dob: '19.09.2023', bday: '19 сен',
       momRu: 'Айша', momEn: 'Aisha', momPhone: '+7 708 343 23 13', dadRu: 'Кайрат', dadEn: 'Kairat', checkin: '08:44', rate: 88 }),
-    kid({ id: 14, group: 'big', emoji: '👶', ru: 'Сабина Ер', en: 'Sabina Yer', dob: '27.06.2023', bday: '27 июн',
+    kid({ id: 14, group: 'big', emoji: '👶🏻', ru: 'Сабина Ер', en: 'Sabina Yer', dob: '27.06.2023', bday: '27 июн',
       momRu: 'Венера', momEn: 'Venera', momPhone: '+7 700 767 87 97', dadRu: 'Ерлан', dadEn: 'Yerlan',
       allergyRu: 'Глютен', allergyEn: 'Gluten', rate: 93 }),
-    kid({ id: 15, group: 'big', emoji: '🧒', ru: 'Олжас Ныгмет', en: 'Olzhas Nygmet', dob: '02.11.2023', bday: '2 ноя',
+    kid({ id: 15, group: 'big', emoji: '🧒🏻', ru: 'Олжас Ныгмет', en: 'Olzhas Nygmet', dob: '02.11.2023', bday: '2 ноя',
       momRu: 'Дана', momEn: 'Dana', momPhone: '+7 701 454 64 74', dadRu: 'Нурлыбек', dadEn: 'Nurlybek', checkin: '08:58', rate: 84 }),
 
     // Облачка
-    kid({ id: 16, group: 'primary', emoji: '👦', ru: 'Ерасыл Дос', en: 'Yerasyl Dos', dob: '15.03.2020', bday: '15 мар',
+    kid({ id: 16, group: 'primary', emoji: '👦🏻', ru: 'Ерасыл Дос', en: 'Yerasyl Dos', dob: '15.03.2020', bday: '15 мар',
       momRu: 'Айымгуль', momEn: 'Aiymgul', momPhone: '+7 705 656 76 86', dadRu: 'Дос', dadEn: 'Dos', checkin: '07:58', rate: 98 }),
-    kid({ id: 17, group: 'primary', emoji: '👧', ru: 'Карина Аб', en: 'Karina Ab', dob: '08.05.2020', bday: '8 мая',
+    kid({ id: 17, group: 'primary', emoji: '👧🏻', ru: 'Карина Аб', en: 'Karina Ab', dob: '08.05.2020', bday: '8 мая',
       momRu: 'Лаура', momEn: 'Laura', momPhone: '+7 707 878 98 08', dadRu: 'Абзал', dadEn: 'Abzal', checkin: '08:15',
       allergyRu: 'Мёд', allergyEn: 'Honey', noteRu: 'Помогает малышам', noteEn: 'Helps the little ones', rate: 96 }),
-    kid({ id: 18, group: 'primary', emoji: '👦', ru: 'Санжар Тур', en: 'Sanzhar Tur', dob: '23.07.2020', bday: '23 июл',
+    kid({ id: 18, group: 'primary', emoji: '👦🏻', ru: 'Санжар Тур', en: 'Sanzhar Tur', dob: '23.07.2020', bday: '23 июл',
       momRu: 'Перизат', momEn: 'Perizat', momPhone: '+7 700 989 09 19', dadRu: 'Турсын', dadEn: 'Tursyn',
       status: 'late', checkin: '09:12', rate: 82 }),
-    kid({ id: 19, group: 'primary', emoji: '👧', ru: 'Малика Жол', en: 'Malika Zhol', dob: '30.01.2020', bday: '30 янв',
+    kid({ id: 19, group: 'primary', emoji: '👧🏻', ru: 'Малика Жол', en: 'Malika Zhol', dob: '30.01.2020', bday: '30 янв',
       momRu: 'Сабина', momEn: 'Sabina', momPhone: '+7 701 010 20 30', dadRu: 'Жолдас', dadEn: 'Zholdas', checkin: '08:22', rate: 94 }),
-    kid({ id: 20, group: 'primary', emoji: '🧒', ru: 'Алихан Бек', en: 'Alikhan Bek', dob: '12.09.2020', bday: '12 сен',
+    kid({ id: 20, group: 'primary', emoji: '🧒🏻', ru: 'Алихан Бек', en: 'Alikhan Bek', dob: '12.09.2020', bday: '12 сен',
       momRu: 'Гаухар', momEn: 'Gaukhar', momPhone: '+7 705 111 21 31', dadRu: 'Бекзат', dadEn: 'Bekzat',
       status: 'absent', noteRu: 'Отпуск с семьёй', noteEn: 'On vacation', rate: 77 }),
   ];
@@ -1459,7 +1459,7 @@ function ChildrenScreen({ go, statuses }) {
           const present = inGroup.filter(k => statuses[k.id] !== 'absent').length;
           return (
             <Card key={grp.id} pad={14} onClick={() => go('group', { groupId: grp.id })}
-              style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#FBF7F2' }}>
               <div style={{ width: 54, height: 54, borderRadius: 18, background: grp.color,
                 display: 'grid', placeItems: 'center', fontSize: 27, flexShrink: 0 }}>{grp.emoji}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -1495,12 +1495,13 @@ function GroupScreen({ params, go, statuses }) {
         </div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {kids.map(kid => {
+        {kids.map((kid, i) => {
           const st = statuses[kid.id];
+          const PALETTE = ['#FBE7A8','#CDE8FB','#D4F0DF','#FBD9E1','#FBE0C0','#E8D5FB'];
           return (
             <Card key={kid.id} pad={12} onClick={() => go('child', { childId: kid.id })}
-              style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
-              <Avatar emoji={kid.emoji} color={grp.color} size={46} />
+              style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2' }}>
+              <Avatar emoji={kid.emoji} color={PALETTE[i % PALETTE.length]} size={46} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}</div>
                 <div style={{ fontSize: 12.5, color: 'var(--ink-faint)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1524,6 +1525,9 @@ function ChildScreen({ params, statuses }) {
   const kid = DATA.CHILDREN.find(k => k.id === params.childId);
   const grp = DATA.GROUPS.find(g => g.id === kid.group);
   const st = statuses[kid.id];
+  const PALETTE = ['#FBE7A8','#CDE8FB','#D4F0DF','#FBD9E1','#FBE0C0','#E8D5FB'];
+  const kidIndex = DATA.CHILDREN.filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
+  const kidColor = PALETTE[kidIndex % PALETTE.length];
   const info = [
     { label: t('age'),      value: ageFromDob(kid.dob) },
     { label: t('birthday'), value: kid.bday },
@@ -1535,7 +1539,7 @@ function ChildScreen({ params, statuses }) {
     <div style={{ padding: '4px 20px 30px' }}>
       {/* hero */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, margin: '4px 0 22px' }}>
-        <Avatar emoji={kid.emoji} color={grp.color} size={92} />
+        <Avatar emoji={kid.emoji} color={kidColor} size={92} />
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{Lo(kid)}</div>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
@@ -1548,7 +1552,7 @@ function ChildScreen({ params, statuses }) {
       {/* info grid */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
         {info.map((row, i) => (
-          <Card key={i} pad={14} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <Card key={i} pad={14} style={{ display: 'flex', flexDirection: 'column', gap: 3, background: '#FBF7F2' }}>
             <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: '0.03em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>{row.label}</div>
             <div style={{ fontSize: 16, fontWeight: 700, color: row.warn ? 'var(--no)' : 'var(--ink)' }}>{row.warn ? '🥜 ' : ''}{row.value}</div>
           </Card>
@@ -1556,8 +1560,8 @@ function ChildScreen({ params, statuses }) {
       </div>
 
       {/* attendance ring */}
-      <Card pad={16} style={{ display: 'flex', alignItems: 'center', gap: 18, marginBottom: 16 }}>
-        <Ring pct={kid.rate} size={92} stroke={11}>
+      <Card pad={16} style={{ display: 'flex', alignItems: 'center', gap: 18, marginBottom: 16, background: '#FBF7F2' }}>
+        <Ring pct={kid.rate} size={92} stroke={11} color='#B07848'>
           <div>
             <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink)', lineHeight: 1 }}>{kid.rate}%</div>
           </div>
@@ -1593,8 +1597,8 @@ function ChildScreen({ params, statuses }) {
 
 function ParentCard({ role, name, phone, emoji }) {
   return (
-    <Card pad={12} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-      <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--accent-soft)', display: 'grid', placeItems: 'center', fontSize: 22, flexShrink: 0 }}>{emoji}</div>
+    <Card pad={12} style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#FBF7F2' }}>
+      <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--card)', display: 'grid', placeItems: 'center', fontSize: 22, flexShrink: 0 }}>{emoji}</div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-faint)' }}>{role}</div>
         <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{name}</div>
@@ -2044,7 +2048,7 @@ function App() {
     <div style={rootStyle}>
       {/* ── header ── */}
       <div style={{ flexShrink: 0, position: 'relative', zIndex: 8,
-        background: '#3E2510', paddingTop: 'env(safe-area-inset-top)',
+        background: '#7D4E2D', paddingTop: 'env(safe-area-inset-top)',
         boxShadow: '0 2px 8px rgba(60,40,20,0.15)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', padding: '2px 16px 10px', gap: 8 }}>
           {/* left: back or logo + title */}
