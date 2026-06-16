@@ -1721,13 +1721,15 @@ function SummaryScreen({ statuses }) {
   const absent  = kids.filter(k => statuses[k.id] === 'absent').length;
   const here    = present + late;
   const rate = Math.round(here / kids.length * 100);
-
-  const meals = [
-    { key: 'breakfast', emoji: '🥣', n: here - 1 },
-    { key: 'lunch',     emoji: '🍲', n: here },
-    { key: 'snack',     emoji: '🍎', n: here - 2 },
-  ];
   const napping = Math.round(here * 0.82);
+
+  const MONTHLY = { toddler: 400, middle: 450, big: 500, primary: 550 };
+  const DAILY   = { toddler: 35,  middle: 40,  big: 45,  primary: 50  };
+  const DAYS = 18;
+  const payPaid   = kids.filter((k, i) => i % 3 !== 2).length;
+  const payUnpaid = kids.length - payPaid;
+  const totalCollected = kids.filter((k, i) => i % 3 !== 2)
+    .reduce((s, k) => s + (k.contract === 'tourist' ? DAILY[k.group] * DAYS : MONTHLY[k.group]), 0);
 
   return (
     <div style={{ padding: '4px 20px 30px', display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -1763,6 +1765,25 @@ function SummaryScreen({ statuses }) {
       <Card pad={18} style={{ background: '#FBF7F2' }}>
         <SectionLabel>{t('thisWeek')}</SectionLabel>
         <WeekChart />
+      </Card>
+
+      {/* payments */}
+      <Card pad={18} style={{ background: '#FBF7F2' }}>
+        <SectionLabel>{t('payments')}</SectionLabel>
+        <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+          <div style={{ flex: 1, textAlign: 'center' }}>
+            <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--ok)', lineHeight: 1, fontFamily: 'var(--font-display)' }}>{payPaid}</div>
+            <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 700, marginTop: 4 }}>{L('Оплатили', 'Paid')}</div>
+          </div>
+          <div style={{ flex: 1, textAlign: 'center' }}>
+            <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--no)', lineHeight: 1, fontFamily: 'var(--font-display)' }}>{payUnpaid}</div>
+            <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 700, marginTop: 4 }}>{L('Не оплатили', 'Unpaid')}</div>
+          </div>
+          <div style={{ flex: 1.4, textAlign: 'center' }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: '#B07848', lineHeight: 1, fontFamily: 'var(--font-display)' }}>${totalCollected}</div>
+            <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 700, marginTop: 4 }}>{L('Собрано', 'Collected')}</div>
+          </div>
+        </div>
       </Card>
 
       {/* naps + mood */}
