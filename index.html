@@ -1643,9 +1643,9 @@ function AttendanceScreen({ statuses, actions }) {
           <button key={c.id} onClick={() => setFilter(c.id)} className="bk-press" style={{
             flexShrink: 0, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
             padding: '8px 14px', borderRadius: 999, fontSize: 13.5, fontWeight: 700,
-            background: filter === c.id ? 'var(--accent)' : 'var(--card)',
+            background: filter === c.id ? '#B07848' : '#FBF7F2',
             color: filter === c.id ? '#fff' : 'var(--ink-soft)',
-            boxShadow: filter === c.id ? '0 6px 14px -6px var(--accent)' : '0 1px 2px rgba(60,40,20,0.05)' }}>
+            boxShadow: filter === c.id ? '0 6px 14px -6px #B07848' : '0 1px 2px rgba(60,40,20,0.05)' }}>
             {c.emoji} {c.label}
           </button>
         ))}
@@ -1662,7 +1662,7 @@ function AttendanceScreen({ statuses, actions }) {
         <span style={{ fontSize: 12.5, color: 'var(--ink-faint)', fontWeight: 600 }}>{t('tapToCycle')}</span>
         <button onClick={() => actions.markAllPresent(kids.map(k => k.id))} className="bk-press" style={{
           border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 700,
-          color: 'var(--accent)', background: 'var(--accent-soft)', padding: '7px 12px', borderRadius: 999 }}>
+          color: '#B07848', background: '#FBF7F2', padding: '7px 12px', borderRadius: 999 }}>
           ✓ {t('markAll')}
         </button>
       </div>
@@ -1673,7 +1673,7 @@ function AttendanceScreen({ statuses, actions }) {
           const grp = DATA.GROUPS.find(g => g.id === kid.group);
           const st = statuses[kid.id];
           return (
-            <Card key={kid.id} pad={12} style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
+            <Card key={kid.id} pad={12} style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2' }}>
               <Avatar emoji={kid.emoji} color={grp.color} size={44} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}</div>
@@ -1692,8 +1692,8 @@ function AttendanceScreen({ statuses, actions }) {
         background: 'linear-gradient(to top, var(--bg) 62%, transparent)' }}>
         <button onClick={() => actions.toast(t('saved') + ' ✓')} className="bk-press" style={{
           width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-display)',
-          background: 'var(--accent)', color: '#fff', fontSize: 17, fontWeight: 800, padding: '15px',
-          borderRadius: 18, boxShadow: '0 10px 24px -8px var(--accent)' }}>{t('save')}</button>
+          background: '#B07848', color: '#fff', fontSize: 17, fontWeight: 800, padding: '15px',
+          borderRadius: 18, boxShadow: '0 10px 24px -8px #B07848' }}>{t('save')}</button>
       </div>
     </div>
   );
@@ -1701,7 +1701,7 @@ function AttendanceScreen({ statuses, actions }) {
 
 function CountStat({ n, label, color }) {
   return (
-    <div style={{ flex: 1, background: 'var(--card)', borderRadius: 18, padding: '12px 8px', textAlign: 'center',
+    <div style={{ flex: 1, background: '#FBF7F2', borderRadius: 18, padding: '12px 8px', textAlign: 'center',
       boxShadow: '0 1px 2px rgba(60,40,20,0.04)' }}>
       <div style={{ fontSize: 26, fontWeight: 800, color, lineHeight: 1, fontFamily: 'var(--font-display)' }}>{n}</div>
       <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 700, marginTop: 4 }}>{label}</div>
