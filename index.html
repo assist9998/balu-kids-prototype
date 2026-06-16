@@ -2046,7 +2046,7 @@ function App() {
       <div style={{ flexShrink: 0, position: 'relative', zIndex: 8,
         background: '#3E2510', paddingTop: 'env(safe-area-inset-top)',
         boxShadow: '0 2px 8px rgba(60,40,20,0.15)' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', padding: '5px 16px 10px', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', padding: '2px 16px 10px', gap: 8 }}>
           {/* left: back or logo + title */}
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, flex: 1 }}>
             {stack.length > 1 ? (
@@ -2069,8 +2069,8 @@ function App() {
           <button onClick={toggleLang} className="bk-press" style={{ display: 'flex', border: 'none', cursor: 'pointer',
             borderRadius: 999, overflow: 'hidden', fontFamily: 'inherit', fontSize: 12, fontWeight: 800,
             background: 'rgba(255,255,255,0.15)', padding: 2, gap: 2 }}>
-            <span style={{ padding: '3px 10px', borderRadius: 999, background: lang === 'ru' ? '#F2A81D' : 'transparent', color: lang === 'ru' ? '#3E2510' : 'rgba(255,255,255,0.6)', transition: 'all 0.2s' }}>RU</span>
-            <span style={{ padding: '3px 10px', borderRadius: 999, background: lang === 'en' ? '#F2A81D' : 'transparent', color: lang === 'en' ? '#3E2510' : 'rgba(255,255,255,0.6)', transition: 'all 0.2s' }}>EN</span>
+            <span style={{ padding: '5px 10px', borderRadius: 999, background: lang === 'ru' ? '#F2A81D' : 'transparent', color: lang === 'ru' ? '#3E2510' : 'rgba(255,255,255,0.6)', transition: 'all 0.2s' }}>RU</span>
+            <span style={{ padding: '5px 10px', borderRadius: 999, background: lang === 'en' ? '#F2A81D' : 'transparent', color: lang === 'en' ? '#3E2510' : 'rgba(255,255,255,0.6)', transition: 'all 0.2s' }}>EN</span>
           </button>
         </div>
       </div>
