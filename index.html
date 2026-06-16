@@ -2321,7 +2321,9 @@ function App() {
       </div>
 
       {/* ── scroll area ── */}
-      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', position: 'relative' }}>
+      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', position: 'relative',
+        backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cellipse cx='60' cy='76' rx='18' ry='15' fill='rgba(176,120,72,0.07)'/%3E%3Ccircle cx='36' cy='54' r='8' fill='rgba(176,120,72,0.07)'/%3E%3Ccircle cx='50' cy='46' r='8' fill='rgba(176,120,72,0.07)'/%3E%3Ccircle cx='70' cy='46' r='8' fill='rgba(176,120,72,0.07)'/%3E%3Ccircle cx='84' cy='54' r='8' fill='rgba(176,120,72,0.07)'/%3E%3C/svg%3E\")",
+        backgroundRepeat: 'repeat' }}>
         <div key={top.name + stack.length} className={dir === 'fwd' ? 'scr-fwd' : 'scr-back'} style={{ minHeight: '100%' }}>
           {renderScreen()}
         </div>
