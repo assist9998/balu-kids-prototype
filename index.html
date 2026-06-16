@@ -1939,11 +1939,12 @@ function PaymentsScreen() {
   const initPaid = () => { const m = {}; DATA.CHILDREN.forEach((k, i) => { m[k.id] = i % 3 !== 2; }); return m; };
   const initClubPaid = () => { const m = {}; DATA.CLUBS.forEach(c => c.kids.forEach((id, i) => { m[`${c.id}_${id}`] = i % 2 === 0; })); return m; };
 
-  const [paid,     setPaid]     = React.useState(initPaid);
-  const [savedP,   setSavedP]   = React.useState(initPaid);
-  const [clubPaid, setClubPaid] = React.useState(initClubPaid);
-  const [savedC,   setSavedC]   = React.useState(initClubPaid);
-  const [toast, setToast] = React.useState(null);
+  const [paid,       setPaid]     = React.useState(initPaid);
+  const [savedP,     setSavedP]   = React.useState(initPaid);
+  const [clubPaid,   setClubPaid] = React.useState(initClubPaid);
+  const [savedC,     setSavedC]   = React.useState(initClubPaid);
+  const [toast,      setToast]    = React.useState(null);
+  const [payFilter,  setPayFilter] = React.useState('all');
 
   const hasChanges = section === 'garden'
     ? DATA.CHILDREN.some(k => paid[k.id] !== savedP[k.id])
@@ -1961,24 +1962,28 @@ function PaymentsScreen() {
   const PALETTE = ['#FBE7A8','#CDE8FB','#D4F0DF','#FBD9E1','#FBE0C0','#E8D5FB'];
   const CLUB_PRICE = { chess: 60, swimming: 80 };
 
-  const gardenKids = DATA.CHILDREN
+  const gardenKidsAll = DATA.CHILDREN
     .filter(k => isTour ? k.contract === 'tourist' : k.contract !== 'tourist')
     .filter(k => group === 'all' || k.group === group);
   const getAmount = kid => isTour ? DAILY[kid.group] : MONTHLY[kid.group];
-  const gCountPaid   = gardenKids.filter(k =>  paid[k.id]).length;
-  const gCountUnpaid = gardenKids.filter(k => !paid[k.id]).length;
-  const gTotal       = gardenKids.filter(k =>  paid[k.id]).reduce((s, k) => s + getAmount(k), 0);
+  const gCountPaid   = gardenKidsAll.filter(k =>  paid[k.id]).length;
+  const gCountUnpaid = gardenKidsAll.filter(k => !paid[k.id]).length;
+  const gTotal       = gardenKidsAll.filter(k =>  paid[k.id]).reduce((s, k) => s + getAmount(k), 0);
+  const gardenKids   = gardenKidsAll.filter(k =>
+    payFilter === 'paid' ? paid[k.id] : payFilter === 'unpaid' ? !paid[k.id] : true);
 
   const activeClub = DATA.CLUBS.find(c => c.id === clubId);
-  const clubKids   = DATA.CHILDREN.filter(k => activeClub.kids.includes(k.id));
+  const clubKidsAll = DATA.CHILDREN.filter(k => activeClub.kids.includes(k.id));
   const cKey = kid => `${clubId}_${kid.id}`;
-  const cCountPaid   = clubKids.filter(k =>  clubPaid[cKey(k)]).length;
-  const cCountUnpaid = clubKids.filter(k => !clubPaid[cKey(k)]).length;
-  const cTotal       = clubKids.filter(k =>  clubPaid[cKey(k)]).length * CLUB_PRICE[clubId];
+  const cCountPaid   = clubKidsAll.filter(k =>  clubPaid[cKey(k)]).length;
+  const cCountUnpaid = clubKidsAll.filter(k => !clubPaid[cKey(k)]).length;
+  const cTotal       = clubKidsAll.filter(k =>  clubPaid[cKey(k)]).length * CLUB_PRICE[clubId];
+  const clubKids     = clubKidsAll.filter(k =>
+    payFilter === 'paid' ? clubPaid[cKey(k)] : payFilter === 'unpaid' ? !clubPaid[cKey(k)] : true);
 
   function SegBtn({ id, children }) {
     return (
-      <button onClick={() => { setSection(id); setGroup('all'); }} className="bk-press" style={{
+      <button onClick={() => { setSection(id); setGroup('all'); setPayFilter('all'); }} className="bk-press" style={{
         flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
         padding: '9px 4px', borderRadius: 999, fontSize: 13, fontWeight: 800,
         background: section === id ? '#B07848' : 'transparent',
@@ -1988,17 +1993,25 @@ function PaymentsScreen() {
     );
   }
 
-  function Stats({ cp, cu, total }) {
+  function Stats({ cp, cu, total, filter, onFilter }) {
+    const statBox = (id, count, label, color) => {
+      const active = filter === id;
+      return (
+        <div onClick={() => onFilter(active ? 'all' : id)} className="bk-press" style={{
+          flex: 1, borderRadius: 18, padding: '12px 8px', textAlign: 'center', cursor: 'pointer',
+          background: active ? '#B07848' : '#FBF7F2',
+          boxShadow: active ? '0 6px 18px -6px #B07848' : 'none', transition: 'all 0.18s' }}>
+          <div style={{ fontSize: 26, fontWeight: 800, lineHeight: 1, fontFamily: 'var(--font-display)',
+            color: active ? '#fff' : color }}>{count}</div>
+          <div style={{ fontSize: 12, fontWeight: 700, marginTop: 4,
+            color: active ? 'rgba(255,255,255,0.85)' : 'var(--ink-soft)' }}>{label}</div>
+        </div>
+      );
+    };
     return (
       <div style={{ display: 'flex', gap: 10, padding: '0 20px 16px' }}>
-        <div style={{ flex: 1, background: '#FBF7F2', borderRadius: 18, padding: '12px 8px', textAlign: 'center' }}>
-          <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--ok)', lineHeight: 1, fontFamily: 'var(--font-display)' }}>{cp}</div>
-          <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 700, marginTop: 4 }}>{L('Оплатили', 'Paid')}</div>
-        </div>
-        <div style={{ flex: 1, background: '#FBF7F2', borderRadius: 18, padding: '12px 8px', textAlign: 'center' }}>
-          <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--no)', lineHeight: 1, fontFamily: 'var(--font-display)' }}>{cu}</div>
-          <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 700, marginTop: 4 }}>{L('Не оплатили', 'Unpaid')}</div>
-        </div>
+        {statBox('paid',   cp, L('Оплатили', 'Paid'),      'var(--ok)')}
+        {statBox('unpaid', cu, L('Не оплатили', 'Unpaid'), 'var(--no)')}
         <div style={{ flex: 1.4, background: '#FBF7F2', borderRadius: 18, padding: '12px 8px', textAlign: 'center' }}>
           <div style={{ fontSize: 22, fontWeight: 800, color: '#B07848', lineHeight: 1, fontFamily: 'var(--font-display)' }}>${total}</div>
           <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 700, marginTop: 4 }}>{L('Собрано', 'Collected')}</div>
@@ -2043,7 +2056,7 @@ function PaymentsScreen() {
         {/* tariff toggle */}
         <div style={{ display: 'flex', margin: '0 20px 14px', background: '#FBF7F2', borderRadius: 999, padding: 4, gap: 4 }}>
           {[['longterm', L('Долгосрочные', 'Long term')], ['tourist', L('Туристы', 'Tourist')]].map(([id, label]) => (
-            <button key={id} onClick={() => { setTariff(id); setGroup('all'); }} className="bk-press" style={{
+            <button key={id} onClick={() => { setTariff(id); setGroup('all'); setPayFilter('all'); }} className="bk-press" style={{
               flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
               padding: '9px 4px', borderRadius: 999, fontSize: 13, fontWeight: 800,
               background: tariff === id ? '#B07848' : 'transparent',
@@ -2064,7 +2077,7 @@ function PaymentsScreen() {
             </button>
           ))}
         </div>
-        <Stats cp={gCountPaid} cu={gCountUnpaid} total={gTotal} />
+        <Stats cp={gCountPaid} cu={gCountUnpaid} total={gTotal} filter={payFilter} onFilter={setPayFilter} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 9, padding: '0 20px' }}>
           {gardenKids.map(kid => (
             <KidPayRow key={kid.id} kid={kid} isPaid={paid[kid.id]}
@@ -2087,7 +2100,7 @@ function PaymentsScreen() {
             </button>
           ))}
         </div>
-        <Stats cp={cCountPaid} cu={cCountUnpaid} total={cTotal} />
+        <Stats cp={cCountPaid} cu={cCountUnpaid} total={cTotal} filter={payFilter} onFilter={setPayFilter} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 9, padding: '0 20px' }}>
           {clubKids.map(kid => (
             <KidPayRow key={kid.id} kid={kid} isPaid={clubPaid[cKey(kid)]}
