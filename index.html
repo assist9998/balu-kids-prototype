@@ -1311,13 +1311,13 @@ function HomeScreen({ go, statuses, feed, homeStyle }) {
   const unread = feed.filter(f => f.unread).length;
 
   const TILES = [
-    { key: 'children',      emoji: '🧒', color: '#FBE7A8', ink: '#8a6410', go: 'children',
+    { key: 'children',      emoji: '🧒', color: '#FBE7A8', colorLight: '#FDFAF0', colorDark: '#C9B986', ink: '#8a6410', go: 'children',
       badge: `${kids.length} ${t('kids')}` },
-    { key: 'attendance',    emoji: '📋', color: '#CDE8FB', ink: '#1f5f86', go: 'attendance',
+    { key: 'attendance',    emoji: '📋', color: '#CDE8FB', colorLight: '#E8F4FD', colorDark: '#A4BCE9', ink: '#1f5f86', go: 'attendance',
       badge: `${present}/${kids.length}` },
-    { key: 'summary',       emoji: '🗞️', color: '#D4F0DF', ink: '#1f7a55', go: 'summary',
+    { key: 'summary',       emoji: '🗞️', color: '#D4F0DF', colorLight: '#EAF8F0', colorDark: '#A9C8B2', ink: '#1f7a55', go: 'summary',
       badge: `${rate}%` },
-    { key: 'notifications', emoji: '⭐', color: '#FBD9E1', ink: '#a8456a', go: 'notifications',
+    { key: 'notifications', emoji: '⭐', color: '#FBD9E1', colorLight: '#FDF0F3', colorDark: '#C9ADBA', ink: '#a8456a', go: 'notifications',
       badge: unread ? `${unread} ${t('unread')}` : null, dot: unread > 0 },
   ];
 
@@ -1369,7 +1369,7 @@ function HomeCircles({ tiles, go }) {
           border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit',
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, padding: 0 }}>
           <div style={{ position: 'relative', width: 132, height: 132, borderRadius: '50%',
-            background: `radial-gradient(125% 125% at 32% 24%, color-mix(in srgb, #fff 60%, ${tile.color}) 0%, ${tile.color} 56%, color-mix(in srgb, ${tile.color} 80%, #000) 135%)`,
+            background: `radial-gradient(125% 125% at 32% 24%, ${tile.colorLight} 0%, ${tile.color} 56%, ${tile.colorDark} 135%)`,
             display: 'grid', placeItems: 'center', fontSize: 52,
             boxShadow: '0 20px 34px -18px rgba(60,40,20,0.55), inset 0 3px 4px rgba(255,255,255,0.65), inset 0 -10px 18px -10px rgba(60,40,20,0.2)' }}>
             <span style={{ filter: 'drop-shadow(0 4px 6px rgba(60,40,20,0.18))' }}>{tile.emoji}</span>
@@ -2120,7 +2120,7 @@ function Stage() {
   }, []);
   if (isMobile) {
     return (
-      <div style={{ height: '100%', width: '100%', overflow: 'hidden' }}>
+      <div style={{ height: '100dvh', width: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <App />
       </div>
     );
