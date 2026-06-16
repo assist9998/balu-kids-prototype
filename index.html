@@ -1603,9 +1603,6 @@ function ParentCard({ role, name, phone, emoji }) {
         <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{name}</div>
         <div style={{ fontSize: 13, color: 'var(--ink-soft)', fontWeight: 600 }}>{phone}</div>
       </div>
-      <a href={`tel:${phone}`} className="bk-press" style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', cursor: 'pointer',
-        background: '#B07848', color: '#fff', fontSize: 17, display: 'grid', placeItems: 'center',
-        boxShadow: '0 6px 14px -6px #B07848', textDecoration: 'none', flexShrink: 0 }}>📞</a>
     </Card>
   );
 }
