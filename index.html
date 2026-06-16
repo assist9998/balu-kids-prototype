@@ -288,7 +288,14 @@
       en: 'Weekly menu updated by administration.', time: 'вчера', timeEn: 'yesterday', unread: false },
   ];
 
-  window.DATA = { GROUPS, CHILDREN, WEEK, FEED };
+  const CLUBS = [
+    { id: 'chess',     ru: 'Шахматы',  en: 'Chess',     emoji: '♟️', color: '#CDE8FB', ink: '#1f5f86',
+      days: { ru: 'Пн, Ср', en: 'Mon, Wed' }, time: '15:00', kids: [1, 4, 7, 10, 16, 19] },
+    { id: 'swimming',  ru: 'Плавание', en: 'Swimming',  emoji: '🏊', color: '#D4F0DF', ink: '#1f7a55',
+      days: { ru: 'Вт, Пт', en: 'Tue, Fri' }, time: '16:00', kids: [2, 5, 8, 12, 17, 20] },
+  ];
+
+  window.DATA = { GROUPS, CHILDREN, CLUBS, WEEK, FEED };
 })();
 
 </script>
@@ -1318,7 +1325,7 @@ function HomeScreen({ go, statuses, feed, homeStyle }) {
       badge: `${present}/${kids.length}` },
     { key: 'payments',      emoji: '💲', color: '#FBE0C0', colorLight: '#FDF4EA', colorDark: '#C9A882', ink: '#8a5010', go: 'payments',
       badge: null },
-    { key: 'activities',    emoji: '🎨', color: '#E8D5FB', colorLight: '#F5EFFD', colorDark: '#B8A0D8', ink: '#5a2a86', go: 'notifications',
+    { key: 'activities',    emoji: '🎨', color: '#E8D5FB', colorLight: '#F5EFFD', colorDark: '#B8A0D8', ink: '#5a2a86', go: 'activities',
       badge: null },
     { key: 'summary',       emoji: '🗞️', color: '#FBE7A8', colorLight: '#FDFAF0', colorDark: '#C9B986', ink: '#8a6410', go: 'summary',
       badge: `${rate}%` },
@@ -2062,7 +2069,65 @@ function PaymentsScreen() {
   );
 }
 
-Object.assign(window, { AttendanceScreen, SummaryScreen, NotificationsScreen, ComposeScreen, PaymentsScreen });
+function ActivitiesScreen({ go }) {
+  return (
+    <div style={{ padding: '4px 20px 28px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {DATA.CLUBS.map(club => (
+        <Card key={club.id} pad={16} onClick={() => go('club', { clubId: club.id })}
+          style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#FBF7F2' }}>
+          <div style={{ width: 54, height: 54, borderRadius: 18, background: club.color,
+            display: 'grid', placeItems: 'center', fontSize: 27, flexShrink: 0 }}>{club.emoji}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{Lo(club)}</div>
+            <div style={{ fontSize: 13, color: 'var(--ink-soft)', fontWeight: 600, marginTop: 2 }}>
+              {Lo(club.days)} · {club.time}
+            </div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: club.ink, fontFamily: 'var(--font-display)' }}>{club.kids.length}</div>
+            <div style={{ fontSize: 11, color: 'var(--ink-faint)', fontWeight: 700 }}>{L('детей', 'kids')}</div>
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function ClubScreen({ params }) {
+  const club = DATA.CLUBS.find(c => c.id === params.clubId);
+  const kids = DATA.CHILDREN.filter(k => club.kids.includes(k.id));
+  const PALETTE = ['#FBE7A8','#CDE8FB','#D4F0DF','#FBD9E1','#FBE0C0','#E8D5FB'];
+  return (
+    <div style={{ padding: '4px 20px 28px' }}>
+      <div style={{ background: club.color, borderRadius: 20, padding: '18px 20px', marginBottom: 18, display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div style={{ fontSize: 48, lineHeight: 1 }}>{club.emoji}</div>
+        <div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: club.ink, fontFamily: 'var(--font-display)' }}>{Lo(club)}</div>
+          <div style={{ fontSize: 13, color: club.ink, fontWeight: 600, opacity: 0.75, marginTop: 2 }}>
+            {Lo(club.days)} · {club.time} · {kids.length} {L('детей', 'kids')}
+          </div>
+        </div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {kids.map((kid, i) => {
+          const grp = DATA.GROUPS.find(g => g.id === kid.group);
+          const kidIndex = DATA.CHILDREN.filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
+          return (
+            <Card key={kid.id} pad={12} style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2' }}>
+              <Avatar emoji={kid.emoji} color={PALETTE[kidIndex % PALETTE.length]} size={44} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}</div>
+                <span style={{ background: grp.color, color: grp.ink, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999 }}>{grp.emoji} {Lo(grp)}</span>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { AttendanceScreen, SummaryScreen, NotificationsScreen, ComposeScreen, PaymentsScreen, ActivitiesScreen, ClubScreen });
 
 </script>
 <script type="text/babel">
@@ -2088,7 +2153,7 @@ const FONTS = {
 
 const TITLES = {
   home: 'appName', children: 'children', attendance: 'markDay',
-  payments: 'payments', summary: 'daySummary', notifications: 'notifications', compose: 'compose',
+  payments: 'payments', activities: 'activities', summary: 'daySummary', notifications: 'notifications', compose: 'compose',
 };
 
 function App() {
@@ -2153,6 +2218,8 @@ function App() {
       case 'child':         return <ChildScreen params={p} statuses={statuses} />;
       case 'attendance':    return <AttendanceScreen statuses={statuses} actions={actions} />;
       case 'payments':      return <PaymentsScreen />;
+      case 'activities':    return <ActivitiesScreen go={go} />;
+      case 'club':          return <ClubScreen params={p} />;
       case 'summary':       return <SummaryScreen statuses={statuses} />;
       case 'notifications': return <NotificationsScreen feed={feed} go={go} actions={actions} />;
       case 'compose':       return <ComposeScreen back={back} actions={actions} />;
