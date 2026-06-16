@@ -161,11 +161,17 @@
 
     // ── notifications ──────────────────────────────────────────
     feed:         { ru: 'Лента',             en: 'Feed' },
-    justNow:      { ru: 'только что',        en: 'just now' },
-    markRead:     { ru: 'Прочитать всё',     en: 'Mark all read' },
-    unread:       { ru: 'новых',             en: 'new' },
-    typeAlert:    { ru: 'Важное',            en: 'Alert' },
-    typeBirthday: { ru: 'День рождения',     en: 'Birthday' },
+    justNow:           { ru: 'только что',      en: 'just now' },
+    markRead:          { ru: 'Прочитать всё',  en: 'Mark all read' },
+    unread:            { ru: 'новых',          en: 'new' },
+    newNote:           { ru: 'Заметка',        en: 'New note' },
+    noteType:          { ru: 'Тип',            en: 'Type' },
+    noteText:          { ru: 'Текст',          en: 'Text' },
+    noteTextPlaceholder: { ru: 'Введите заметку…', en: 'Enter note…' },
+    noteSaved:         { ru: 'Сохранено',      en: 'Saved' },
+    typeAlert:         { ru: 'Важное',         en: 'Alert' },
+    typeBirthday:      { ru: 'День рождения',  en: 'Birthday' },
+    compose:           { ru: 'Новая заметка',  en: 'New note' },
   };
 
   let LANG = 'ru';
@@ -1854,6 +1860,72 @@ function NotificationsScreen({ feed, go, actions }) {
         ))}
       </div>
 
+      {/* compose FAB */}
+      <div style={{ position: 'sticky', bottom: 18, display: 'flex', justifyContent: 'flex-end', pointerEvents: 'none', marginTop: 18 }}>
+        <button onClick={() => go('compose')} className="bk-press" style={{
+          pointerEvents: 'auto', height: 54, paddingInline: 20, borderRadius: 999, border: 'none', cursor: 'pointer',
+          background: '#B07848', color: '#fff', fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 15,
+          display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 12px 26px -8px #B07848' }}>
+          <span style={{ fontSize: 20, lineHeight: 1 }}>✏️</span>{t('newNote')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+//  COMPOSE (internal notes/alerts for staff)
+// ════════════════════════════════════════════════════════════════
+function ComposeScreen({ back, actions }) {
+  const [text, setText] = React.useState('');
+  const [type, setType] = React.useState('alert');
+  const types = [
+    { id: 'alert',    emoji: '📋', label: t('typeAlert') },
+    { id: 'birthday', emoji: '🎂', label: t('typeBirthday') },
+  ];
+
+  function send() {
+    if (!text.trim()) return;
+    const chosen = types.find(x => x.id === type);
+    actions.addPost({ ru: text, en: text, emoji: chosen.emoji, type });
+    actions.toast(t('noteSaved') + ' ✓');
+    back();
+  }
+
+  return (
+    <div style={{ padding: '6px 20px 30px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+      <div>
+        <SectionLabel>{t('noteType')}</SectionLabel>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {types.map(x => (
+            <button key={x.id} onClick={() => setType(x.id)} className="bk-press" style={{
+              border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13.5, fontWeight: 700,
+              padding: '9px 14px', borderRadius: 999,
+              background: type === x.id ? '#B07848' : '#FBF7F2',
+              color: type === x.id ? '#fff' : 'var(--ink-soft)',
+              boxShadow: type === x.id ? '0 6px 14px -6px #B07848' : '0 1px 2px rgba(60,40,20,0.05)' }}>
+              {x.emoji} {x.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <SectionLabel>{t('noteText')}</SectionLabel>
+        <textarea value={text} onChange={e => setText(e.target.value)} placeholder={t('noteTextPlaceholder')}
+          rows={5} style={{ width: '100%', boxSizing: 'border-box', resize: 'none', border: 'none',
+          background: '#FBF7F2', borderRadius: 18, padding: 16, fontFamily: 'inherit', fontSize: 15.5,
+          color: 'var(--ink)', fontWeight: 600, lineHeight: 1.4, outline: 'none',
+          boxShadow: '0 1px 2px rgba(60,40,20,0.05)' }} />
+      </div>
+
+      <button onClick={send} className="bk-press" disabled={!text.trim()} style={{
+        width: '100%', border: 'none', cursor: text.trim() ? 'pointer' : 'default', fontFamily: 'var(--font-display)',
+        background: text.trim() ? '#B07848' : 'rgba(0,0,0,0.12)', color: '#fff', fontSize: 17, fontWeight: 800,
+        padding: 15, borderRadius: 18, marginTop: 4,
+        boxShadow: text.trim() ? '0 10px 24px -8px #B07848' : 'none', transition: 'background .2s' }}>
+        💾 {t('save')}
+      </button>
     </div>
   );
 }
@@ -2103,7 +2175,7 @@ function ClubScreen({ params }) {
   );
 }
 
-Object.assign(window, { AttendanceScreen, SummaryScreen, NotificationsScreen, PaymentsScreen, ActivitiesScreen, ClubScreen });
+Object.assign(window, { AttendanceScreen, SummaryScreen, NotificationsScreen, ComposeScreen, PaymentsScreen, ActivitiesScreen, ClubScreen });
 
 </script>
 <script type="text/babel">
@@ -2129,7 +2201,7 @@ const FONTS = {
 
 const TITLES = {
   home: 'appName', children: 'children', attendance: 'markDay',
-  payments: 'payments', activities: 'activities', summary: 'daySummary', notifications: 'notifications',
+  payments: 'payments', activities: 'activities', summary: 'daySummary', notifications: 'notifications', compose: 'compose',
 };
 
 function App() {
@@ -2198,6 +2270,7 @@ function App() {
       case 'club':          return <ClubScreen params={p} />;
       case 'summary':       return <SummaryScreen statuses={statuses} />;
       case 'notifications': return <NotificationsScreen feed={feed} go={go} actions={actions} />;
+      case 'compose':       return <ComposeScreen back={back} actions={actions} />;
       default:              return null;
     }
   }
