@@ -22,8 +22,8 @@
     --ok:        #3DAE7A;
     --no:        #E0654F;
     --warn:      #E0A02E;
-    --accent:    #F2795B;
-    --accent-soft: #fde6df;
+    --accent:    #F2A81D;
+    --accent-soft: #FEF3CC;
   }
   * { -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; padding: 0; }
@@ -1315,9 +1315,9 @@ function HomeScreen({ go, statuses, feed, homeStyle }) {
       badge: `${kids.length} ${t('kids')}` },
     { key: 'attendance',    emoji: '📋', color: '#CDE8FB', ink: '#1f5f86', go: 'attendance',
       badge: `${present}/${kids.length}` },
-    { key: 'summary',       emoji: '📊', color: '#D4F0DF', ink: '#1f7a55', go: 'summary',
+    { key: 'summary',       emoji: '🗞️', color: '#D4F0DF', ink: '#1f7a55', go: 'summary',
       badge: `${rate}%` },
-    { key: 'notifications', emoji: '🔔', color: '#FBD9E1', ink: '#a8456a', go: 'notifications',
+    { key: 'notifications', emoji: '⭐', color: '#FBD9E1', ink: '#a8456a', go: 'notifications',
       badge: unread ? `${unread} ${t('unread')}` : null, dot: unread > 0 },
   ];
 
