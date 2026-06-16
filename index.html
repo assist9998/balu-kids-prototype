@@ -1732,8 +1732,8 @@ function SummaryScreen({ statuses }) {
   return (
     <div style={{ padding: '4px 20px 30px', display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* hero ring */}
-      <Card pad={20} style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-        <Ring pct={rate} size={120} stroke={13}>
+      <Card pad={20} style={{ display: 'flex', alignItems: 'center', gap: 20, background: '#FBF7F2' }}>
+        <Ring pct={rate} size={120} stroke={13} color='#B07848'>
           <div>
             <div style={{ fontSize: 30, fontWeight: 800, color: 'var(--ink)', lineHeight: 1, fontFamily: 'var(--font-display)' }}>{rate}%</div>
             <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink-faint)', marginTop: 2 }}>{t('rate')}</div>
@@ -1747,7 +1747,7 @@ function SummaryScreen({ statuses }) {
       </Card>
 
       {/* by group */}
-      <Card pad={18}>
+      <Card pad={18} style={{ background: '#FBF7F2' }}>
         <SectionLabel>{t('byGroup')}</SectionLabel>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 4 }}>
           {DATA.GROUPS.map(g => {
@@ -1760,17 +1760,17 @@ function SummaryScreen({ statuses }) {
       </Card>
 
       {/* week */}
-      <Card pad={18}>
+      <Card pad={18} style={{ background: '#FBF7F2' }}>
         <SectionLabel>{t('thisWeek')}</SectionLabel>
         <WeekChart />
       </Card>
 
       {/* meals */}
-      <Card pad={18}>
+      <Card pad={18} style={{ background: '#FBF7F2' }}>
         <SectionLabel>{t('meals')}</SectionLabel>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginTop: 2 }}>
           {meals.map(m => (
-            <div key={m.key} style={{ textAlign: 'center', background: 'var(--accent-soft)', borderRadius: 16, padding: '14px 6px' }}>
+            <div key={m.key} style={{ textAlign: 'center', background: '#EDE8E0', borderRadius: 16, padding: '14px 6px' }}>
               <div style={{ fontSize: 26 }}>{m.emoji}</div>
               <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--ink)', marginTop: 4, fontFamily: 'var(--font-display)' }}>{m.n}</div>
               <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink-soft)' }}>{t(m.key)}</div>
@@ -1782,12 +1782,12 @@ function SummaryScreen({ statuses }) {
 
       {/* naps + mood */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <Card pad={16} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <Card pad={16} style={{ display: 'flex', flexDirection: 'column', gap: 4, background: '#FBF7F2' }}>
           <div style={{ fontSize: 28 }}>😴</div>
           <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{napping}</div>
           <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink-soft)' }}>{t('naps')} · {t('sleeping')}</div>
         </Card>
-        <Card pad={16} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <Card pad={16} style={{ display: 'flex', flexDirection: 'column', gap: 4, background: '#FBF7F2' }}>
           <div style={{ fontSize: 28 }}>😄</div>
           <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>92%</div>
           <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink-soft)' }}>{t('mood')}</div>
@@ -1815,7 +1815,7 @@ function WeekChart() {
         <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, height: '100%', justifyContent: 'flex-end' }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--ink-soft)' }}>{d.v}</div>
           <div style={{ width: '100%', maxWidth: 30, height: `${(d.v / 100) * 78}px`, borderRadius: 8,
-            background: d.v === max ? 'var(--accent)' : 'var(--accent-soft)',
+            background: d.v === max ? '#B07848' : '#EDE8E0',
             transition: 'height 0.8s cubic-bezier(.22,1,.36,1)' }} />
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-faint)' }}>{Lo(d)}</div>
         </div>
