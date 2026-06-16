@@ -10,7 +10,7 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@500;600;700&family=Nunito:ital,wght@0,400;0,600;0,700;0,800&family=Onest:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@300;500;600;700&family=Nunito:ital,wght@0,400;0,600;0,700;0,800&family=Onest:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 
 <style>
   :root {
@@ -1312,18 +1312,18 @@ function HomeScreen({ go, statuses, feed, homeStyle }) {
   const unread = feed.filter(f => f.unread).length;
 
   const TILES = [
-    { key: 'children',      emoji: '👦🏼', color: '#FBE7A8', colorLight: '#FDFAF0', colorDark: '#C9B986', ink: '#8a6410', go: 'children',
+    { key: 'children',      emoji: '👦🏼', color: '#D4F0DF', colorLight: '#EAF8F0', colorDark: '#A9C8B2', ink: '#1f7a55', go: 'children',
       badge: `${kids.length} ${t('kids')}` },
     { key: 'attendance',    emoji: '📋', color: '#CDE8FB', colorLight: '#E8F4FD', colorDark: '#A4BCE9', ink: '#1f5f86', go: 'attendance',
       badge: `${present}/${kids.length}` },
-    { key: 'summary',       emoji: '🗞️', color: '#D4F0DF', colorLight: '#EAF8F0', colorDark: '#A9C8B2', ink: '#1f7a55', go: 'summary',
-      badge: `${rate}%` },
-    { key: 'notifications', emoji: '⭐', color: '#FBD9E1', colorLight: '#FDF0F3', colorDark: '#C9ADBA', ink: '#a8456a', go: 'notifications',
-      badge: unread ? `${unread} ${t('unread')}` : null, dot: unread > 0 },
     { key: 'payments',      emoji: '💲', color: '#FBE0C0', colorLight: '#FDF4EA', colorDark: '#C9A882', ink: '#8a5010', go: 'notifications',
       badge: null },
     { key: 'activities',    emoji: '🎨', color: '#E8D5FB', colorLight: '#F5EFFD', colorDark: '#B8A0D8', ink: '#5a2a86', go: 'notifications',
       badge: null },
+    { key: 'summary',       emoji: '🗞️', color: '#FBE7A8', colorLight: '#FDFAF0', colorDark: '#C9B986', ink: '#8a6410', go: 'summary',
+      badge: `${rate}%` },
+    { key: 'notifications', emoji: '⭐', color: '#FBD9E1', colorLight: '#FDF0F3', colorDark: '#C9ADBA', ink: '#a8456a', go: 'notifications',
+      badge: unread ? `${unread} ${t('unread')}` : null, dot: unread > 0 },
   ];
 
   const hour = new Date().getHours();
@@ -2046,9 +2046,9 @@ function App() {
       <div style={{ flexShrink: 0, position: 'relative', zIndex: 8,
         background: '#3E2510', paddingTop: 'env(safe-area-inset-top)',
         boxShadow: '0 2px 8px rgba(60,40,20,0.15)' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', padding: '10px 16px 10px', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', padding: '5px 16px 10px', gap: 8 }}>
           {/* left: back or logo + title */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, flex: 1 }}>
             {stack.length > 1 ? (
               <button onClick={back} className="bk-press" style={{ display: 'flex', alignItems: 'center', gap: 4,
                 border: 'none', background: 'rgba(255,255,255,0.15)', cursor: 'pointer', fontFamily: 'inherit',
