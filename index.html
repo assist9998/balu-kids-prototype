@@ -161,17 +161,9 @@
 
     // ── notifications ──────────────────────────────────────────
     feed:         { ru: 'Лента',             en: 'Feed' },
-    compose:      { ru: 'Новое сообщение',   en: 'New message' },
-    newPost:      { ru: 'Создать',           en: 'Compose' },
-    to:           { ru: 'Кому',              en: 'To' },
-    allParents:   { ru: 'Все родители',      en: 'All parents' },
-    messageText:  { ru: 'Текст сообщения…',  en: 'Type a message…' },
-    send:         { ru: 'Отправить',         en: 'Send' },
-    sent:         { ru: 'Отправлено',        en: 'Sent' },
     justNow:      { ru: 'только что',        en: 'just now' },
     markRead:     { ru: 'Прочитать всё',     en: 'Mark all read' },
     unread:       { ru: 'новых',             en: 'new' },
-    typeMsg:      { ru: 'Сообщение',         en: 'Message' },
     typeAlert:    { ru: 'Важное',            en: 'Alert' },
     typeBirthday: { ru: 'День рождения',     en: 'Birthday' },
   };
@@ -280,10 +272,10 @@
       en: "It's Safiya's birthday today — she turns 4! 🎉", time: '09:10', unread: true },
     { id: 2, type: 'alert', emoji: '⚠️', ru: 'Завтра медосмотр в группе «Капельки». Напомните родителям.',
       en: 'Medical check-up for Droplets tomorrow. Please remind parents.', time: '08:35', unread: true },
-    { id: 3, type: 'message', emoji: '💬', ru: 'Мама Тимура: «Заберём сегодня в 17:00»',
-      en: "Timur's mum: \u201cWe'll pick him up at 5 PM today\u201d", time: '08:20', unread: true },
-    { id: 4, type: 'message', emoji: '💬', ru: 'Папа Малики: «Малика приболела, останемся дома»',
-      en: "Malika's dad: \u201cShe's a bit unwell, staying home\u201d", time: 'вчера', timeEn: 'yesterday', unread: false },
+    { id: 3, type: 'alert', emoji: '📋', ru: 'Тимур уйдёт в 17:00 — забирает папа.',
+      en: 'Timur leaving at 5 PM — picked up by dad.', time: '08:20', unread: true },
+    { id: 4, type: 'alert', emoji: '🤒', ru: 'Малика сегодня не придёт — болеет.',
+      en: 'Malika absent today — not feeling well.', time: 'вчера', timeEn: 'yesterday', unread: false },
     { id: 5, type: 'alert', emoji: '📋', ru: 'Меню на неделю обновлено администрацией.',
       en: 'Weekly menu updated by administration.', time: 'вчера', timeEn: 'yesterday', unread: false },
   ];
@@ -1862,76 +1854,6 @@ function NotificationsScreen({ feed, go, actions }) {
         ))}
       </div>
 
-      {/* compose FAB */}
-      <div style={{ position: 'sticky', bottom: 18, display: 'flex', justifyContent: 'flex-end', pointerEvents: 'none', marginTop: 18 }}>
-        <button onClick={() => go('compose')} className="bk-press" style={{
-          pointerEvents: 'auto', height: 54, paddingInline: 20, borderRadius: 999, border: 'none', cursor: 'pointer',
-          background: '#B07848', color: '#fff', fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 15,
-          display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 12px 26px -8px #B07848' }}>
-          <span style={{ fontSize: 20, lineHeight: 1 }}>✏️</span>{t('newPost')}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ════════════════════════════════════════════════════════════════
-//  COMPOSE
-// ════════════════════════════════════════════════════════════════
-function ComposeScreen({ back, actions }) {
-  const [to, setTo] = React.useState('all');
-  const [text, setText] = React.useState('');
-  const targets = [{ id: 'all', label: t('allParents'), emoji: '👨‍👩‍👧' }, ...DATA.GROUPS.map(g => ({ id: g.id, label: Lo(g), emoji: g.emoji }))];
-
-  function send() {
-    if (!text.trim()) return;
-    const toLabel = targets.find(x => x.id === to).label;
-    actions.addPost({ ru: text, en: text, to: toLabel });
-    actions.toast(t('sent') + ' ✓');
-    back();
-  }
-
-  return (
-    <div style={{ padding: '6px 20px 30px', display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <div>
-        <SectionLabel>{t('to')}</SectionLabel>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {targets.map(x => (
-            <button key={x.id} onClick={() => setTo(x.id)} className="bk-press" style={{
-              border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13.5, fontWeight: 700,
-              padding: '9px 14px', borderRadius: 999,
-              background: to === x.id ? '#B07848' : '#FBF7F2',
-              color: to === x.id ? '#fff' : 'var(--ink-soft)',
-              boxShadow: to === x.id ? '0 6px 14px -6px #B07848' : '0 1px 2px rgba(60,40,20,0.05)' }}>
-              {x.emoji} {x.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <SectionLabel>{t('typeMsg')}</SectionLabel>
-        <textarea value={text} onChange={e => setText(e.target.value)} placeholder={t('messageText')}
-          rows={5} style={{ width: '100%', boxSizing: 'border-box', resize: 'none', border: 'none',
-          background: '#FBF7F2', borderRadius: 18, padding: 16, fontFamily: 'inherit', fontSize: 15.5,
-          color: 'var(--ink)', fontWeight: 600, lineHeight: 1.4, outline: 'none',
-          boxShadow: '0 1px 2px rgba(60,40,20,0.05)' }} />
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-          {[L('Доброе утро! ☀️', 'Good morning! ☀️'), L('Напоминаем о…', 'Reminder about…'), L('Спасибо! 🙏', 'Thank you! 🙏')].map((q, i) => (
-            <button key={i} onClick={() => setText(t2 => (t2 ? t2 + ' ' : '') + q)} className="bk-press" style={{
-              border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600,
-              padding: '7px 12px', borderRadius: 999, background: 'var(--accent-soft)', color: 'var(--ink-soft)' }}>{q}</button>
-          ))}
-        </div>
-      </div>
-
-      <button onClick={send} className="bk-press" disabled={!text.trim()} style={{
-        width: '100%', border: 'none', cursor: text.trim() ? 'pointer' : 'default', fontFamily: 'var(--font-display)',
-        background: text.trim() ? '#B07848' : 'rgba(0,0,0,0.12)', color: '#fff', fontSize: 17, fontWeight: 800,
-        padding: 15, borderRadius: 18, marginTop: 4,
-        boxShadow: text.trim() ? '0 10px 24px -8px #B07848' : 'none', transition: 'background .2s' }}>
-        ✈️ {t('send')}
-      </button>
     </div>
   );
 }
@@ -2181,7 +2103,7 @@ function ClubScreen({ params }) {
   );
 }
 
-Object.assign(window, { AttendanceScreen, SummaryScreen, NotificationsScreen, ComposeScreen, PaymentsScreen, ActivitiesScreen, ClubScreen });
+Object.assign(window, { AttendanceScreen, SummaryScreen, NotificationsScreen, PaymentsScreen, ActivitiesScreen, ClubScreen });
 
 </script>
 <script type="text/babel">
@@ -2207,7 +2129,7 @@ const FONTS = {
 
 const TITLES = {
   home: 'appName', children: 'children', attendance: 'markDay',
-  payments: 'payments', activities: 'activities', summary: 'daySummary', notifications: 'notifications', compose: 'compose',
+  payments: 'payments', activities: 'activities', summary: 'daySummary', notifications: 'notifications',
 };
 
 function App() {
@@ -2276,7 +2198,6 @@ function App() {
       case 'club':          return <ClubScreen params={p} />;
       case 'summary':       return <SummaryScreen statuses={statuses} />;
       case 'notifications': return <NotificationsScreen feed={feed} go={go} actions={actions} />;
-      case 'compose':       return <ComposeScreen back={back} actions={actions} />;
       default:              return null;
     }
   }
