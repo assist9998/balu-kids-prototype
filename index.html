@@ -2322,12 +2322,16 @@ function App() {
         <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 0 }}
           xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
           {[
-            { x: 30,  y: 60,  r: -20 },
-            { x: 70,  y: 160, r: 15  },
-            { x: 25,  y: 270, r: -25 },
-            { x: 75,  y: 380, r: 20  },
-            { x: 28,  y: 490, r: -15 },
-            { x: 72,  y: 600, r: 25  },
+            { x: 55,  y: 50,  r: 10  },
+            { x: 20,  y: 130, r: -40 },
+            { x: 80,  y: 210, r: 30  },
+            { x: 35,  y: 310, r: -15 },
+            { x: 15,  y: 410, r: 50  },
+            { x: 70,  y: 480, r: -30 },
+            { x: 45,  y: 570, r: 20  },
+            { x: 85,  y: 650, r: -50 },
+            { x: 25,  y: 740, r: 35  },
+            { x: 60,  y: 830, r: -20 },
           ].map((p, i) => (
             <g key={i} transform={`translate(${p.x},${p.y}) rotate(${p.r})`} opacity="0.09" fill="#B07848">
               <ellipse cx="0" cy="12" rx="13" ry="11" />
