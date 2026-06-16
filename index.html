@@ -1578,7 +1578,6 @@ function ChildScreen({ params, statuses }) {
       <SectionLabel>{t('parents')}</SectionLabel>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
         <ParentCard role={t('mother')} name={L(kid.momRu, kid.momEn)} phone={kid.momPhone} emoji="👩" />
-        <ParentCard role={t('father')} name={L(kid.dadRu, kid.dadEn)} phone={kid.momPhone.replace(/\d{2}$/, '00')} emoji="👨" />
       </div>
 
       {/* notes */}
