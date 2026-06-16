@@ -1944,6 +1944,19 @@ function PaymentsScreen() {
     DATA.CHILDREN.forEach((k, i) => { m[k.id] = i % 3 !== 2; });
     return m;
   });
+  const [saved, setSaved] = React.useState(() => {
+    const m = {};
+    DATA.CHILDREN.forEach((k, i) => { m[k.id] = i % 3 !== 2; });
+    return m;
+  });
+  const [toast, setToast] = React.useState(null);
+  const hasChanges = DATA.CHILDREN.some(k => paid[k.id] !== saved[k.id]);
+
+  function handleSave() {
+    setSaved({ ...paid });
+    setToast(L('Сохранено ✓', 'Saved ✓'));
+    setTimeout(() => setToast(null), 2000);
+  }
 
   const MONTHLY = { toddler: 400, middle: 450, big: 500, primary: 550 };
   const DAILY   = { toddler: 35,  middle: 40,  big: 45,  primary: 50  };
@@ -2035,7 +2048,23 @@ function PaymentsScreen() {
           );
         })}
       </div>
-      <div style={{ height: 30 }} />
+      {hasChanges && (
+        <div style={{ position: 'sticky', bottom: 0, marginTop: 16, padding: '14px 20px 26px',
+          background: 'linear-gradient(to top, var(--bg) 62%, transparent)' }}>
+          <button onClick={handleSave} className="bk-press" style={{
+            width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-display)',
+            background: '#B07848', color: '#fff', fontSize: 17, fontWeight: 800, padding: '15px',
+            borderRadius: 18, boxShadow: '0 10px 24px -8px #B07848' }}>
+            {L('Сохранить', 'Save')}
+          </button>
+        </div>
+      )}
+      {toast && (
+        <div style={{ position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)',
+          background: 'var(--ink)', color: 'var(--bg)', padding: '12px 20px', borderRadius: 999,
+          fontWeight: 700, fontSize: 14.5, whiteSpace: 'nowrap', zIndex: 40 }}>{toast}</div>
+      )}
+      {!hasChanges && <div style={{ height: 30 }} />}
     </div>
   );
 }
