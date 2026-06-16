@@ -1313,7 +1313,7 @@ function HomeScreen({ go, statuses, feed, homeStyle }) {
   const unread = feed.filter(f => f.unread).length;
 
   const TILES = [
-    { key: 'children',      emoji: '👦🏼', color: '#CDE8FB', colorLight: '#E8F4FD', colorDark: '#A4BCE9', ink: '#1f5f86', go: 'children',
+    { key: 'children',      emoji: '👦🏼', color: '#FBE7A8', colorLight: '#FDFAF0', colorDark: '#C9B986', ink: '#8a6410', go: 'children',
       badge: `${kids.length} ${t('kids')}` },
     { key: 'attendance',    emoji: '📋', color: '#CDE8FB', colorLight: '#E8F4FD', colorDark: '#A4BCE9', ink: '#1f5f86', go: 'attendance',
       badge: `${present}/${kids.length}` },
@@ -1321,9 +1321,9 @@ function HomeScreen({ go, statuses, feed, homeStyle }) {
       badge: `${rate}%` },
     { key: 'notifications', emoji: '⭐', color: '#FBD9E1', colorLight: '#FDF0F3', colorDark: '#C9ADBA', ink: '#a8456a', go: 'notifications',
       badge: unread ? `${unread} ${t('unread')}` : null, dot: unread > 0 },
-    { key: 'payments',      emoji: '💲', color: '#E8F0FB', colorLight: '#F4F7FD', colorDark: '#A4B4D8', ink: '#2a4486', go: 'notifications',
+    { key: 'payments',      emoji: '💲', color: '#FBE0C0', colorLight: '#FDF4EA', colorDark: '#C9A882', ink: '#8a5010', go: 'notifications',
       badge: null },
-    { key: 'activities',    emoji: '🎨', color: '#F0EBFB', colorLight: '#F8F5FD', colorDark: '#B4A4D8', ink: '#4a2a86', go: 'notifications',
+    { key: 'activities',    emoji: '🎨', color: '#E8D5FB', colorLight: '#F5EFFD', colorDark: '#B8A0D8', ink: '#5a2a86', go: 'notifications',
       badge: null },
   ];
 
