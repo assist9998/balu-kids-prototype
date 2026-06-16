@@ -2092,8 +2092,10 @@ function App() {
 }
 
 function Stage() {
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth <= 500;
   const [scale, setScale] = React.useState(1);
   React.useEffect(() => {
+    if (isMobile) return;
     function fit() {
       const m = 24;
       setScale(Math.min((window.innerWidth - m) / 402, (window.innerHeight - m) / 874, 1.15));
@@ -2102,6 +2104,13 @@ function Stage() {
     window.addEventListener('resize', fit);
     return () => window.removeEventListener('resize', fit);
   }, []);
+  if (isMobile) {
+    return (
+      <div style={{ minHeight: '100dvh', width: '100%', overflow: 'hidden' }}>
+        <App />
+      </div>
+    );
+  }
   return (
     <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 12, boxSizing: 'border-box' }}>
       <div style={{ transform: `scale(${scale})`, transformOrigin: 'center center' }}>
