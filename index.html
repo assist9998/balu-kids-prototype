@@ -1672,9 +1672,11 @@ function AttendanceScreen({ statuses, actions }) {
         {kids.map(kid => {
           const grp = DATA.GROUPS.find(g => g.id === kid.group);
           const st = statuses[kid.id];
+          const PALETTE = ['#FBE7A8','#CDE8FB','#D4F0DF','#FBD9E1','#FBE0C0','#E8D5FB'];
+          const kidIndex = DATA.CHILDREN.filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
           return (
             <Card key={kid.id} pad={12} style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2' }}>
-              <Avatar emoji={kid.emoji} color={grp.color} size={44} />
+              <Avatar emoji={kid.emoji} color={PALETTE[kidIndex % PALETTE.length]} size={44} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}</div>
                 <div style={{ fontSize: 12, color: 'var(--ink-faint)', fontWeight: 600 }}>
