@@ -1313,7 +1313,7 @@ function HomeScreen({ go, statuses, feed, homeStyle }) {
   const unread = feed.filter(f => f.unread).length;
 
   const TILES = [
-    { key: 'children',      emoji: '👦🏼', color: '#FBE7A8', colorLight: '#FDFAF0', colorDark: '#C9B986', ink: '#8a6410', go: 'children',
+    { key: 'children',      emoji: '👦🏼', color: '#CDE8FB', colorLight: '#E8F4FD', colorDark: '#A4BCE9', ink: '#1f5f86', go: 'children',
       badge: `${kids.length} ${t('kids')}` },
     { key: 'attendance',    emoji: '📋', color: '#CDE8FB', colorLight: '#E8F4FD', colorDark: '#A4BCE9', ink: '#1f5f86', go: 'attendance',
       badge: `${present}/${kids.length}` },
@@ -2045,38 +2045,38 @@ function App() {
     <div style={rootStyle}>
       {/* ── header ── */}
       <div style={{ flexShrink: 0, position: 'relative', zIndex: 8,
-        background: 'color-mix(in srgb, var(--bg) 86%, #fff)',
-        boxShadow: '0 1px 0 rgba(60,40,20,0.06)' }}>
+        background: '#3E2510',
+        boxShadow: '0 2px 8px rgba(60,40,20,0.15)' }}>
         <div style={{ display: 'flex', alignItems: 'center', padding: '10px 16px 10px', gap: 8 }}>
           {/* left: back or logo + title */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
             {stack.length > 1 ? (
               <button onClick={back} className="bk-press" style={{ display: 'flex', alignItems: 'center', gap: 4,
-                border: 'none', background: '#E8E3DA', cursor: 'pointer', fontFamily: 'inherit',
-                color: 'var(--ink-soft)', fontSize: 13, fontWeight: 800, padding: '5px 12px 5px 8px',
+                border: 'none', background: 'rgba(255,255,255,0.15)', cursor: 'pointer', fontFamily: 'inherit',
+                color: '#fff', fontSize: 13, fontWeight: 800, padding: '5px 12px 5px 8px',
                 borderRadius: 999 }}>
-                <Chevron dir="left" size={16} color="var(--ink-soft)" />{t('back')}
+                <Chevron dir="left" size={16} color="#fff" />{t('back')}
               </button>
             ) : (
               <>
                 <div style={{ lineHeight: 1.1 }}>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{title}</div>
-                  <div style={{ fontSize: 11, color: 'var(--ink-faint)', fontWeight: 600 }}>{t('miniApp')}</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', fontFamily: 'var(--font-display)' }}>{title}</div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>{t('miniApp')}</div>
                 </div>
               </>
             )}
             {stack.length > 1 && (
               <div style={{ lineHeight: 1.1 }}>
-                <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{title}</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', fontFamily: 'var(--font-display)' }}>{title}</div>
               </div>
             )}
           </div>
           {/* right: lang toggle only */}
           <button onClick={toggleLang} className="bk-press" style={{ display: 'flex', border: 'none', cursor: 'pointer',
             borderRadius: 999, overflow: 'hidden', fontFamily: 'inherit', fontSize: 12, fontWeight: 800,
-            background: '#E8E3DA', padding: 3, gap: 2 }}>
-            <span style={{ padding: '5px 12px', borderRadius: 999, background: lang === 'ru' ? 'var(--accent)' : 'transparent', color: lang === 'ru' ? '#fff' : 'var(--ink-soft)', transition: 'all 0.2s' }}>RU</span>
-            <span style={{ padding: '5px 12px', borderRadius: 999, background: lang === 'en' ? 'var(--accent)' : 'transparent', color: lang === 'en' ? '#fff' : 'var(--ink-soft)', transition: 'all 0.2s' }}>EN</span>
+            background: 'rgba(255,255,255,0.15)', padding: 3, gap: 2 }}>
+            <span style={{ padding: '5px 12px', borderRadius: 999, background: lang === 'ru' ? '#F2A81D' : 'transparent', color: lang === 'ru' ? '#3E2510' : 'rgba(255,255,255,0.6)', transition: 'all 0.2s' }}>RU</span>
+            <span style={{ padding: '5px 12px', borderRadius: 999, background: lang === 'en' ? '#F2A81D' : 'transparent', color: lang === 'en' ? '#3E2510' : 'rgba(255,255,255,0.6)', transition: 'all 0.2s' }}>EN</span>
           </button>
         </div>
       </div>
