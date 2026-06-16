@@ -201,7 +201,7 @@
   ];
 
   // status: 'present' | 'absent' | 'late'
-  function kid(o) { return Object.assign({ status: 'present', allergyRu: '', allergyEn: '', noteRu: '', noteEn: '' }, o); }
+  function kid(o) { return Object.assign({ status: 'present', allergyRu: '', allergyEn: '', noteRu: '', noteEn: '', contract: 'longterm' }, o); }
 
   const CHILDREN = [
     // Солнышки
@@ -213,14 +213,14 @@
       status: 'late', rate: 88 }),
     kid({ id: 3, group: 'toddler', emoji: '👧🏻', ru: 'Сафия Нуржан', en: 'Safiya Nurzhan', dob: '21.06.2022', bday: '21 июн',
       momRu: 'Мадина', momEn: 'Madina', momPhone: '+7 705 998 77 66', dadRu: 'Нуржан', dadEn: 'Nurzhan',
-      status: 'absent', noteRu: 'Заболела, ОРВИ', noteEn: 'Sick — cold', rate: 81 }),
+      status: 'absent', noteRu: 'Заболела, ОРВИ', noteEn: 'Sick — cold', rate: 81, contract: 'tourist' }),
     kid({ id: 4, group: 'toddler', emoji: '🧒🏻', ru: 'Даниэль Ким', en: 'Daniel Kim', dob: '09.09.2022', bday: '9 сен',
       momRu: 'Елена', momEn: 'Elena', momPhone: '+7 700 555 44 33', dadRu: 'Виктор', dadEn: 'Victor', checkin: '08:05', rate: 99 }),
     kid({ id: 5, group: 'toddler', emoji: '👦🏻', ru: 'Арман Болат', en: 'Arman Bolat', dob: '17.11.2021', bday: '17 ноя',
       momRu: 'Сауле', momEn: 'Saule', momPhone: '+7 702 345 67 89', dadRu: 'Болат', dadEn: 'Bolat', checkin: '08:28',
       allergyRu: 'Лактоза', allergyEn: 'Lactose', rate: 92 }),
     kid({ id: 6, group: 'toddler', emoji: '👧🏻', ru: 'Зере Аман', en: 'Zere Aman', dob: '28.03.2022', bday: '28 мар',
-      momRu: 'Гульнара', momEn: 'Gulnara', momPhone: '+7 708 222 11 00', dadRu: 'Аман', dadEn: 'Aman', checkin: '08:33', rate: 94 }),
+      momRu: 'Гульнара', momEn: 'Gulnara', momPhone: '+7 708 222 11 00', dadRu: 'Аман', dadEn: 'Aman', checkin: '08:33', rate: 94, contract: 'tourist' }),
 
     // Звёздочки
     kid({ id: 7, group: 'middle', emoji: '👦🏻', ru: 'Ислам Тлеу', en: 'Islam Tleu', dob: '14.01.2021', bday: '14 янв',
@@ -230,7 +230,7 @@
       allergyRu: 'Цитрусовые', allergyEn: 'Citrus', rate: 90 }),
     kid({ id: 9, group: 'middle', emoji: '🧒🏻', ru: 'Нурлан Касым', en: 'Nurlan Kasym', dob: '30.05.2021', bday: '30 мая',
       momRu: 'Бакыт', momEn: 'Bakyt', momPhone: '+7 707 444 55 66', dadRu: 'Касым', dadEn: 'Kasym',
-      status: 'late', checkin: '09:05', rate: 85 }),
+      status: 'late', checkin: '09:05', rate: 85, contract: 'tourist' }),
     kid({ id: 10, group: 'middle', emoji: '👧🏻', ru: 'Лейла Омар', en: 'Leila Omar', dob: '11.10.2021', bday: '11 окт',
       momRu: 'Жулдыз', momEn: 'Zhuldyz', momPhone: '+7 700 121 31 41', dadRu: 'Омар', dadEn: 'Omar', checkin: '08:25', rate: 95 }),
     kid({ id: 11, group: 'middle', emoji: '👦🏻', ru: 'Дамир Аск', en: 'Damir Ask', dob: '22.12.2021', bday: '22 дек',
@@ -245,7 +245,7 @@
       momRu: 'Айша', momEn: 'Aisha', momPhone: '+7 708 343 23 13', dadRu: 'Кайрат', dadEn: 'Kairat', checkin: '08:44', rate: 88 }),
     kid({ id: 14, group: 'big', emoji: '👶🏻', ru: 'Сабина Ер', en: 'Sabina Yer', dob: '27.06.2023', bday: '27 июн',
       momRu: 'Венера', momEn: 'Venera', momPhone: '+7 700 767 87 97', dadRu: 'Ерлан', dadEn: 'Yerlan',
-      allergyRu: 'Глютен', allergyEn: 'Gluten', rate: 93 }),
+      allergyRu: 'Глютен', allergyEn: 'Gluten', rate: 93, contract: 'tourist' }),
     kid({ id: 15, group: 'big', emoji: '🧒🏻', ru: 'Олжас Ныгмет', en: 'Olzhas Nygmet', dob: '02.11.2023', bday: '2 ноя',
       momRu: 'Дана', momEn: 'Dana', momPhone: '+7 701 454 64 74', dadRu: 'Нурлыбек', dadEn: 'Nurlybek', checkin: '08:58', rate: 84 }),
 
@@ -257,7 +257,7 @@
       allergyRu: 'Мёд', allergyEn: 'Honey', noteRu: 'Помогает малышам', noteEn: 'Helps the little ones', rate: 96 }),
     kid({ id: 18, group: 'primary', emoji: '👦🏻', ru: 'Санжар Тур', en: 'Sanzhar Tur', dob: '23.07.2020', bday: '23 июл',
       momRu: 'Перизат', momEn: 'Perizat', momPhone: '+7 700 989 09 19', dadRu: 'Турсын', dadEn: 'Tursyn',
-      status: 'late', checkin: '09:12', rate: 82 }),
+      status: 'late', checkin: '09:12', rate: 82, contract: 'tourist' }),
     kid({ id: 19, group: 'primary', emoji: '👧🏻', ru: 'Малика Жол', en: 'Malika Zhol', dob: '30.01.2020', bday: '30 янв',
       momRu: 'Сабина', momEn: 'Sabina', momPhone: '+7 701 010 20 30', dadRu: 'Жолдас', dadEn: 'Zholdas', checkin: '08:22', rate: 94 }),
     kid({ id: 20, group: 'primary', emoji: '🧒🏻', ru: 'Алихан Бек', en: 'Alikhan Bek', dob: '12.09.2020', bday: '12 сен',
@@ -1944,13 +1944,47 @@ function PaymentsScreen() {
     return m;
   });
 
-  const AMOUNTS = { toddler: 400, middle: 450, big: 500, primary: 550 };
+  const MONTHLY = { toddler: 400, middle: 450, big: 500, primary: 550 };
+  const DAILY   = { toddler: 35,  middle: 40,  big: 45,  primary: 50  };
+  const DAYS    = 18; // рабочих дней в месяце
+
   const chips = [{ id: 'all', label: t('all'), emoji: '🗂️' }, ...DATA.GROUPS.map(g => ({ id: g.id, label: Lo(g), emoji: g.emoji }))];
-  const kids = DATA.CHILDREN.filter(k => filter === 'all' || k.group === filter);
-  const countPaid   = kids.filter(k =>  paid[k.id]).length;
-  const countUnpaid = kids.filter(k => !paid[k.id]).length;
-  const totalPaid   = kids.filter(k =>  paid[k.id]).reduce((s, k) => s + AMOUNTS[k.group], 0);
+  const allKids = DATA.CHILDREN.filter(k => filter === 'all' || k.group === filter);
+  const longterm = allKids.filter(k => k.contract !== 'tourist');
+  const tourist  = allKids.filter(k => k.contract === 'tourist');
+
+  const getAmount = kid => kid.contract === 'tourist' ? DAILY[kid.group] * DAYS : MONTHLY[kid.group];
+  const totalPaid = allKids.filter(k => paid[k.id]).reduce((s, k) => s + getAmount(k), 0);
+  const countPaid   = allKids.filter(k =>  paid[k.id]).length;
+  const countUnpaid = allKids.filter(k => !paid[k.id]).length;
   const PALETTE = ['#FBE7A8','#CDE8FB','#D4F0DF','#FBD9E1','#FBE0C0','#E8D5FB'];
+
+  function KidRow({ kid }) {
+    const grp = DATA.GROUPS.find(g => g.id === kid.group);
+    const isPaid = paid[kid.id];
+    const isTourist = kid.contract === 'tourist';
+    const amount = getAmount(kid);
+    const kidIndex = DATA.CHILDREN.filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
+    return (
+      <Card pad={12} onClick={() => setPaid(m => ({ ...m, [kid.id]: !m[kid.id] }))}
+        style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2' }}>
+        <Avatar emoji={kid.emoji} color={PALETTE[kidIndex % PALETTE.length]} size={44} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}</div>
+          <span style={{ background: grp.color, color: grp.ink, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999 }}>{grp.emoji} {Lo(grp)}</span>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--ink)', marginBottom: 4 }}>
+            ${isTourist ? `${DAILY[kid.group]}/день` : amount}
+          </div>
+          <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
+            background: isPaid ? '#E6F7EE' : '#FEF0ED', color: isPaid ? '#1f7a55' : '#c0392b' }}>
+            {isPaid ? L('✓ Оплачено', '✓ Paid') : L('Не оплачено', 'Unpaid')}
+          </span>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
@@ -1983,29 +2017,14 @@ function PaymentsScreen() {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 9, padding: '0 20px' }}>
-        {kids.map(kid => {
-          const grp = DATA.GROUPS.find(g => g.id === kid.group);
-          const isPaid = paid[kid.id];
-          const amount = AMOUNTS[kid.group];
-          const kidIndex = DATA.CHILDREN.filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
-          return (
-            <Card key={kid.id} pad={12} onClick={() => setPaid(m => ({ ...m, [kid.id]: !m[kid.id] }))}
-              style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2' }}>
-              <Avatar emoji={kid.emoji} color={PALETTE[kidIndex % PALETTE.length]} size={44} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}</div>
-                <span style={{ background: grp.color, color: grp.ink, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999 }}>{grp.emoji} {Lo(grp)}</span>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--ink)', marginBottom: 4 }}>${amount}</div>
-                <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
-                  background: isPaid ? '#E6F7EE' : '#FEF0ED', color: isPaid ? '#1f7a55' : '#c0392b' }}>
-                  {isPaid ? L('✓ Оплачено', '✓ Paid') : L('Не оплачено', 'Unpaid')}
-                </span>
-              </div>
-            </Card>
-          );
-        })}
+        {longterm.length > 0 && <>
+          <SectionLabel>{L('Долгосрочные', 'Long term')}</SectionLabel>
+          {longterm.map(kid => <KidRow key={kid.id} kid={kid} />)}
+        </>}
+        {tourist.length > 0 && <>
+          <SectionLabel>{L('Туристы', 'Tourist')}</SectionLabel>
+          {tourist.map(kid => <KidRow key={kid.id} kid={kid} />)}
+        </>}
       </div>
       <div style={{ height: 30 }} />
     </div>
