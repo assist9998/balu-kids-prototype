@@ -1452,7 +1452,6 @@ function HomeList({ tiles, go }) {
 function ChildrenScreen({ go, statuses }) {
   return (
     <div style={{ padding: '4px 20px 28px' }}>
-      <SectionLabel>{t('groups')}</SectionLabel>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {DATA.GROUPS.map(grp => {
           const inGroup = DATA.CHILDREN.filter(k => k.group === grp.id);
