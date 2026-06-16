@@ -1936,30 +1936,43 @@ function ComposeScreen({ back, actions }) {
 }
 
 function PaymentsScreen() {
-  const [section, setSection] = React.useState('garden');
-  const [tariff,  setTariff]  = React.useState('longterm');
-  const [group,   setGroup]   = React.useState('all');
-  const [clubId,  setClubId]  = React.useState(() => DATA.CLUBS[0].id);
+  const GARDEN_MONTHS = [
+    { id: 'jun', ru: 'Июнь',     en: 'June'      },
+    { id: 'jul', ru: 'Июль',     en: 'July'       },
+    { id: 'aug', ru: 'Август',   en: 'August'     },
+    { id: 'sep', ru: 'Сентябрь', en: 'September'  },
+  ];
+  const TODAY = '16.06.26';
 
-  const initPaid = () => { const m = {}; DATA.CHILDREN.forEach((k, i) => { m[k.id] = i % 3 !== 2; }); return m; };
+  const [section,     setSection]    = React.useState('garden');
+  const [tariff,      setTariff]     = React.useState('longterm');
+  const [group,       setGroup]      = React.useState('all');
+  const [clubId,      setClubId]     = React.useState(() => DATA.CLUBS[0].id);
+  const [selMonth,    setSelMonth]   = React.useState('jun');
+  const [payFilter,   setPayFilter]  = React.useState('all');
+  const [showTotal,   setShowTotal]  = React.useState(false);
+  const [expandedKid, setExpandedKid] = React.useState(null);
+  const [toast,       setToast]      = React.useState(null);
+
+  const initMonthPaid = () => {
+    const r = {};
+    GARDEN_MONTHS.forEach((mo, mi) => {
+      r[mo.id] = {};
+      DATA.CHILDREN.forEach((k, i) => {
+        r[mo.id][k.id] = { paid: mi === 0 && i % 3 !== 2, date: mi === 0 && i % 3 !== 2 ? TODAY : '' };
+      });
+    });
+    return r;
+  };
+  const [monthPaid,  setMonthPaid]  = React.useState(initMonthPaid);
+  const [monthSaved, setMonthSaved] = React.useState(initMonthPaid);
+
   const initClubPaid = () => { const m = {}; DATA.CLUBS.forEach(c => c.kids.forEach((id, i) => { m[`${c.id}_${id}`] = i % 2 === 0; })); return m; };
+  const [clubPaid, setClubPaid] = React.useState(initClubPaid);
+  const [savedC,   setSavedC]   = React.useState(initClubPaid);
 
-  const [paid,       setPaid]     = React.useState(initPaid);
-  const [savedP,     setSavedP]   = React.useState(initPaid);
-  const [clubPaid,   setClubPaid] = React.useState(initClubPaid);
-  const [savedC,     setSavedC]   = React.useState(initClubPaid);
-  const [toast,      setToast]    = React.useState(null);
-  const [payFilter,  setPayFilter] = React.useState('all');
-
-  const hasChanges = section === 'garden'
-    ? DATA.CHILDREN.some(k => paid[k.id] !== savedP[k.id])
-    : DATA.CLUBS.flatMap(c => c.kids.map(id => `${c.id}_${id}`)).some(key => clubPaid[key] !== savedC[key]);
-
-  function handleSave() {
-    if (section === 'garden') setSavedP({ ...paid }); else setSavedC({ ...clubPaid });
-    setToast(L('Сохранено ✓', 'Saved ✓'));
-    setTimeout(() => setToast(null), 2000);
-  }
+  const curPaid  = monthPaid[selMonth]  || {};
+  const curSaved = monthSaved[selMonth] || {};
 
   const MONTHLY = { toddler: 400, middle: 450, big: 500, primary: 550 };
   const DAILY   = { toddler: 35,  middle: 40,  big: 45,  primary: 50  };
@@ -1971,24 +1984,48 @@ function PaymentsScreen() {
     .filter(k => isTour ? k.contract === 'tourist' : k.contract !== 'tourist')
     .filter(k => group === 'all' || k.group === group);
   const getAmount = kid => isTour ? DAILY[kid.group] : MONTHLY[kid.group];
-  const gCountPaid   = gardenKidsAll.filter(k =>  paid[k.id]).length;
-  const gCountUnpaid = gardenKidsAll.filter(k => !paid[k.id]).length;
-  const gTotal       = gardenKidsAll.filter(k =>  paid[k.id]).reduce((s, k) => s + getAmount(k), 0);
+  const isPaidCur = kid => !!curPaid[kid.id]?.paid;
+  const gCountPaid   = gardenKidsAll.filter(k =>  isPaidCur(k)).length;
+  const gCountUnpaid = gardenKidsAll.filter(k => !isPaidCur(k)).length;
+  const gTotal       = gardenKidsAll.filter(k =>  isPaidCur(k)).reduce((s, k) => s + getAmount(k), 0);
   const gardenKids   = gardenKidsAll.filter(k =>
-    payFilter === 'paid' ? paid[k.id] : payFilter === 'unpaid' ? !paid[k.id] : true);
+    payFilter === 'paid' ? isPaidCur(k) : payFilter === 'unpaid' ? !isPaidCur(k) : true);
 
-  const activeClub = DATA.CLUBS.find(c => c.id === clubId);
+  const activeClub  = DATA.CLUBS.find(c => c.id === clubId);
   const clubKidsAll = DATA.CHILDREN.filter(k => activeClub.kids.includes(k.id));
-  const cKey = kid => `${clubId}_${kid.id}`;
+  const cKey        = kid => `${clubId}_${kid.id}`;
   const cCountPaid   = clubKidsAll.filter(k =>  clubPaid[cKey(k)]).length;
   const cCountUnpaid = clubKidsAll.filter(k => !clubPaid[cKey(k)]).length;
   const cTotal       = clubKidsAll.filter(k =>  clubPaid[cKey(k)]).length * CLUB_PRICE[clubId];
   const clubKids     = clubKidsAll.filter(k =>
     payFilter === 'paid' ? clubPaid[cKey(k)] : payFilter === 'unpaid' ? !clubPaid[cKey(k)] : true);
 
+  const hasChanges = section === 'garden'
+    ? DATA.CHILDREN.some(k => (curPaid[k.id]?.paid || false) !== (curSaved[k.id]?.paid || false))
+    : DATA.CLUBS.flatMap(c => c.kids.map(id => `${c.id}_${id}`)).some(key => clubPaid[key] !== savedC[key]);
+
+  function showToastMsg(msg) { setToast(msg); setTimeout(() => setToast(null), 2000); }
+
+  function handleSave() {
+    if (section === 'garden') setMonthSaved(prev => ({ ...prev, [selMonth]: { ...curPaid } }));
+    else setSavedC({ ...clubPaid });
+    showToastMsg(L('Сохранено ✓', 'Saved ✓'));
+  }
+
+  function toggleKidMonth(kidId, monthId) {
+    setMonthPaid(prev => {
+      const wasPaid = prev[monthId]?.[kidId]?.paid;
+      return { ...prev, [monthId]: { ...prev[monthId], [kidId]: { paid: !wasPaid, date: !wasPaid ? TODAY : '' } } };
+    });
+  }
+
+  function kidPaidMonths(kidId) {
+    return GARDEN_MONTHS.filter(mo => monthPaid[mo.id]?.[kidId]?.paid).map(mo => mo.id);
+  }
+
   function SegBtn({ id, children }) {
     return (
-      <button onClick={() => { setSection(id); setGroup('all'); setPayFilter('all'); }} className="bk-press" style={{
+      <button onClick={() => { setSection(id); setGroup('all'); setPayFilter('all'); setExpandedKid(null); }} className="bk-press" style={{
         flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
         padding: '9px 4px', borderRadius: 999, fontSize: 13, fontWeight: 800,
         background: section === id ? '#B07848' : 'transparent',
@@ -2017,32 +2054,71 @@ function PaymentsScreen() {
       <div style={{ display: 'flex', gap: 10, padding: '0 20px 16px' }}>
         {statBox('paid',   cp, L('Оплатили', 'Paid'),      'var(--ok)')}
         {statBox('unpaid', cu, L('Не оплатили', 'Unpaid'), 'var(--no)')}
-        <div style={{ flex: 1.4, background: '#FBF7F2', borderRadius: 18, padding: '12px 8px', textAlign: 'center' }}>
-          <div style={{ fontSize: 22, fontWeight: 800, color: '#B07848', lineHeight: 1, fontFamily: 'var(--font-display)' }}>${total}</div>
-          <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 700, marginTop: 4 }}>{L('Собрано', 'Collected')}</div>
+        <div onClick={() => setShowTotal(v => !v)} className="bk-press" style={{
+          flex: 1.4, background: '#FBF7F2', borderRadius: 18, padding: '12px 8px', textAlign: 'center', cursor: 'pointer' }}>
+          <div style={{ fontSize: 22, fontWeight: 800, color: '#B07848', lineHeight: 1, fontFamily: 'var(--font-display)',
+            filter: showTotal ? 'none' : 'blur(6px)', userSelect: 'none', transition: 'filter 0.2s' }}>${total}</div>
+          <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 700, marginTop: 4 }}>
+            {showTotal ? L('Собрано', 'Collected') : '👁 ' + L('показать', 'show')}
+          </div>
         </div>
       </div>
     );
   }
 
-  function KidPayRow({ kid, isPaid, onToggle, amount, suffix }) {
+  function KidPayRow({ kid, isPaid, date, onToggle, amount, suffix, showMonths }) {
     const grp = DATA.GROUPS.find(g => g.id === kid.group);
     const kidIndex = DATA.CHILDREN.filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
+    const isExpanded = expandedKid === kid.id;
+    const paidMonths = showMonths ? kidPaidMonths(kid.id) : [];
     return (
-      <Card pad={12} onClick={onToggle} style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2' }}>
-        <Avatar emoji={kid.emoji} color={PALETTE[kidIndex % PALETTE.length]} size={44} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}</div>
-          <span style={{ background: grp.color, color: grp.ink, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999 }}>{grp.emoji} {Lo(grp)}</span>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--ink)', marginBottom: 4 }}>${amount}{suffix || ''}</div>
-          <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
-            background: isPaid ? '#E6F7EE' : '#FEF0ED', color: isPaid ? '#1f7a55' : '#c0392b' }}>
-            {isPaid ? L('✓ Оплачено', '✓ Paid') : L('Не оплачено', 'Unpaid')}
-          </span>
-        </div>
-      </Card>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+        <Card pad={12} style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2',
+          borderRadius: isExpanded ? '18px 18px 0 0' : 18 }}>
+          <div onClick={onToggle} style={{ display: 'flex', alignItems: 'center', gap: 13, flex: 1, minWidth: 0, cursor: 'pointer' }}>
+            <Avatar emoji={kid.emoji} color={PALETTE[kidIndex % PALETTE.length]} size={44} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                <span style={{ background: grp.color, color: grp.ink, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999 }}>{grp.emoji} {Lo(grp)}</span>
+                {isPaid && date && <span style={{ fontSize: 11, color: 'var(--ink-faint)', fontWeight: 600 }}>{date}</span>}
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+            <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--ink)' }}>${amount}{suffix || ''}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span onClick={onToggle} style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, cursor: 'pointer',
+                background: isPaid ? '#E6F7EE' : '#FEF0ED', color: isPaid ? '#1f7a55' : '#c0392b' }}>
+                {isPaid ? L('✓ Оплачено', '✓ Paid') : L('Не оплачено', 'Unpaid')}
+              </span>
+              {showMonths && (
+                <span onClick={e => { e.stopPropagation(); setExpandedKid(isExpanded ? null : kid.id); }}
+                  style={{ fontSize: 14, cursor: 'pointer', opacity: 0.6, lineHeight: 1 }}>📅</span>
+              )}
+            </div>
+          </div>
+        </Card>
+        {isExpanded && showMonths && (
+          <div style={{ background: '#F3EDE6', borderRadius: '0 0 18px 18px', padding: '10px 14px 12px', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <div style={{ width: '100%', fontSize: 11, fontWeight: 700, color: 'var(--ink-faint)', marginBottom: 4 }}>
+              {L('Оплачено за месяцы:', 'Paid months:')}
+            </div>
+            {GARDEN_MONTHS.map(mo => {
+              const isP = paidMonths.includes(mo.id);
+              return (
+                <button key={mo.id} onClick={() => toggleKidMonth(kid.id, mo.id)} className="bk-press" style={{
+                  border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700,
+                  padding: '5px 12px', borderRadius: 999,
+                  background: isP ? '#B07848' : '#FBF7F2',
+                  color: isP ? '#fff' : 'var(--ink-soft)' }}>
+                  {isP ? '✓ ' : ''}{mo.ru}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
     );
   }
 
@@ -2058,10 +2134,23 @@ function PaymentsScreen() {
       </div>
 
       {section === 'garden' && <>
+        {/* month selector */}
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '0 20px 14px', scrollbarWidth: 'none' }}>
+          {GARDEN_MONTHS.map(mo => (
+            <button key={mo.id} onClick={() => { setSelMonth(mo.id); setPayFilter('all'); setExpandedKid(null); }} className="bk-press" style={{
+              flexShrink: 0, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+              padding: '7px 16px', borderRadius: 999, fontSize: 13, fontWeight: 700,
+              background: selMonth === mo.id ? '#B07848' : '#FBF7F2',
+              color: selMonth === mo.id ? '#fff' : 'var(--ink-soft)',
+              boxShadow: selMonth === mo.id ? '0 6px 14px -6px #B07848' : '0 1px 2px rgba(60,40,20,0.05)' }}>
+              {mo.ru}
+            </button>
+          ))}
+        </div>
         {/* tariff toggle */}
         <div style={{ display: 'flex', margin: '0 20px 14px', background: '#FBF7F2', borderRadius: 999, padding: 4, gap: 4 }}>
           {[['longterm', L('Долгосрочные', 'Long term')], ['tourist', L('Туристы', 'Tourist')]].map(([id, label]) => (
-            <button key={id} onClick={() => { setTariff(id); setGroup('all'); setPayFilter('all'); }} className="bk-press" style={{
+            <button key={id} onClick={() => { setTariff(id); setGroup('all'); setPayFilter('all'); setExpandedKid(null); }} className="bk-press" style={{
               flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
               padding: '9px 4px', borderRadius: 999, fontSize: 13, fontWeight: 800,
               background: tariff === id ? '#B07848' : 'transparent',
@@ -2085,9 +2174,11 @@ function PaymentsScreen() {
         <Stats cp={gCountPaid} cu={gCountUnpaid} total={gTotal} filter={payFilter} onFilter={setPayFilter} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 9, padding: '0 20px' }}>
           {gardenKids.map(kid => (
-            <KidPayRow key={kid.id} kid={kid} isPaid={paid[kid.id]}
-              onToggle={() => setPaid(m => ({ ...m, [kid.id]: !m[kid.id] }))}
-              amount={getAmount(kid)} suffix={isTour ? L('/день', '/day') : ''} />
+            <KidPayRow key={kid.id} kid={kid}
+              isPaid={isPaidCur(kid)} date={curPaid[kid.id]?.date}
+              onToggle={() => toggleKidMonth(kid.id, selMonth)}
+              amount={getAmount(kid)} suffix={isTour ? L('/день', '/day') : ''}
+              showMonths={!isTour} />
           ))}
         </div>
       </>}
@@ -2110,10 +2201,11 @@ function PaymentsScreen() {
           {clubKids.map(kid => (
             <KidPayRow key={kid.id} kid={kid} isPaid={clubPaid[cKey(kid)]}
               onToggle={() => setClubPaid(m => ({ ...m, [cKey(kid)]: !m[cKey(kid)] }))}
-              amount={CLUB_PRICE[clubId]} />
+              amount={CLUB_PRICE[clubId]} showMonths={false} />
           ))}
         </div>
       </>}
+
       {hasChanges && (
         <div style={{ position: 'sticky', bottom: 0, marginTop: 16, padding: '14px 20px 26px',
           background: 'linear-gradient(to top, var(--bg) 62%, transparent)' }}>
