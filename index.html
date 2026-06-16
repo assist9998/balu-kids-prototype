@@ -110,6 +110,8 @@
     attendance:      { ru: 'Посещаемость',    en: 'Attendance' },
     summary:         { ru: 'Сводка',          en: 'Summary' },
     notifications:   { ru: 'Уведомления',     en: 'Notifications' },
+    payments:        { ru: 'Оплата',          en: 'Payments' },
+    activities:      { ru: 'Доп. занятия',    en: 'Activities' },
     children_sub:    { ru: 'Профили и группы', en: 'Profiles & groups' },
     attendance_sub:  { ru: 'Отметки за день',  en: 'Daily check-in' },
     summary_sub:     { ru: 'Статистика дня',   en: 'Today at a glance' },
@@ -1319,6 +1321,10 @@ function HomeScreen({ go, statuses, feed, homeStyle }) {
       badge: `${rate}%` },
     { key: 'notifications', emoji: '⭐', color: '#FBD9E1', colorLight: '#FDF0F3', colorDark: '#C9ADBA', ink: '#a8456a', go: 'notifications',
       badge: unread ? `${unread} ${t('unread')}` : null, dot: unread > 0 },
+    { key: 'payments',      emoji: '💳', color: '#E8F0FB', colorLight: '#F4F7FD', colorDark: '#A4B4D8', ink: '#2a4486', go: 'notifications',
+      badge: null },
+    { key: 'activities',    emoji: '🏊', color: '#F0EBFB', colorLight: '#F8F5FD', colorDark: '#B4A4D8', ink: '#4a2a86', go: 'notifications',
+      badge: null },
   ];
 
   const hour = new Date().getHours();
