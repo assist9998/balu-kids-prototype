@@ -2075,9 +2075,9 @@ function App() {
           {/* right: lang toggle only */}
           <button onClick={toggleLang} className="bk-press" style={{ display: 'flex', border: 'none', cursor: 'pointer',
             borderRadius: 999, overflow: 'hidden', fontFamily: 'inherit', fontSize: 12, fontWeight: 800,
-            background: 'color-mix(in srgb, var(--ink) 8%, transparent)' }}>
-            <span style={{ padding: '5px 9px', background: lang === 'ru' ? 'var(--accent)' : 'transparent', color: lang === 'ru' ? '#fff' : 'var(--ink-soft)' }}>RU</span>
-            <span style={{ padding: '5px 9px', background: lang === 'en' ? 'var(--accent)' : 'transparent', color: lang === 'en' ? '#fff' : 'var(--ink-soft)' }}>EN</span>
+            background: '#E8E3DA', padding: 3, gap: 2 }}>
+            <span style={{ padding: '5px 12px', borderRadius: 999, background: lang === 'ru' ? 'var(--accent)' : 'transparent', color: lang === 'ru' ? '#fff' : 'var(--ink-soft)', transition: 'all 0.2s' }}>RU</span>
+            <span style={{ padding: '5px 12px', borderRadius: 999, background: lang === 'en' ? 'var(--accent)' : 'transparent', color: lang === 'en' ? '#fff' : 'var(--ink-soft)', transition: 'all 0.2s' }}>EN</span>
           </button>
         </div>
       </div>
