@@ -1929,7 +1929,6 @@ function ComposeScreen({ back, actions }) {
   return (
     <div style={{ padding: '6px 20px 30px', display: 'flex', flexDirection: 'column', gap: 18 }}>
       <div>
-        <SectionLabel>{t('noteType')}</SectionLabel>
         <div style={{ display: 'flex', gap: 8 }}>
           {types.map(x => (
             <button key={x.id} onClick={() => setType(x.id)} className="bk-press" style={{
@@ -1945,7 +1944,6 @@ function ComposeScreen({ back, actions }) {
       </div>
 
       <div>
-        <SectionLabel>RU</SectionLabel>
         <textarea value={text} onChange={e => handleTextChange(e.target.value)} placeholder={t('noteTextPlaceholder')}
           rows={4} style={{ width: '100%', boxSizing: 'border-box', resize: 'none', border: 'none',
           background: '#FBF7F2', borderRadius: 18, padding: 16, fontFamily: 'inherit', fontSize: 15.5,
