@@ -2115,44 +2115,31 @@ function PaymentsGardenScreen() {
           if (dx < -50) nextMonth();
           else if (dx > 50) prevMonth();
         }}
-        style={{ margin: '0 20px 16px', borderRadius: 26, padding: '18px 18px 16px',
-          background: '#fde6df', boxShadow: '0 1px 2px rgba(60,40,20,0.04), 0 16px 32px -24px rgba(60,40,20,0.55)',
-          userSelect: 'none', position: 'relative', overflow: 'hidden' }}>
+        style={{ margin: '0 20px 16px', borderRadius: 22, padding: '16px 18px',
+          background: '#fde6df', boxShadow: '0 1px 2px rgba(60,40,20,0.04), 0 16px 32px -24px rgba(60,40,20,0.45)',
+          userSelect: 'none' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-          <button onClick={prevMonth} style={{ width: 36, height: 36, borderRadius: '50%', border: 'none',
-            background: monthIdx > 0 ? 'rgba(255,255,255,0.65)' : 'transparent',
-            cursor: monthIdx > 0 ? 'pointer' : 'default', opacity: monthIdx > 0 ? 1 : 0.25,
-            fontSize: 18, display: 'grid', placeItems: 'center', color: '#B07848', fontWeight: 800,
-            boxShadow: monthIdx > 0 ? '0 2px 6px rgba(60,40,20,0.1)' : 'none' }}>‹</button>
+          <button onClick={prevMonth} style={{ border: 'none', background: 'none', cursor: monthIdx > 0 ? 'pointer' : 'default',
+            fontSize: 20, opacity: monthIdx > 0 ? 1 : 0.25, padding: 0 }}>‹</button>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)', lineHeight: 1 }}>{Lo(mo)}</div>
-            <div style={{ display: 'flex', gap: 5, justifyContent: 'center', marginTop: 8 }}>
-              {GARDEN_MONTHS.map((_, i) => (
-                <div key={i} onClick={() => { setMonthIdx(i); setPayFilter('all'); }}
-                  style={{ height: 6, borderRadius: 3, cursor: 'pointer', transition: 'all 0.2s',
-                    width: i === monthIdx ? 18 : 6,
-                    background: i === monthIdx ? '#B07848' : 'rgba(176,120,72,0.3)' }} />
-              ))}
+            <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{Lo(mo)}</div>
+            <div style={{ fontSize: 12, color: 'var(--ink-faint)', fontWeight: 600, marginTop: 2 }}>
+              {monthIdx + 1} / {GARDEN_MONTHS.length}
             </div>
           </div>
-          <button onClick={nextMonth} style={{ width: 36, height: 36, borderRadius: '50%', border: 'none',
-            background: monthIdx < GARDEN_MONTHS.length-1 ? 'rgba(255,255,255,0.65)' : 'transparent',
-            cursor: monthIdx < GARDEN_MONTHS.length-1 ? 'pointer' : 'default', opacity: monthIdx < GARDEN_MONTHS.length-1 ? 1 : 0.25,
-            fontSize: 18, display: 'grid', placeItems: 'center', color: '#B07848', fontWeight: 800,
-            boxShadow: monthIdx < GARDEN_MONTHS.length-1 ? '0 2px 6px rgba(60,40,20,0.1)' : 'none' }}>›</button>
+          <button onClick={nextMonth} style={{ border: 'none', background: 'none', cursor: monthIdx < GARDEN_MONTHS.length - 1 ? 'pointer' : 'default',
+            fontSize: 20, opacity: monthIdx < GARDEN_MONTHS.length - 1 ? 1 : 0.25, padding: 0 }}>›</button>
         </div>
-        <div style={{ display: 'flex', background: 'rgba(255,255,255,0.55)', borderRadius: 16, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', gap: 10 }}>
           {[
-            { label: L('Оплатили', 'Paid'),     val: countPaid,   color: 'var(--ok)', filter: 'paid'   },
-            { label: L('Не платили', 'Unpaid'), val: countUnpaid, color: 'var(--no)', filter: 'unpaid' },
-            { label: L('Собрано', 'Collected'), val: `$${total}`, color: '#B07848',   filter: null     },
+            { label: L('Оплатили', 'Paid'),       val: countPaid,   color: 'var(--ok)' },
+            { label: L('Не оплатили', 'Unpaid'),   val: countUnpaid, color: 'var(--no)' },
+            { label: L('Собрано', 'Collected'),    val: `$${total}`, color: '#B07848'   },
           ].map((s, i) => (
-            <div key={i} onClick={() => s.filter && setPayFilter(f => f === s.filter ? 'all' : s.filter)}
-              style={{ flex: 1, padding: '10px 6px', textAlign: 'center',
-                cursor: s.filter ? 'pointer' : 'default',
-                borderLeft: i > 0 ? '1px solid rgba(176,120,72,0.15)' : 'none',
-                background: payFilter === s.filter ? 'rgba(176,120,72,0.13)' : 'transparent',
-                transition: 'background 0.15s' }}>
+            <div key={i} onClick={() => i < 2 && setPayFilter(f => f === (i===0?'paid':'unpaid') ? 'all' : (i===0?'paid':'unpaid'))}
+              style={{ flex: 1, background: 'rgba(255,255,255,0.6)', borderRadius: 14, padding: '10px 6px',
+                textAlign: 'center', cursor: i < 2 ? 'pointer' : 'default',
+                boxShadow: (payFilter === 'paid' && i===0) || (payFilter === 'unpaid' && i===1) ? '0 0 0 2px #B07848' : 'none' }}>
               <div style={{ fontSize: 22, fontWeight: 800, color: s.color, lineHeight: 1, fontFamily: 'var(--font-display)' }}>{s.val}</div>
               <div style={{ fontSize: 11, color: 'var(--ink-soft)', fontWeight: 700, marginTop: 3 }}>{s.label}</div>
             </div>
