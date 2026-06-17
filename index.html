@@ -2080,6 +2080,31 @@ function PaymentsGardenScreen() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
 
+      {/* tariff toggle */}
+      <div style={{ display: 'flex', margin: '0 20px 14px', background: '#FBF7F2', borderRadius: 999, padding: 4, gap: 4 }}>
+        {[['longterm', L('Долгосрочные', 'Long term')], ['tourist', L('Туристы', 'Tourist')]].map(([id, label]) => (
+          <button key={id} onClick={() => { setTariff(id); setGroup('all'); setPayFilter('all'); }} className="bk-press" style={{
+            flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+            padding: '9px 4px', borderRadius: 999, fontSize: 13, fontWeight: 800,
+            background: tariff === id ? '#B07848' : 'transparent',
+            color: tariff === id ? '#fff' : 'var(--ink-soft)', transition: 'all 0.2s' }}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '0 20px 14px', scrollbarWidth: 'none' }}>
+        {chips.map(c => (
+          <button key={c.id} onClick={() => setGroup(c.id)} className="bk-press" style={{
+            flexShrink: 0, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+            padding: '7px 12px', borderRadius: 999, fontSize: 13, fontWeight: 700,
+            background: group === c.id ? '#B07848' : '#FBF7F2',
+            color: group === c.id ? '#fff' : 'var(--ink-soft)',
+            boxShadow: group === c.id ? '0 6px 14px -6px #B07848' : '0 1px 2px rgba(60,40,20,0.05)' }}>
+            {c.emoji} {c.label}
+          </button>
+        ))}
+      </div>
+
       {/* month card */}
       <div
         onTouchStart={e => { touchStart.current = e.touches[0].clientX; }}
@@ -2122,30 +2147,6 @@ function PaymentsGardenScreen() {
         </div>
       </div>
 
-      {/* tariff toggle */}
-      <div style={{ display: 'flex', margin: '0 20px 14px', background: '#FBF7F2', borderRadius: 999, padding: 4, gap: 4 }}>
-        {[['longterm', L('Долгосрочные', 'Long term')], ['tourist', L('Туристы', 'Tourist')]].map(([id, label]) => (
-          <button key={id} onClick={() => { setTariff(id); setGroup('all'); setPayFilter('all'); }} className="bk-press" style={{
-            flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-            padding: '9px 4px', borderRadius: 999, fontSize: 13, fontWeight: 800,
-            background: tariff === id ? '#B07848' : 'transparent',
-            color: tariff === id ? '#fff' : 'var(--ink-soft)', transition: 'all 0.2s' }}>
-            {label}
-          </button>
-        ))}
-      </div>
-      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '0 20px 14px', scrollbarWidth: 'none' }}>
-        {chips.map(c => (
-          <button key={c.id} onClick={() => setGroup(c.id)} className="bk-press" style={{
-            flexShrink: 0, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-            padding: '7px 12px', borderRadius: 999, fontSize: 13, fontWeight: 700,
-            background: group === c.id ? '#B07848' : '#FBF7F2',
-            color: group === c.id ? '#fff' : 'var(--ink-soft)',
-            boxShadow: group === c.id ? '0 6px 14px -6px #B07848' : '0 1px 2px rgba(60,40,20,0.05)' }}>
-            {c.emoji} {c.label}
-          </button>
-        ))}
-      </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 9, padding: '0 20px' }}>
         {kids.map(kid => (
           <KidPayRow key={kid.id} kid={kid} isPaid={curPaid[kid.id]}
