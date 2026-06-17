@@ -1884,20 +1884,43 @@ function NotificationsScreen({ feed, go, actions }) {
 //  COMPOSE (internal notes/alerts for staff)
 // ════════════════════════════════════════════════════════════════
 function ComposeScreen({ back, actions }) {
-  const [text, setText] = React.useState('');
+  const [text,       setText]       = React.useState('');
+  const [translated, setTranslated] = React.useState('');
+  const [loading,    setLoading]    = React.useState(false);
   const [type, setType] = React.useState('alert');
   const types = [
     { id: 'alert',    emoji: '📋', label: t('typeAlert') },
     { id: 'birthday', emoji: '🎂', label: t('typeBirthday') },
   ];
 
+  async function translate() {
+    if (!text.trim()) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text.trim())}&langpair=ru|en`);
+      const data = await res.json();
+      setTranslated(data.responseData?.translatedText || '');
+    } catch {
+      setTranslated('');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleTextChange(val) {
+    setText(val);
+    setTranslated('');
+  }
+
   function send() {
     if (!text.trim()) return;
     const chosen = types.find(x => x.id === type);
-    actions.addPost({ ru: text, en: text, emoji: chosen.emoji, type });
+    actions.addPost({ ru: text, en: translated || text, emoji: chosen.emoji, type });
     actions.toast(t('noteSaved') + ' ✓');
     back();
   }
+
+  const canSend = text.trim() && translated;
 
   return (
     <div style={{ padding: '6px 20px 30px', display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -1918,19 +1941,38 @@ function ComposeScreen({ back, actions }) {
       </div>
 
       <div>
-        <SectionLabel>{t('noteText')}</SectionLabel>
-        <textarea value={text} onChange={e => setText(e.target.value)} placeholder={t('noteTextPlaceholder')}
-          rows={5} style={{ width: '100%', boxSizing: 'border-box', resize: 'none', border: 'none',
+        <SectionLabel>RU</SectionLabel>
+        <textarea value={text} onChange={e => handleTextChange(e.target.value)} placeholder={t('noteTextPlaceholder')}
+          rows={4} style={{ width: '100%', boxSizing: 'border-box', resize: 'none', border: 'none',
           background: '#FBF7F2', borderRadius: 18, padding: 16, fontFamily: 'inherit', fontSize: 15.5,
           color: 'var(--ink)', fontWeight: 600, lineHeight: 1.4, outline: 'none',
           boxShadow: '0 1px 2px rgba(60,40,20,0.05)' }} />
       </div>
 
-      <button onClick={send} className="bk-press" disabled={!text.trim()} style={{
-        width: '100%', border: 'none', cursor: text.trim() ? 'pointer' : 'default', fontFamily: 'var(--font-display)',
-        background: text.trim() ? '#B07848' : 'rgba(0,0,0,0.12)', color: '#fff', fontSize: 17, fontWeight: 800,
-        padding: 15, borderRadius: 18, marginTop: 4,
-        boxShadow: text.trim() ? '0 10px 24px -8px #B07848' : 'none', transition: 'background .2s' }}>
+      <button onClick={translate} disabled={!text.trim() || loading} className="bk-press" style={{
+        width: '100%', border: 'none', cursor: text.trim() && !loading ? 'pointer' : 'default',
+        fontFamily: 'inherit', fontSize: 15, fontWeight: 700, padding: '12px',
+        borderRadius: 14, background: '#FBF7F2', color: '#B07848',
+        opacity: text.trim() ? 1 : 0.4, transition: 'opacity .2s' }}>
+        {loading ? L('Переводим...', 'Translating...') : L('Перевести на английский →', 'Translate to English →')}
+      </button>
+
+      {translated ? (
+        <div>
+          <SectionLabel>EN</SectionLabel>
+          <textarea value={translated} onChange={e => setTranslated(e.target.value)} rows={4}
+            style={{ width: '100%', boxSizing: 'border-box', resize: 'none', border: 'none',
+            background: '#FBF7F2', borderRadius: 18, padding: 16, fontFamily: 'inherit', fontSize: 15.5,
+            color: 'var(--ink)', fontWeight: 600, lineHeight: 1.4, outline: 'none',
+            boxShadow: '0 1px 2px rgba(60,40,20,0.05)' }} />
+        </div>
+      ) : null}
+
+      <button onClick={send} disabled={!canSend} className="bk-press" style={{
+        width: '100%', border: 'none', cursor: canSend ? 'pointer' : 'default', fontFamily: 'var(--font-display)',
+        background: canSend ? '#B07848' : 'rgba(0,0,0,0.12)', color: '#fff', fontSize: 17, fontWeight: 800,
+        padding: 15, borderRadius: 18,
+        boxShadow: canSend ? '0 10px 24px -8px #B07848' : 'none', transition: 'background .2s' }}>
         💾 {t('save')}
       </button>
     </div>
