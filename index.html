@@ -1633,6 +1633,7 @@ const CYCLE = { present: 'absent', absent: 'present', late: 'present' };
 function AttendanceScreen({ actions }) {
   const initLocal = () => { const m = {}; DATA.CHILDREN.forEach(k => { m[k.id] = 'absent'; }); return m; };
   const [local,      setLocal]      = React.useState(initLocal);
+  const [savedLocal, setSavedLocal] = React.useState(initLocal);
   const [allMarked,  setAllMarked]  = React.useState(false);
   const snapRef = React.useRef(null);
   const [filter, setFilter] = React.useState('all');
@@ -1642,7 +1643,7 @@ function AttendanceScreen({ actions }) {
     present: DATA.CHILDREN.filter(k => local[k.id] === 'present').length,
     absent:  DATA.CHILDREN.filter(k => local[k.id] !== 'present').length,
   };
-  const hasChanges = DATA.CHILDREN.some(k => local[k.id] !== 'absent');
+  const hasChanges = DATA.CHILDREN.some(k => local[k.id] !== savedLocal[k.id]);
 
   function toggleMarkAll() {
     if (!allMarked) {
@@ -1654,7 +1655,7 @@ function AttendanceScreen({ actions }) {
     }
   }
   function setStatus(id, st) { setLocal(m => ({ ...m, [id]: st })); setAllMarked(false); }
-  function handleSave() { actions.saveStatuses(local); actions.toast(t('saved') + ' ✓'); }
+  function handleSave() { actions.saveStatuses(local); setSavedLocal({ ...local }); actions.toast(t('saved') + ' ✓'); }
   const chips = [{ id: 'all', label: t('all'), emoji: '🗂️' }, ...DATA.GROUPS.map(g => ({ id: g.id, label: Lo(g), emoji: g.emoji }))];
 
   return (
