@@ -1706,9 +1706,6 @@ function AttendanceScreen({ actions }) {
               <Avatar emoji={kid.emoji} color={PALETTE[kidIndex % PALETTE.length]} size={44} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}</div>
-                <div style={{ fontSize: 12, color: 'var(--ink-faint)', fontWeight: 600 }}>
-                  {st === 'absent' ? '—' : `${t('checkedAt')} ${kid.checkin || '08:30'}`}
-                </div>
               </div>
               <StatusChip status={st} onClick={() => setStatus(kid.id, CYCLE[st])} />
             </Card>
