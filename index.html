@@ -2116,13 +2116,13 @@ function PaymentsGardenScreen() {
             if (dx < -50) nextMonth();
             else if (dx > 50) prevMonth();
           }}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 14,
+          style={{ display: 'flex', alignItems: 'center', gap: 14, width: '100%',
             background: '#FBF7F2', borderRadius: 999, padding: '9px 18px',
             boxShadow: '0 1px 3px rgba(60,40,20,0.07)', userSelect: 'none' }}>
           <button onClick={prevMonth} style={{ border: 'none', background: 'none', padding: 0,
             cursor: monthIdx > 0 ? 'pointer' : 'default', opacity: monthIdx > 0 ? 1 : 0.2,
             fontSize: 20, color: '#B07848', fontWeight: 800, lineHeight: 1 }}>‹</button>
-          <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)', minWidth: 72, textAlign: 'center' }}>{Lo(mo)}</span>
+          <span style={{ flex: 1, fontSize: 15, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)', textAlign: 'center' }}>{Lo(mo)}</span>
           <button onClick={nextMonth} style={{ border: 'none', background: 'none', padding: 0,
             cursor: monthIdx < GARDEN_MONTHS.length-1 ? 'pointer' : 'default', opacity: monthIdx < GARDEN_MONTHS.length-1 ? 1 : 0.2,
             fontSize: 20, color: '#B07848', fontWeight: 800, lineHeight: 1 }}>›</button>
