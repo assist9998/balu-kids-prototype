@@ -1634,17 +1634,32 @@ Object.assign(window, { HomeScreen, ChildrenScreen, GroupScreen, ChildScreen });
 // ════════════════════════════════════════════════════════════════
 const CYCLE = { present: 'late', late: 'absent', absent: 'present' };
 
-function AttendanceScreen({ statuses, actions }) {
+function AttendanceScreen({ actions }) {
+  const initLocal = () => { const m = {}; DATA.CHILDREN.forEach(k => { m[k.id] = 'absent'; }); return m; };
+  const [local,      setLocal]      = React.useState(initLocal);
+  const [allMarked,  setAllMarked]  = React.useState(false);
+  const snapRef = React.useRef(null);
   const [filter, setFilter] = React.useState('all');
-  const savedStatuses = React.useRef({ ...statuses });
+
   const kids = DATA.CHILDREN.filter(k => filter === 'all' || k.group === filter);
   const counts = {
-    present: kids.filter(k => statuses[k.id] === 'present').length,
-    late:    kids.filter(k => statuses[k.id] === 'late').length,
-    absent:  kids.filter(k => statuses[k.id] === 'absent').length,
+    present: DATA.CHILDREN.filter(k => local[k.id] === 'present').length,
+    late:    DATA.CHILDREN.filter(k => local[k.id] === 'late').length,
+    absent:  DATA.CHILDREN.filter(k => local[k.id] === 'absent').length,
   };
-  const hasChanges = DATA.CHILDREN.some(k => statuses[k.id] !== savedStatuses.current[k.id]);
-  function handleSave() { savedStatuses.current = { ...statuses }; actions.toast(t('saved') + ' ✓'); }
+  const hasChanges = DATA.CHILDREN.some(k => local[k.id] !== 'absent');
+
+  function toggleMarkAll() {
+    if (!allMarked) {
+      snapRef.current = { ...local };
+      const all = {}; DATA.CHILDREN.forEach(k => { all[k.id] = 'present'; });
+      setLocal(all); setAllMarked(true);
+    } else {
+      setLocal(snapRef.current || initLocal()); setAllMarked(false);
+    }
+  }
+  function setStatus(id, st) { setLocal(m => ({ ...m, [id]: st })); setAllMarked(false); }
+  function handleSave() { actions.saveStatuses(local); actions.toast(t('saved') + ' ✓'); }
   const chips = [{ id: 'all', label: t('all'), emoji: '🗂️' }, ...DATA.GROUPS.map(g => ({ id: g.id, label: Lo(g), emoji: g.emoji }))];
 
   return (
@@ -1672,10 +1687,13 @@ function AttendanceScreen({ statuses, actions }) {
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 24px 12px' }}>
         <span style={{ fontSize: 12.5, color: 'var(--ink-faint)', fontWeight: 600 }}>{t('tapToCycle')}</span>
-        <button onClick={() => actions.markAllPresent(kids.map(k => k.id))} className="bk-press" style={{
-          border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 700,
-          color: '#fff', background: '#B07848', padding: '7px 12px', borderRadius: 999 }}>
-          ✓ {t('markAll')}
+        <button onClick={toggleMarkAll} className="bk-press" style={{
+          border: allMarked ? 'none' : '2px solid #B07848', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 700,
+          color: allMarked ? '#fff' : '#B07848',
+          background: allMarked ? '#B07848' : 'transparent',
+          padding: allMarked ? '7px 12px' : '5px 12px', borderRadius: 999,
+          boxShadow: allMarked ? '0 6px 14px -6px #B07848' : 'none', transition: 'all 0.18s' }}>
+          {allMarked ? `✓ ${t('markAll')}` : t('markAll')}
         </button>
       </div>
 
@@ -1683,7 +1701,7 @@ function AttendanceScreen({ statuses, actions }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 9, padding: '0 20px' }}>
         {kids.map(kid => {
           const grp = DATA.GROUPS.find(g => g.id === kid.group);
-          const st = statuses[kid.id];
+          const st = local[kid.id];
           const PALETTE = ['#FBE7A8','#CDE8FB','#D4F0DF','#FBD9E1','#FBE0C0','#E8D5FB'];
           const kidIndex = DATA.CHILDREN.filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
           return (
@@ -1695,7 +1713,7 @@ function AttendanceScreen({ statuses, actions }) {
                   {st === 'absent' ? '—' : `${t('checkedAt')} ${kid.checkin || '08:30'}`}
                 </div>
               </div>
-              <StatusChip status={st} onClick={() => actions.setStatus(kid.id, CYCLE[st])} />
+              <StatusChip status={st} onClick={() => setStatus(kid.id, CYCLE[st])} />
             </Card>
           );
         })}
@@ -2417,6 +2435,7 @@ function App() {
   const actions = {
     setStatus: (id, st) => setStatuses(m => ({ ...m, [id]: st })),
     markAllPresent: (ids) => setStatuses(m => { const n = { ...m }; ids.forEach(i => n[i] = 'present'); return n; }),
+    saveStatuses: (map) => setStatuses(() => ({ ...map })),
     markAllRead: () => setFeed(f => f.map(x => ({ ...x, unread: false }))),
     addPost: ({ ru, en, emoji = '📋', type = 'alert' }) => setFeed(f => [{
       id: Date.now(), type, emoji,
