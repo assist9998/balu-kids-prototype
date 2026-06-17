@@ -1383,7 +1383,7 @@ function HomeCircles({ tiles, go }) {
             display: 'grid', placeItems: 'center', fontSize: 52,
             boxShadow: '0 4px 16px rgba(60,40,20,0.08)' }}>
             <span>{tile.emoji}</span>
-            {tile.badge && (
+            {tile.badge && tile.key === 'notifications' && (
               <span style={{ position: 'absolute', top: 4, right: 0, background: 'var(--card)', color: tile.ink,
                 fontSize: 12, fontWeight: 800, padding: '4px 9px', borderRadius: 999,
                 boxShadow: '0 2px 8px -2px rgba(60,40,20,0.25)' }}>{tile.badge}</span>
