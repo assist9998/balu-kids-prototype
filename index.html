@@ -2053,25 +2053,70 @@ function PayStats({ cp, cu, total, filter, onFilter }) {
   );
 }
 
-function KidPayRow({ kid, isPaid, onToggle, amount, suffix }) {
+function fmtTourDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso + 'T00:00:00');
+  const mRu = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+  const mEn = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return L(`${d.getDate()} ${mRu[d.getMonth()]}`, `${mEn[d.getMonth()]} ${d.getDate()}`);
+}
+
+function KidPayRow({ kid, isPaid, onToggle, amount, tourDays, onDaysChange, tourDate, onDateChange }) {
+  const [showDays, setShowDays] = React.useState(false);
   const grp = DATA.GROUPS.find(g => g.id === kid.group);
   const kidIndex = DATA.CHILDREN.filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
+  const paidBadge = <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
+    background: '#E6F7EE', color: '#1f7a55' }}>{L('Оплачено', 'Paid')}</span>;
+  const unpaidBadge = (label) => <span style={{ fontSize: 13, fontWeight: 700, padding: '4px 10px', borderRadius: 999,
+    background: '#FEF0ED', color: '#c0392b' }}>{label}</span>;
+  const bigBtn = { width: 52, height: 52, borderRadius: 999, border: '2px solid #B07848',
+    background: 'none', cursor: 'pointer', fontSize: 28, color: '#B07848', fontWeight: 800,
+    display: 'flex', alignItems: 'center', justifyContent: 'center' };
   return (
-    <Card pad={12} onClick={onToggle} style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2', cursor: 'pointer' }}>
-      <Avatar emoji={kid.emoji} color={PAY_PALETTE[kidIndex % PAY_PALETTE.length]} size={44} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}</div>
-        <span style={{ background: grp.color, color: grp.ink, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999 }}>{grp.emoji} {Lo(grp)}</span>
-      </div>
-      <div style={{ textAlign: 'right' }}>
-        {isPaid
-          ? <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
-              background: '#E6F7EE', color: '#1f7a55' }}>{L('Оплачено', 'Paid')}</span>
-          : <span style={{ fontSize: 13, fontWeight: 700, padding: '4px 10px', borderRadius: 999,
-              background: '#FEF0ED', color: '#c0392b' }}>${amount}{suffix || ''}</span>
-        }
-      </div>
-    </Card>
+    <>
+      <Card pad={12} onClick={tourDays !== undefined ? () => setShowDays(true) : onToggle}
+        style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2' }}>
+        <Avatar emoji={kid.emoji} color={PAY_PALETTE[kidIndex % PAY_PALETTE.length]} size={44} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}</div>
+          <span style={{ background: grp.color, color: grp.ink, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999 }}>{grp.emoji} {Lo(grp)}</span>
+        </div>
+        <div style={{ textAlign: 'right' }} onClick={tourDays !== undefined ? e => { e.stopPropagation(); onToggle(); } : undefined}>
+          {isPaid ? paidBadge : unpaidBadge(tourDays !== undefined ? `$${amount} · ${tourDays} ${L('дн.','days')}` : `$${amount}`)}
+        </div>
+      </Card>
+
+      {showDays && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'flex-end',
+          background: 'rgba(0,0,0,0.35)' }} onClick={() => setShowDays(false)}>
+          <div style={{ width: '100%', background: 'var(--bg)', borderRadius: '24px 24px 0 0',
+            padding: '28px 32px 40px' }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-soft)', textAlign: 'center', marginBottom: 2 }}>
+              {Lo(kid)}
+            </div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--ink)', textAlign: 'center',
+              marginBottom: 20, fontFamily: 'var(--font-display)' }}>
+              {L('Количество дней', 'Number of days')}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 32, marginBottom: 10 }}>
+              <button style={bigBtn} onClick={() => onDaysChange(Math.max(1, tourDays - 1))}>−</button>
+              <span style={{ fontSize: 52, fontWeight: 800, color: 'var(--ink)', minWidth: 72,
+                textAlign: 'center', fontFamily: 'var(--font-display)' }}>{tourDays}</span>
+              <button style={bigBtn} onClick={() => onDaysChange(tourDays + 1)}>+</button>
+            </div>
+            <div style={{ textAlign: 'center', fontSize: 16, fontWeight: 700, color: 'var(--ink-soft)', marginBottom: 24 }}>
+              ${amount}
+            </div>
+            <button onClick={() => setShowDays(false)} className="bk-press" style={{ width: '100%', border: 'none',
+              cursor: 'pointer', fontFamily: 'var(--font-display)', background: '#B07848', color: '#fff',
+              fontSize: 17, fontWeight: 800, padding: 15, borderRadius: 18,
+              boxShadow: '0 10px 24px -8px #B07848' }}>
+              {L('Готово', 'Done')}
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -2080,15 +2125,15 @@ function SaveBar({ hasChanges, onSave }) {
   function handle() { onSave(); setDone(true); setTimeout(() => setDone(false), 1800); }
   if (!hasChanges && !done) return <div style={{ height: 30 }} />;
   return (
-    <div style={{ position: 'sticky', bottom: 0, marginTop: 16, padding: '14px 20px 26px',
-      background: 'linear-gradient(to top, var(--bg) 62%, transparent)' }}>
+    <div style={{ position: 'sticky', bottom: 0, marginTop: 12, padding: '10px 20px 22px',
+      background: 'linear-gradient(to top, var(--bg) 60%, transparent)', display: 'flex', justifyContent: 'center' }}>
       <button onClick={done ? undefined : handle} className={done ? '' : 'bk-press'} style={{
-        width: '100%', border: 'none', cursor: done ? 'default' : 'pointer', fontFamily: 'var(--font-display)',
+        border: 'none', cursor: done ? 'default' : 'pointer', fontFamily: 'var(--font-display)',
         background: done ? '#F2A81D' : '#B07848', color: done ? '#3E2510' : '#fff',
-        fontSize: 17, fontWeight: 800, padding: 15, borderRadius: 18,
-        boxShadow: done ? '0 4px 16px -4px rgba(242,168,29,0.5)' : '0 10px 24px -8px #B07848',
+        fontSize: 14, fontWeight: 800, padding: '10px 32px', borderRadius: 999, minWidth: 160,
+        boxShadow: done ? '0 4px 12px -4px rgba(242,168,29,0.5)' : '0 6px 18px -6px #B07848',
         transition: 'background 0.25s, color 0.25s, box-shadow 0.25s' }}>
-        {done ? L('Сохранено', 'Saved') : L('Сохранить', 'Save')}
+        {done ? L('Сохранено ✓', 'Saved ✓') : L('Сохранить', 'Save')}
       </button>
     </div>
   );
@@ -2149,27 +2194,48 @@ function PaymentsGardenScreen() {
     });
     return m;
   };
-  const [paid,  setPaid]  = React.useState(initPaid);
-  const [saved, setSaved] = React.useState(initPaid);
+  const initDays = () => {
+    const m = {};
+    GARDEN_MONTHS.forEach(mo => { m[mo.id] = {}; DATA.CHILDREN.forEach(k => { m[mo.id][k.id] = 1; }); });
+    return m;
+  };
+  const [paid,      setPaid]      = React.useState(initPaid);
+  const [saved,     setSaved]     = React.useState(initPaid);
+  const [days,      setDays]      = React.useState(initDays);
+  const [savedDays, setSavedDays] = React.useState(initDays);
+  const [secDays,  setSecDays]  = React.useState(() => { const m = {}; GARDEN_MONTHS.forEach(mo => { m[mo.id] = new Date().getDate(); }); return m; });
 
-  const mo      = GARDEN_MONTHS[monthIdx];
-  const curPaid = paid[mo.id];
-  const isTour  = tariff === 'tourist';
+  const mo       = GARDEN_MONTHS[monthIdx];
+  const curPaid  = paid[mo.id];
+  const curDays  = days[mo.id];
+  const isTour   = tariff === 'tourist';
 
   const allKids = DATA.CHILDREN
     .filter(k => isTour ? k.contract === 'tourist' : k.contract !== 'tourist')
     .filter(k => group === 'all' || k.group === group);
-  const getAmount   = kid => isTour ? PAY_DAILY[kid.group] : PAY_MONTHLY[kid.group];
+  const getAmount   = kid => isTour ? (curDays[kid.id] || 1) * PAY_DAILY[kid.group] : PAY_MONTHLY[kid.group];
   const countPaid   = allKids.filter(k =>  curPaid[k.id]).length;
   const countUnpaid = allKids.filter(k => !curPaid[k.id]).length;
   const total       = allKids.filter(k =>  curPaid[k.id]).reduce((s, k) => s + getAmount(k), 0);
   const kids        = allKids.filter(k => payFilter === 'paid' ? curPaid[k.id] : payFilter === 'unpaid' ? !curPaid[k.id] : true);
-  const hasChanges  = GARDEN_MONTHS.some(m => DATA.CHILDREN.some(k => (paid[m.id][k.id]||false) !== (saved[m.id][k.id]||false)));
+  const hasChanges  = GARDEN_MONTHS.some(m => DATA.CHILDREN.some(k =>
+    (paid[m.id][k.id]||false) !== (saved[m.id][k.id]||false) ||
+    (days[m.id][k.id]||1) !== (savedDays[m.id][k.id]||1)
+  ));
 
   function toggle(kidId) {
     setPaid(prev => ({ ...prev, [mo.id]: { ...prev[mo.id], [kidId]: !prev[mo.id][kidId] } }));
   }
-  function handleSave() { setSaved(JSON.parse(JSON.stringify(paid))); }
+  function changeDays(kidId, n) {
+    setDays(prev => ({ ...prev, [mo.id]: { ...prev[mo.id], [kidId]: n } }));
+  }
+  function changeDate(kidId, d) {
+    setDates(prev => ({ ...prev, [mo.id]: { ...prev[mo.id], [kidId]: d } }));
+  }
+  function handleSave() {
+    setSaved(JSON.parse(JSON.stringify(paid)));
+    setSavedDays(JSON.parse(JSON.stringify(days)));
+  }
   function prevMonth() { if (monthIdx > 0) { setMonthIdx(i => i - 1); setPayFilter('all'); } }
   function nextMonth() { if (monthIdx < maxMonthIdx) { setMonthIdx(i => i + 1); setPayFilter('all'); } }
 
@@ -2226,13 +2292,32 @@ function PaymentsGardenScreen() {
             fontSize: 20, color: '#B07848', fontWeight: 800, lineHeight: 1 }}>›</button>
         </div>
       </div>
+      {isTour && (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '0 20px 14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, width: '100%',
+            background: '#FBF7F2', borderRadius: 999, padding: '9px 18px',
+            boxShadow: '0 1px 3px rgba(60,40,20,0.07)', userSelect: 'none' }}>
+            <button onClick={() => setSecDays(p => ({ ...p, [mo.id]: Math.max(1, p[mo.id] - 1) }))}
+              style={{ border: 'none', background: 'none', padding: 0, cursor: secDays[mo.id] > 1 ? 'pointer' : 'default',
+                opacity: secDays[mo.id] > 1 ? 1 : 0.2, fontSize: 20, color: '#B07848', fontWeight: 800, lineHeight: 1 }}>‹</button>
+            <span style={{ flex: 1, textAlign: 'center', fontSize: 15, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>
+              {secDays[mo.id]}
+            </span>
+            <button onClick={() => setSecDays(p => ({ ...p, [mo.id]: Math.min(31, p[mo.id] + 1) }))}
+              style={{ border: 'none', background: 'none', padding: 0, cursor: secDays[mo.id] < 31 ? 'pointer' : 'default',
+                opacity: secDays[mo.id] < 31 ? 1 : 0.2, fontSize: 20, color: '#B07848', fontWeight: 800, lineHeight: 1 }}>›</button>
+          </div>
+        </div>
+      )}
       <PayStats cp={countPaid} cu={countUnpaid} total={total} filter={payFilter} onFilter={setPayFilter} />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 9, padding: '0 20px' }}>
         {kids.map(kid => (
           <KidPayRow key={kid.id} kid={kid} isPaid={curPaid[kid.id]}
             onToggle={() => toggle(kid.id)}
-            amount={getAmount(kid)} suffix={isTour ? L('/день', '/day') : ''} />
+            amount={getAmount(kid)}
+            tourDays={isTour ? (curDays[kid.id] || 1) : undefined}
+            onDaysChange={isTour ? (n) => changeDays(kid.id, n) : undefined} />
         ))}
       </div>
       <SaveBar hasChanges={hasChanges} onSave={handleSave} />
@@ -2327,9 +2412,6 @@ function PaymentsClubsScreen() {
             amount={PAY_CLUB_PRICE[clubId]} />
         ))}
       </div>
-      {hasChanges && (
-        <div style={{ position: 'sticky', bottom: 0, marginTop: 16, padding: '14px 20px 26px',
-          background: 'linear-gradient(to top, var(--bg) 62%, transparent)' }}>
       <SaveBar hasChanges={hasChanges} onSave={handleSave} />
     </div>
   );
