@@ -1945,9 +1945,9 @@ function ComposeScreen({ back, actions }) {
           position: 'absolute', bottom: 10, right: 10,
           border: 'none', cursor: text.trim() && !loading ? 'pointer' : 'default',
           fontSize: 20, lineHeight: 1, padding: '4px 8px', borderRadius: 10,
-          background: 'rgba(255,255,255,0.7)', opacity: text.trim() ? 1 : 0.3,
+          background: 'rgba(255,255,255,0.7)', opacity: loading ? 0.4 : text.trim() ? 1 : 0.3,
           transition: 'opacity .2s', boxShadow: '0 1px 4px rgba(60,40,20,0.1)' }}>
-          {loading ? '⏳' : '🇬🇧'}
+          🇬🇧
         </button>
       </div>
 
