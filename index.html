@@ -1980,11 +1980,12 @@ function KidPayRow({ kid, isPaid, onToggle, amount, suffix }) {
         <span style={{ background: grp.color, color: grp.ink, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999 }}>{grp.emoji} {Lo(grp)}</span>
       </div>
       <div style={{ textAlign: 'right' }}>
-        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--ink)', marginBottom: 4 }}>${amount}{suffix || ''}</div>
-        <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
-          background: isPaid ? '#E6F7EE' : '#FEF0ED', color: isPaid ? '#1f7a55' : '#c0392b' }}>
-          {isPaid ? L('✓ Оплачено', '✓ Paid') : L('Не оплачено', 'Unpaid')}
-        </span>
+        {isPaid
+          ? <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
+              background: '#E6F7EE', color: '#1f7a55' }}>{L('✓ Оплачено', '✓ Paid')}</span>
+          : <span style={{ fontSize: 13, fontWeight: 700, padding: '4px 10px', borderRadius: 999,
+              background: '#FEF0ED', color: '#c0392b' }}>${amount}{suffix || ''}</span>
+        }
       </div>
     </Card>
   );
