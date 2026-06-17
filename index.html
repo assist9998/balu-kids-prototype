@@ -1636,12 +1636,15 @@ const CYCLE = { present: 'late', late: 'absent', absent: 'present' };
 
 function AttendanceScreen({ statuses, actions }) {
   const [filter, setFilter] = React.useState('all');
+  const savedStatuses = React.useRef({ ...statuses });
   const kids = DATA.CHILDREN.filter(k => filter === 'all' || k.group === filter);
   const counts = {
     present: kids.filter(k => statuses[k.id] === 'present').length,
     late:    kids.filter(k => statuses[k.id] === 'late').length,
     absent:  kids.filter(k => statuses[k.id] === 'absent').length,
   };
+  const hasChanges = DATA.CHILDREN.some(k => statuses[k.id] !== savedStatuses.current[k.id]);
+  function handleSave() { savedStatuses.current = { ...statuses }; actions.toast(t('saved') + ' ✓'); }
   const chips = [{ id: 'all', label: t('all'), emoji: '🗂️' }, ...DATA.GROUPS.map(g => ({ id: g.id, label: Lo(g), emoji: g.emoji }))];
 
   return (
@@ -1698,14 +1701,16 @@ function AttendanceScreen({ statuses, actions }) {
         })}
       </div>
 
-      {/* save bar */}
-      <div style={{ position: 'sticky', bottom: 0, marginTop: 16, padding: '14px 20px 26px',
-        background: 'linear-gradient(to top, var(--bg) 62%, transparent)' }}>
-        <button onClick={() => actions.toast(t('saved') + ' ✓')} className="bk-press" style={{
-          width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-display)',
-          background: '#B07848', color: '#fff', fontSize: 17, fontWeight: 800, padding: '15px',
-          borderRadius: 18, boxShadow: '0 10px 24px -8px #B07848' }}>{t('save')}</button>
-      </div>
+      {hasChanges && (
+        <div style={{ position: 'sticky', bottom: 0, marginTop: 16, padding: '14px 20px 26px',
+          background: 'linear-gradient(to top, var(--bg) 62%, transparent)' }}>
+          <button onClick={handleSave} className="bk-press" style={{
+            width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-display)',
+            background: '#B07848', color: '#fff', fontSize: 17, fontWeight: 800, padding: '15px',
+            borderRadius: 18, boxShadow: '0 10px 24px -8px #B07848' }}>{t('save')}</button>
+        </div>
+      )}
+      {!hasChanges && <div style={{ height: 30 }} />}
     </div>
   );
 }
