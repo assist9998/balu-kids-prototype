@@ -2162,24 +2162,48 @@ function PaymentsClubsScreen() {
   const [clubId,    setClubId]   = React.useState(() => DATA.CLUBS[0].id);
   const [payFilter, setPayFilter] = React.useState('all');
   const [toast,     setToast]    = React.useState(null);
-  const initPaid = () => { const m = {}; DATA.CLUBS.forEach(c => c.kids.forEach((id, i) => { m[`${c.id}_${id}`] = i % 2 === 0; })); return m; };
+  const curCalMonthIdx = React.useMemo(() => {
+    const m = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'][new Date().getMonth()];
+    const i = GARDEN_MONTHS.findIndex(x => x.id === m);
+    return i === -1 ? 0 : i;
+  }, []);
+  const maxMonthIdx = Math.min(curCalMonthIdx + 1, GARDEN_MONTHS.length - 1);
+  const [monthIdx,  setMonthIdx] = React.useState(curCalMonthIdx);
+  const touchStart = React.useRef(null);
+
+  const initPaid = () => {
+    const m = {};
+    GARDEN_MONTHS.forEach((mo, mi) => {
+      m[mo.id] = {};
+      DATA.CLUBS.forEach(c => c.kids.forEach((id, i) => { m[mo.id][`${c.id}_${id}`] = mi === 0 && i % 2 === 0; }));
+    });
+    return m;
+  };
   const [paid,  setPaid]  = React.useState(initPaid);
   const [saved, setSaved] = React.useState(initPaid);
 
+  const mo         = GARDEN_MONTHS[monthIdx];
+  const curPaid    = paid[mo.id];
   const activeClub = DATA.CLUBS.find(c => c.id === clubId);
   const cKey       = kid => `${clubId}_${kid.id}`;
   const allKids    = DATA.CHILDREN.filter(k => activeClub.kids.includes(k.id));
-  const countPaid   = allKids.filter(k =>  paid[cKey(k)]).length;
-  const countUnpaid = allKids.filter(k => !paid[cKey(k)]).length;
+  const countPaid   = allKids.filter(k =>  curPaid[cKey(k)]).length;
+  const countUnpaid = allKids.filter(k => !curPaid[cKey(k)]).length;
   const total       = countPaid * PAY_CLUB_PRICE[clubId];
-  const kids        = allKids.filter(k => payFilter === 'paid' ? paid[cKey(k)] : payFilter === 'unpaid' ? !paid[cKey(k)] : true);
-  const hasChanges  = Object.keys(paid).some(k => paid[k] !== saved[k]);
+  const kids        = allKids.filter(k => payFilter === 'paid' ? curPaid[cKey(k)] : payFilter === 'unpaid' ? !curPaid[cKey(k)] : true);
+  const hasChanges  = GARDEN_MONTHS.some(m => Object.keys(paid[m.id]).some(k => (paid[m.id][k]||false) !== (saved[m.id][k]||false)));
 
+  function toggle(kid) {
+    const k = cKey(kid);
+    setPaid(prev => ({ ...prev, [mo.id]: { ...prev[mo.id], [k]: !prev[mo.id][k] } }));
+  }
   function handleSave() {
-    setSaved({ ...paid });
+    setSaved(JSON.parse(JSON.stringify(paid)));
     setToast(L('Сохранено ✓', 'Saved ✓'));
     setTimeout(() => setToast(null), 2000);
   }
+  function prevMonth() { if (monthIdx > 0) { setMonthIdx(i => i - 1); setPayFilter('all'); } }
+  function nextMonth() { if (monthIdx < maxMonthIdx) { setMonthIdx(i => i + 1); setPayFilter('all'); } }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
@@ -2195,11 +2219,34 @@ function PaymentsClubsScreen() {
           </button>
         ))}
       </div>
+      {/* month nav */}
+      <div style={{ display: 'flex', justifyContent: 'center', padding: '0 20px 14px' }}>
+        <div
+          onTouchStart={e => { touchStart.current = e.touches[0].clientX; }}
+          onTouchEnd={e => {
+            if (touchStart.current === null) return;
+            const dx = e.changedTouches[0].clientX - touchStart.current;
+            touchStart.current = null;
+            if (dx < -50) nextMonth();
+            else if (dx > 50) prevMonth();
+          }}
+          style={{ display: 'flex', alignItems: 'center', gap: 14, width: '100%',
+            background: '#FBF7F2', borderRadius: 999, padding: '9px 18px',
+            boxShadow: '0 1px 3px rgba(60,40,20,0.07)', userSelect: 'none' }}>
+          <button onClick={prevMonth} style={{ border: 'none', background: 'none', padding: 0,
+            cursor: monthIdx > 0 ? 'pointer' : 'default', opacity: monthIdx > 0 ? 1 : 0.2,
+            fontSize: 20, color: '#B07848', fontWeight: 800, lineHeight: 1 }}>‹</button>
+          <span style={{ flex: 1, fontSize: 15, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)', textAlign: 'center' }}>{Lo(mo)}</span>
+          <button onClick={nextMonth} style={{ border: 'none', background: 'none', padding: 0,
+            cursor: monthIdx < maxMonthIdx ? 'pointer' : 'default', opacity: monthIdx < maxMonthIdx ? 1 : 0.2,
+            fontSize: 20, color: '#B07848', fontWeight: 800, lineHeight: 1 }}>›</button>
+        </div>
+      </div>
       <PayStats cp={countPaid} cu={countUnpaid} total={total} filter={payFilter} onFilter={setPayFilter} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 9, padding: '0 20px' }}>
         {kids.map(kid => (
-          <KidPayRow key={kid.id} kid={kid} isPaid={paid[cKey(kid)]}
-            onToggle={() => setPaid(m => ({ ...m, [cKey(kid)]: !m[cKey(kid)] }))}
+          <KidPayRow key={kid.id} kid={kid} isPaid={curPaid[cKey(kid)]}
+            onToggle={() => toggle(kid)}
             amount={PAY_CLUB_PRICE[clubId]} />
         ))}
       </div>
