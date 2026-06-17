@@ -2024,42 +2024,28 @@ function PaymentsScreen({ go }) {
   );
 }
 
-const MONTHS = [
-  { id: 'jun', ru: 'Июнь', en: 'Jun' },
-  { id: 'jul', ru: 'Июль', en: 'Jul' },
-  { id: 'aug', ru: 'Авг',  en: 'Aug' },
-  { id: 'sep', ru: 'Сент', en: 'Sep' },
-];
-
 function PaymentsGardenScreen() {
-  const [tariff,  setTariff] = React.useState('longterm');
-  const [group,   setGroup]  = React.useState('all');
-  const [toast,   setToast]  = React.useState(null);
-
-  const initPaid = () => {
-    const m = {};
-    MONTHS.forEach((mo, mi) => {
-      m[mo.id] = {};
-      DATA.CHILDREN.forEach((k, i) => { m[mo.id][k.id] = mi === 0 && i % 3 !== 2; });
-    });
-    return m;
-  };
+  const [tariff,    setTariff]   = React.useState('longterm');
+  const [group,     setGroup]    = React.useState('all');
+  const [payFilter, setPayFilter] = React.useState('all');
+  const [toast,     setToast]    = React.useState(null);
+  const initPaid = () => { const m = {}; DATA.CHILDREN.forEach((k, i) => { m[k.id] = i % 3 !== 2; }); return m; };
   const [paid,  setPaid]  = React.useState(initPaid);
   const [saved, setSaved] = React.useState(initPaid);
 
-  const isTour  = tariff === 'tourist';
+  const isTour = tariff === 'tourist';
   const allKids = DATA.CHILDREN
     .filter(k => isTour ? k.contract === 'tourist' : k.contract !== 'tourist')
     .filter(k => group === 'all' || k.group === group);
-
-  const hasChanges = MONTHS.some(mo => DATA.CHILDREN.some(k => (paid[mo.id][k.id]||false) !== (saved[mo.id][k.id]||false)));
-
-  function toggle(kidId, monthId) {
-    setPaid(prev => ({ ...prev, [monthId]: { ...prev[monthId], [kidId]: !prev[monthId][kidId] } }));
-  }
+  const getAmount = kid => isTour ? PAY_DAILY[kid.group] : PAY_MONTHLY[kid.group];
+  const countPaid   = allKids.filter(k =>  paid[k.id]).length;
+  const countUnpaid = allKids.filter(k => !paid[k.id]).length;
+  const total       = allKids.filter(k =>  paid[k.id]).reduce((s, k) => s + getAmount(k), 0);
+  const kids        = allKids.filter(k => payFilter === 'paid' ? paid[k.id] : payFilter === 'unpaid' ? !paid[k.id] : true);
+  const hasChanges  = DATA.CHILDREN.some(k => paid[k.id] !== saved[k.id]);
 
   function handleSave() {
-    setSaved(JSON.parse(JSON.stringify(paid)));
+    setSaved({ ...paid });
     setToast(L('Сохранено ✓', 'Saved ✓'));
     setTimeout(() => setToast(null), 2000);
   }
@@ -2071,7 +2057,7 @@ function PaymentsGardenScreen() {
       {/* tariff toggle */}
       <div style={{ display: 'flex', margin: '0 20px 14px', background: '#FBF7F2', borderRadius: 999, padding: 4, gap: 4 }}>
         {[['longterm', L('Долгосрочные', 'Long term')], ['tourist', L('Туристы', 'Tourist')]].map(([id, label]) => (
-          <button key={id} onClick={() => { setTariff(id); setGroup('all'); }} className="bk-press" style={{
+          <button key={id} onClick={() => { setTariff(id); setGroup('all'); setPayFilter('all'); }} className="bk-press" style={{
             flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
             padding: '9px 4px', borderRadius: 999, fontSize: 13, fontWeight: 800,
             background: tariff === id ? '#B07848' : 'transparent',
@@ -2092,54 +2078,14 @@ function PaymentsGardenScreen() {
           </button>
         ))}
       </div>
-
-      {/* table */}
-      <div style={{ overflowX: 'auto', padding: '0 20px', scrollbarWidth: 'none' }}>
-        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 6px' }}>
-          <thead>
-            <tr>
-              <th style={{ textAlign: 'left', fontSize: 12, fontWeight: 700, color: 'var(--ink-faint)',
-                padding: '0 0 6px', paddingLeft: 12 }}>{L('Ребёнок', 'Child')}</th>
-              {MONTHS.map(mo => (
-                <th key={mo.id} style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-faint)',
-                  padding: '0 4px 6px', textAlign: 'center', minWidth: 48 }}>{Lo(mo)}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {allKids.map((kid, i) => {
-              const kidIndex = DATA.CHILDREN.filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
-              return (
-                <tr key={kid.id}>
-                  <td style={{ padding: '0 8px 0 0' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#FBF7F2',
-                      borderRadius: '14px 0 0 14px', padding: '8px 10px 8px 10px' }}>
-                      <Avatar emoji={kid.emoji} color={PAY_PALETTE[kidIndex % PAY_PALETTE.length]} size={32} />
-                      <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--ink)', whiteSpace: 'nowrap' }}>{Lo(kid)}</span>
-                    </div>
-                  </td>
-                  {MONTHS.map((mo, mi) => {
-                    const isPaid = !!paid[mo.id][kid.id];
-                    return (
-                      <td key={mo.id} style={{ textAlign: 'center', padding: '0 2px',
-                        background: '#FBF7F2',
-                        borderRadius: mi === MONTHS.length - 1 ? '0 14px 14px 0' : 0 }}>
-                        <button onClick={() => toggle(kid.id, mo.id)} className="bk-press" style={{
-                          border: 'none', cursor: 'pointer', background: 'none',
-                          width: 36, height: 36, borderRadius: 10, display: 'grid', placeItems: 'center',
-                          background: isPaid ? '#E6F7EE' : 'transparent' }}>
-                          <span style={{ fontSize: 16 }}>{isPaid ? '✓' : '·'}</span>
-                        </button>
-                      </td>
-                    );
-                  })}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <PayStats cp={countPaid} cu={countUnpaid} total={total} filter={payFilter} onFilter={setPayFilter} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 9, padding: '0 20px' }}>
+        {kids.map(kid => (
+          <KidPayRow key={kid.id} kid={kid} isPaid={paid[kid.id]}
+            onToggle={() => setPaid(m => ({ ...m, [kid.id]: !m[kid.id] }))}
+            amount={getAmount(kid)} suffix={isTour ? L('/день', '/day') : ''} />
+        ))}
       </div>
-
       {hasChanges && (
         <div style={{ position: 'sticky', bottom: 0, marginTop: 16, padding: '14px 20px 26px',
           background: 'linear-gradient(to top, var(--bg) 62%, transparent)' }}>
