@@ -1859,28 +1859,30 @@ function WeekChart() {
 // ════════════════════════════════════════════════════════════════
 const TYPE_TINT = { birthday: '#FBD9E1', alert: '#FBE7A8', message: '#CDE8FB', sent: '#D4F0DF' };
 
-function SwipeToDelete({ onDelete, children }) {
-  const [offset, setOffset] = React.useState(0);
-  const [gone,   setGone]   = React.useState(false);
-  const startX = React.useRef(null);
-  if (gone) return null;
+function LongPressCard({ onDelete, onTap, children, style }) {
+  const [confirm, setConfirm] = React.useState(false);
+  const timer = React.useRef(null);
+  function onTouchStart() { timer.current = setTimeout(() => setConfirm(true), 500); }
+  function onTouchEnd()   { clearTimeout(timer.current); }
   return (
-    <div style={{ overflow: 'hidden', borderRadius: 18, position: 'relative' }}>
-      <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 72,
-        background: '#e74c3c', display: 'grid', placeItems: 'center', borderRadius: 18 }}>
-        <span style={{ fontSize: 20 }}>🗑️</span>
-      </div>
-      <div
-        onTouchStart={e => { startX.current = e.touches[0].clientX; }}
-        onTouchMove={e => { const dx = e.touches[0].clientX - startX.current; if (dx < 0) setOffset(Math.max(dx, -120)); }}
-        onTouchEnd={() => {
-          if (offset < -72) { setGone(true); onDelete(); }
-          else setOffset(0);
-          startX.current = null;
-        }}
-        style={{ transform: `translateX(${offset}px)`, transition: offset === 0 ? 'transform 0.25s' : 'none', position: 'relative', zIndex: 1 }}>
-        {children}
-      </div>
+    <div style={{ position: 'relative' }}
+      onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} onTouchMove={() => clearTimeout(timer.current)}>
+      <div onClick={() => { if (!confirm) onTap(); }} style={style}>{children}</div>
+      {confirm && (
+        <div style={{ position: 'absolute', inset: 0, borderRadius: 18, background: 'rgba(231,76,60,0.92)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, zIndex: 5 }}>
+          <button onClick={() => { onDelete(); setConfirm(false); }} className="bk-press" style={{
+            border: 'none', cursor: 'pointer', background: '#fff', color: '#e74c3c',
+            fontFamily: 'inherit', fontWeight: 800, fontSize: 14, padding: '8px 18px', borderRadius: 999 }}>
+            {L('Удалить', 'Delete')}
+          </button>
+          <button onClick={() => setConfirm(false)} className="bk-press" style={{
+            border: 'none', cursor: 'pointer', background: 'rgba(255,255,255,0.25)', color: '#fff',
+            fontFamily: 'inherit', fontWeight: 700, fontSize: 14, padding: '8px 18px', borderRadius: 999 }}>
+            {L('Отмена', 'Cancel')}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -1903,21 +1905,22 @@ function NotificationsScreen({ feed, go, actions }) {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {feed.map(item => (
-          <SwipeToDelete key={item.id} onDelete={() => actions.deletePost(item.id)}>
-            <Card pad={13} onClick={() => item.unread && actions.markOneRead(item.id)}
-              style={{ display: 'flex', gap: 12, alignItems: 'flex-start', cursor: item.unread ? 'pointer' : 'default',
-              background: '#FBF7F2', opacity: item.unread ? 1 : 0.72 }}>
-              <div style={{ width: 42, height: 42, borderRadius: '50%', background: TYPE_TINT[item.type] || 'var(--accent-soft)',
-                display: 'grid', placeItems: 'center', fontSize: 21, flexShrink: 0 }}>{item.emoji}</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14.5, color: 'var(--ink)', fontWeight: 600, lineHeight: 1.4, textWrap: 'pretty' }}>{Lo(item)}</div>
-                <div style={{ fontSize: 12, color: 'var(--ink-faint)', fontWeight: 600, marginTop: 4 }}>
-                  {item.timeEn ? L(item.time, item.timeEn) : item.time}
-                </div>
+          <LongPressCard key={item.id}
+            onDelete={() => actions.deletePost(item.id)}
+            onTap={() => item.unread && actions.markOneRead(item.id)}
+            style={{ display: 'flex', gap: 12, alignItems: 'flex-start',
+              background: '#FBF7F2', borderRadius: 18, padding: 13,
+              opacity: item.unread ? 1 : 0.72, cursor: item.unread ? 'pointer' : 'default' }}>
+            <div style={{ width: 42, height: 42, borderRadius: '50%', background: TYPE_TINT[item.type] || 'var(--accent-soft)',
+              display: 'grid', placeItems: 'center', fontSize: 21, flexShrink: 0 }}>{item.emoji}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14.5, color: 'var(--ink)', fontWeight: 600, lineHeight: 1.4, textWrap: 'pretty' }}>{Lo(item)}</div>
+              <div style={{ fontSize: 12, color: 'var(--ink-faint)', fontWeight: 600, marginTop: 4 }}>
+                {item.timeEn ? L(item.time, item.timeEn) : item.time}
               </div>
-              {item.unread && <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#B07848', marginTop: 6, flexShrink: 0 }} />}
-            </Card>
-          </SwipeToDelete>
+            </div>
+            {item.unread && <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#B07848', marginTop: 6, flexShrink: 0 }} />}
+          </LongPressCard>
         ))}
       </div>
 
