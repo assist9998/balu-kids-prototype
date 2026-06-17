@@ -169,8 +169,10 @@
     noteText:          { ru: 'Текст',          en: 'Text' },
     noteTextPlaceholder: { ru: 'Введите заметку…', en: 'Enter note…' },
     noteSaved:         { ru: 'Сохранено',      en: 'Saved' },
-    typeAlert:         { ru: 'Важное',         en: 'Alert' },
-    typeBirthday:      { ru: 'День рождения',  en: 'Birthday' },
+    typeAlert:         { ru: 'Объявление',    en: 'Announcement' },
+    typeUrgent:        { ru: 'Срочно',         en: 'Urgent'       },
+    typeDayOff:        { ru: 'Выходной',       en: 'Day off'      },
+    typeEvent:         { ru: 'Мероприятие',    en: 'Event'        },
     compose:           { ru: 'Новая заметка',  en: 'New note' },
   };
 
@@ -1889,8 +1891,10 @@ function ComposeScreen({ back, actions }) {
   const [loading,    setLoading]    = React.useState(false);
   const [type, setType] = React.useState('alert');
   const types = [
-    { id: 'alert',    emoji: '📋', label: t('typeAlert') },
-    { id: 'birthday', emoji: '🎂', label: t('typeBirthday') },
+    { id: 'alert',   emoji: '📢', label: t('typeAlert')   },
+    { id: 'urgent',  emoji: '⚠️', label: t('typeUrgent')  },
+    { id: 'dayoff',  emoji: '🏖️', label: t('typeDayOff')  },
+    { id: 'event',   emoji: '📅', label: t('typeEvent')   },
   ];
 
   async function translate() {
