@@ -1970,13 +1970,17 @@ function ComposeScreen({ back, actions }) {
         </div>
       ) : null}
 
-      <button onClick={send} disabled={!canSend} className="bk-press" style={{
-        width: '100%', border: 'none', cursor: canSend ? 'pointer' : 'default', fontFamily: 'var(--font-display)',
-        background: canSend ? '#B07848' : 'rgba(0,0,0,0.12)', color: '#fff', fontSize: 17, fontWeight: 800,
-        padding: 15, borderRadius: 18,
-        boxShadow: canSend ? '0 10px 24px -8px #B07848' : 'none', transition: 'background .2s' }}>
-        {t('save')}
-      </button>
+      {canSend && (
+        <div style={{ position: 'sticky', bottom: 0, marginTop: 4, padding: '14px 0 26px',
+          background: 'linear-gradient(to top, var(--bg) 62%, transparent)' }}>
+          <button onClick={send} className="bk-press" style={{
+            width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-display)',
+            background: '#B07848', color: '#fff', fontSize: 17, fontWeight: 800,
+            padding: 15, borderRadius: 18, boxShadow: '0 10px 24px -8px #B07848' }}>
+            {t('save')}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
