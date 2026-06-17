@@ -1951,13 +1951,19 @@ function ComposeScreen({ back, actions }) {
           boxShadow: '0 1px 2px rgba(60,40,20,0.05)' }} />
       </div>
 
-      <button onClick={translate} disabled={!text.trim() || loading} className="bk-press" style={{
-        width: '100%', border: 'none', cursor: text.trim() && !loading ? 'pointer' : 'default',
-        fontFamily: 'inherit', fontSize: 15, fontWeight: 700, padding: '12px',
-        borderRadius: 14, background: '#FBF7F2', color: '#B07848',
-        opacity: text.trim() ? 1 : 0.4, transition: 'opacity .2s' }}>
-        {loading ? L('Переводим...', 'Translating...') : L('Перевести на английский →', 'Translate to English →')}
-      </button>
+      <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <button onClick={translate} disabled={!text.trim() || loading} className="bk-press" style={{
+          border: 'none', cursor: text.trim() && !loading ? 'pointer' : 'default',
+          fontFamily: 'inherit', fontSize: 13, fontWeight: 800, padding: '8px 18px',
+          borderRadius: 999, background: '#FBF7F2', color: '#B07848',
+          display: 'flex', alignItems: 'center', gap: 6,
+          opacity: text.trim() ? 1 : 0.35, transition: 'opacity .2s',
+          boxShadow: '0 1px 3px rgba(60,40,20,0.07)' }}>
+          {loading
+            ? <><span style={{ fontSize: 16 }}>🌐</span> {L('Переводим...', 'Translating...')}</>
+            : <><span style={{ fontSize: 16 }}>🌐</span> RU → EN</>}
+        </button>
+      </div>
 
       {translated ? (
         <div>
