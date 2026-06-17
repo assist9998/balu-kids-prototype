@@ -1655,7 +1655,7 @@ function AttendanceScreen({ actions }) {
     }
   }
   function setStatus(id, st) { setLocal(m => ({ ...m, [id]: st })); setAllMarked(false); }
-  function handleSave() { actions.saveStatuses(local); setSavedLocal({ ...local }); actions.toast(t('saved') + ' ✓'); }
+  function handleSave() { actions.saveStatuses(local); setSavedLocal({ ...local }); }
   const chips = [{ id: 'all', label: t('all'), emoji: '🗂️' }, ...DATA.GROUPS.map(g => ({ id: g.id, label: Lo(g), emoji: g.emoji }))];
 
   return (
@@ -1711,16 +1711,7 @@ function AttendanceScreen({ actions }) {
         })}
       </div>
 
-      {hasChanges && (
-        <div style={{ position: 'sticky', bottom: 0, marginTop: 16, padding: '14px 20px 26px',
-          background: 'linear-gradient(to top, var(--bg) 62%, transparent)' }}>
-          <button onClick={handleSave} className="bk-press" style={{
-            width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-display)',
-            background: '#B07848', color: '#fff', fontSize: 17, fontWeight: 800, padding: '15px',
-            borderRadius: 18, boxShadow: '0 10px 24px -8px #B07848' }}>{t('save')}</button>
-        </div>
-      )}
-      {!hasChanges && <div style={{ height: 30 }} />}
+      <SaveBar hasChanges={hasChanges} onSave={handleSave} />
     </div>
   );
 }
@@ -2084,12 +2075,23 @@ function KidPayRow({ kid, isPaid, onToggle, amount, suffix }) {
   );
 }
 
-function PayToast({ msg }) {
-  if (!msg) return null;
-  return <div style={{ position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)',
-    background: '#F2A81D', color: '#3E2510', padding: '10px 22px', borderRadius: 999,
-    fontWeight: 800, fontSize: 14, whiteSpace: 'nowrap', zIndex: 40,
-    boxShadow: '0 4px 16px -4px rgba(242,168,29,0.5)' }}>{msg}</div>;
+function SaveBar({ hasChanges, onSave }) {
+  const [done, setDone] = React.useState(false);
+  function handle() { onSave(); setDone(true); setTimeout(() => setDone(false), 1800); }
+  if (!hasChanges && !done) return <div style={{ height: 30 }} />;
+  return (
+    <div style={{ position: 'sticky', bottom: 0, marginTop: 16, padding: '14px 20px 26px',
+      background: 'linear-gradient(to top, var(--bg) 62%, transparent)' }}>
+      <button onClick={done ? undefined : handle} className={done ? '' : 'bk-press'} style={{
+        width: '100%', border: 'none', cursor: done ? 'default' : 'pointer', fontFamily: 'var(--font-display)',
+        background: done ? '#F2A81D' : '#B07848', color: done ? '#3E2510' : '#fff',
+        fontSize: 17, fontWeight: 800, padding: 15, borderRadius: 18,
+        boxShadow: done ? '0 4px 16px -4px rgba(242,168,29,0.5)' : '0 10px 24px -8px #B07848',
+        transition: 'background 0.25s, color 0.25s, box-shadow 0.25s' }}>
+        {done ? L('Сохранено', 'Saved') : L('Сохранить', 'Save')}
+      </button>
+    </div>
+  );
 }
 
 function PaymentsScreen({ go }) {
@@ -2130,7 +2132,6 @@ function PaymentsGardenScreen() {
   const [tariff,    setTariff]   = React.useState('longterm');
   const [group,     setGroup]    = React.useState('all');
   const [payFilter, setPayFilter] = React.useState('all');
-  const [toast,     setToast]    = React.useState(null);
   const curCalMonthIdx = React.useMemo(() => {
     const m = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'][new Date().getMonth()];
     const i = GARDEN_MONTHS.findIndex(x => x.id === m);
@@ -2168,11 +2169,7 @@ function PaymentsGardenScreen() {
   function toggle(kidId) {
     setPaid(prev => ({ ...prev, [mo.id]: { ...prev[mo.id], [kidId]: !prev[mo.id][kidId] } }));
   }
-  function handleSave() {
-    setSaved(JSON.parse(JSON.stringify(paid)));
-    setToast(L('Сохранено ✓', 'Saved ✓'));
-    setTimeout(() => setToast(null), 2000);
-  }
+  function handleSave() { setSaved(JSON.parse(JSON.stringify(paid))); }
   function prevMonth() { if (monthIdx > 0) { setMonthIdx(i => i - 1); setPayFilter('all'); } }
   function nextMonth() { if (monthIdx < maxMonthIdx) { setMonthIdx(i => i + 1); setPayFilter('all'); } }
 
@@ -2238,17 +2235,7 @@ function PaymentsGardenScreen() {
             amount={getAmount(kid)} suffix={isTour ? L('/день', '/day') : ''} />
         ))}
       </div>
-      {hasChanges && (
-        <div style={{ position: 'sticky', bottom: 0, marginTop: 16, padding: '14px 20px 26px',
-          background: 'linear-gradient(to top, var(--bg) 62%, transparent)' }}>
-          <button onClick={handleSave} className="bk-press" style={{
-            width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-display)',
-            background: '#B07848', color: '#fff', fontSize: 17, fontWeight: 800, padding: '15px',
-            borderRadius: 18, boxShadow: '0 10px 24px -8px #B07848' }}>{L('Сохранить', 'Save')}</button>
-        </div>
-      )}
-      {!hasChanges && <div style={{ height: 30 }} />}
-      <PayToast msg={toast} />
+      <SaveBar hasChanges={hasChanges} onSave={handleSave} />
     </div>
   );
 }
@@ -2256,7 +2243,6 @@ function PaymentsGardenScreen() {
 function PaymentsClubsScreen() {
   const [clubId,    setClubId]   = React.useState(() => DATA.CLUBS[0].id);
   const [payFilter, setPayFilter] = React.useState('all');
-  const [toast,     setToast]    = React.useState(null);
   const curCalMonthIdx = React.useMemo(() => {
     const m = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'][new Date().getMonth()];
     const i = GARDEN_MONTHS.findIndex(x => x.id === m);
@@ -2292,11 +2278,7 @@ function PaymentsClubsScreen() {
     const k = cKey(kid);
     setPaid(prev => ({ ...prev, [mo.id]: { ...prev[mo.id], [k]: !prev[mo.id][k] } }));
   }
-  function handleSave() {
-    setSaved(JSON.parse(JSON.stringify(paid)));
-    setToast(L('Сохранено ✓', 'Saved ✓'));
-    setTimeout(() => setToast(null), 2000);
-  }
+  function handleSave() { setSaved(JSON.parse(JSON.stringify(paid))); }
   function prevMonth() { if (monthIdx > 0) { setMonthIdx(i => i - 1); setPayFilter('all'); } }
   function nextMonth() { if (monthIdx < maxMonthIdx) { setMonthIdx(i => i + 1); setPayFilter('all'); } }
 
@@ -2348,14 +2330,7 @@ function PaymentsClubsScreen() {
       {hasChanges && (
         <div style={{ position: 'sticky', bottom: 0, marginTop: 16, padding: '14px 20px 26px',
           background: 'linear-gradient(to top, var(--bg) 62%, transparent)' }}>
-          <button onClick={handleSave} className="bk-press" style={{
-            width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-display)',
-            background: '#B07848', color: '#fff', fontSize: 17, fontWeight: 800, padding: '15px',
-            borderRadius: 18, boxShadow: '0 10px 24px -8px #B07848' }}>{L('Сохранить', 'Save')}</button>
-        </div>
-      )}
-      {!hasChanges && <div style={{ height: 30 }} />}
-      <PayToast msg={toast} />
+      <SaveBar hasChanges={hasChanges} onSave={handleSave} />
     </div>
   );
 }
