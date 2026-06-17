@@ -2024,36 +2024,104 @@ function PaymentsScreen({ go }) {
   );
 }
 
+const GARDEN_MONTHS = [
+  { id: 'jun', ru: 'Июнь',     en: 'June'      },
+  { id: 'jul', ru: 'Июль',     en: 'July'       },
+  { id: 'aug', ru: 'Август',   en: 'August'     },
+  { id: 'sep', ru: 'Сентябрь', en: 'September'  },
+];
+
 function PaymentsGardenScreen() {
   const [tariff,    setTariff]   = React.useState('longterm');
   const [group,     setGroup]    = React.useState('all');
   const [payFilter, setPayFilter] = React.useState('all');
   const [toast,     setToast]    = React.useState(null);
-  const initPaid = () => { const m = {}; DATA.CHILDREN.forEach((k, i) => { m[k.id] = i % 3 !== 2; }); return m; };
+  const [monthIdx,  setMonthIdx] = React.useState(0);
+  const touchStart = React.useRef(null);
+
+  const initPaid = () => {
+    const m = {};
+    GARDEN_MONTHS.forEach((mo, mi) => {
+      m[mo.id] = {};
+      DATA.CHILDREN.forEach((k, i) => { m[mo.id][k.id] = mi === 0 && i % 3 !== 2; });
+    });
+    return m;
+  };
   const [paid,  setPaid]  = React.useState(initPaid);
   const [saved, setSaved] = React.useState(initPaid);
 
-  const isTour = tariff === 'tourist';
+  const mo      = GARDEN_MONTHS[monthIdx];
+  const curPaid = paid[mo.id];
+  const isTour  = tariff === 'tourist';
+
   const allKids = DATA.CHILDREN
     .filter(k => isTour ? k.contract === 'tourist' : k.contract !== 'tourist')
     .filter(k => group === 'all' || k.group === group);
-  const getAmount = kid => isTour ? PAY_DAILY[kid.group] : PAY_MONTHLY[kid.group];
-  const countPaid   = allKids.filter(k =>  paid[k.id]).length;
-  const countUnpaid = allKids.filter(k => !paid[k.id]).length;
-  const total       = allKids.filter(k =>  paid[k.id]).reduce((s, k) => s + getAmount(k), 0);
-  const kids        = allKids.filter(k => payFilter === 'paid' ? paid[k.id] : payFilter === 'unpaid' ? !paid[k.id] : true);
-  const hasChanges  = DATA.CHILDREN.some(k => paid[k.id] !== saved[k.id]);
+  const getAmount   = kid => isTour ? PAY_DAILY[kid.group] : PAY_MONTHLY[kid.group];
+  const countPaid   = allKids.filter(k =>  curPaid[k.id]).length;
+  const countUnpaid = allKids.filter(k => !curPaid[k.id]).length;
+  const total       = allKids.filter(k =>  curPaid[k.id]).reduce((s, k) => s + getAmount(k), 0);
+  const kids        = allKids.filter(k => payFilter === 'paid' ? curPaid[k.id] : payFilter === 'unpaid' ? !curPaid[k.id] : true);
+  const hasChanges  = GARDEN_MONTHS.some(m => DATA.CHILDREN.some(k => (paid[m.id][k.id]||false) !== (saved[m.id][k.id]||false)));
 
+  function toggle(kidId) {
+    setPaid(prev => ({ ...prev, [mo.id]: { ...prev[mo.id], [kidId]: !prev[mo.id][kidId] } }));
+  }
   function handleSave() {
-    setSaved({ ...paid });
+    setSaved(JSON.parse(JSON.stringify(paid)));
     setToast(L('Сохранено ✓', 'Saved ✓'));
     setTimeout(() => setToast(null), 2000);
   }
+  function prevMonth() { if (monthIdx > 0) { setMonthIdx(i => i - 1); setPayFilter('all'); } }
+  function nextMonth() { if (monthIdx < GARDEN_MONTHS.length - 1) { setMonthIdx(i => i + 1); setPayFilter('all'); } }
 
   const chips = [{ id: 'all', label: t('all'), emoji: '🗂️' }, ...DATA.GROUPS.map(g => ({ id: g.id, label: Lo(g), emoji: g.emoji }))];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
+
+      {/* month card */}
+      <div
+        onTouchStart={e => { touchStart.current = e.touches[0].clientX; }}
+        onTouchEnd={e => {
+          if (touchStart.current === null) return;
+          const dx = e.changedTouches[0].clientX - touchStart.current;
+          touchStart.current = null;
+          if (dx < -50) nextMonth();
+          else if (dx > 50) prevMonth();
+        }}
+        style={{ margin: '0 20px 16px', borderRadius: 22, padding: '16px 18px',
+          background: '#fde6df', boxShadow: '0 1px 2px rgba(60,40,20,0.04), 0 16px 32px -24px rgba(60,40,20,0.45)',
+          userSelect: 'none' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <button onClick={prevMonth} style={{ border: 'none', background: 'none', cursor: monthIdx > 0 ? 'pointer' : 'default',
+            fontSize: 20, opacity: monthIdx > 0 ? 1 : 0.25, padding: 0 }}>‹</button>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{Lo(mo)}</div>
+            <div style={{ fontSize: 12, color: 'var(--ink-faint)', fontWeight: 600, marginTop: 2 }}>
+              {monthIdx + 1} / {GARDEN_MONTHS.length}
+            </div>
+          </div>
+          <button onClick={nextMonth} style={{ border: 'none', background: 'none', cursor: monthIdx < GARDEN_MONTHS.length - 1 ? 'pointer' : 'default',
+            fontSize: 20, opacity: monthIdx < GARDEN_MONTHS.length - 1 ? 1 : 0.25, padding: 0 }}>›</button>
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          {[
+            { label: L('Оплатили', 'Paid'),       val: countPaid,   color: 'var(--ok)' },
+            { label: L('Не оплатили', 'Unpaid'),   val: countUnpaid, color: 'var(--no)' },
+            { label: L('Собрано', 'Collected'),    val: `$${total}`, color: '#B07848'   },
+          ].map((s, i) => (
+            <div key={i} onClick={() => i < 2 && setPayFilter(f => f === (i===0?'paid':'unpaid') ? 'all' : (i===0?'paid':'unpaid'))}
+              style={{ flex: 1, background: 'rgba(255,255,255,0.6)', borderRadius: 14, padding: '10px 6px',
+                textAlign: 'center', cursor: i < 2 ? 'pointer' : 'default',
+                boxShadow: (payFilter === 'paid' && i===0) || (payFilter === 'unpaid' && i===1) ? '0 0 0 2px #B07848' : 'none' }}>
+              <div style={{ fontSize: 22, fontWeight: 800, color: s.color, lineHeight: 1, fontFamily: 'var(--font-display)' }}>{s.val}</div>
+              <div style={{ fontSize: 11, color: 'var(--ink-soft)', fontWeight: 700, marginTop: 3 }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* tariff toggle */}
       <div style={{ display: 'flex', margin: '0 20px 14px', background: '#FBF7F2', borderRadius: 999, padding: 4, gap: 4 }}>
         {[['longterm', L('Долгосрочные', 'Long term')], ['tourist', L('Туристы', 'Tourist')]].map(([id, label]) => (
@@ -2078,11 +2146,10 @@ function PaymentsGardenScreen() {
           </button>
         ))}
       </div>
-      <PayStats cp={countPaid} cu={countUnpaid} total={total} filter={payFilter} onFilter={setPayFilter} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 9, padding: '0 20px' }}>
         {kids.map(kid => (
-          <KidPayRow key={kid.id} kid={kid} isPaid={paid[kid.id]}
-            onToggle={() => setPaid(m => ({ ...m, [kid.id]: !m[kid.id] }))}
+          <KidPayRow key={kid.id} kid={kid} isPaid={curPaid[kid.id]}
+            onToggle={() => toggle(kid.id)}
             amount={getAmount(kid)} suffix={isTour ? L('/день', '/day') : ''} />
         ))}
       </div>
