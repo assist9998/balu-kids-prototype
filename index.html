@@ -2036,7 +2036,13 @@ function PaymentsGardenScreen() {
   const [group,     setGroup]    = React.useState('all');
   const [payFilter, setPayFilter] = React.useState('all');
   const [toast,     setToast]    = React.useState(null);
-  const [monthIdx,  setMonthIdx] = React.useState(0);
+  const curCalMonthIdx = React.useMemo(() => {
+    const m = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'][new Date().getMonth()];
+    const i = GARDEN_MONTHS.findIndex(x => x.id === m);
+    return i === -1 ? 0 : i;
+  }, []);
+  const maxMonthIdx = Math.min(curCalMonthIdx + 1, GARDEN_MONTHS.length - 1);
+  const [monthIdx,  setMonthIdx] = React.useState(curCalMonthIdx);
   const touchStart = React.useRef(null);
 
   const initPaid = () => {
@@ -2073,7 +2079,7 @@ function PaymentsGardenScreen() {
     setTimeout(() => setToast(null), 2000);
   }
   function prevMonth() { if (monthIdx > 0) { setMonthIdx(i => i - 1); setPayFilter('all'); } }
-  function nextMonth() { if (monthIdx < GARDEN_MONTHS.length - 1) { setMonthIdx(i => i + 1); setPayFilter('all'); } }
+  function nextMonth() { if (monthIdx < maxMonthIdx) { setMonthIdx(i => i + 1); setPayFilter('all'); } }
 
   const chips = [{ id: 'all', label: t('all'), emoji: '🗂️' }, ...DATA.GROUPS.map(g => ({ id: g.id, label: Lo(g), emoji: g.emoji }))];
 
@@ -2124,7 +2130,7 @@ function PaymentsGardenScreen() {
             fontSize: 20, color: '#B07848', fontWeight: 800, lineHeight: 1 }}>‹</button>
           <span style={{ flex: 1, fontSize: 15, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)', textAlign: 'center' }}>{Lo(mo)}</span>
           <button onClick={nextMonth} style={{ border: 'none', background: 'none', padding: 0,
-            cursor: monthIdx < GARDEN_MONTHS.length-1 ? 'pointer' : 'default', opacity: monthIdx < GARDEN_MONTHS.length-1 ? 1 : 0.2,
+            cursor: monthIdx < maxMonthIdx ? 'pointer' : 'default', opacity: monthIdx < maxMonthIdx ? 1 : 0.2,
             fontSize: 20, color: '#B07848', fontWeight: 800, lineHeight: 1 }}>›</button>
         </div>
       </div>
