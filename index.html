@@ -1994,8 +1994,9 @@ function KidPayRow({ kid, isPaid, onToggle, amount, suffix }) {
 function PayToast({ msg }) {
   if (!msg) return null;
   return <div style={{ position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)',
-    background: 'var(--ink)', color: 'var(--bg)', padding: '12px 20px', borderRadius: 999,
-    fontWeight: 700, fontSize: 14.5, whiteSpace: 'nowrap', zIndex: 40 }}>{msg}</div>;
+    background: '#F2A81D', color: '#3E2510', padding: '10px 22px', borderRadius: 999,
+    fontWeight: 800, fontSize: 14, whiteSpace: 'nowrap', zIndex: 40,
+    boxShadow: '0 4px 16px -4px rgba(242,168,29,0.5)' }}>{msg}</div>;
 }
 
 function PaymentsScreen({ go }) {
