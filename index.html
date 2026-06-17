@@ -1215,8 +1215,8 @@ function Avatar({ emoji, color = '#eee', size = 46, ring }) {
 }
 
 // ── status: dot, chip ──────────────────────────────────────────
-const STATUS_COLOR = { present: 'var(--ok)', absent: 'var(--no)', late: 'var(--warn)' };
-const STATUS_KEY   = { present: 'present', absent: 'absent', late: 'late' };
+const STATUS_COLOR = { present: 'var(--ok)', absent: 'var(--no)', late: 'var(--no)' };
+const STATUS_KEY   = { present: 'present', absent: 'absent', late: 'absent' };
 
 function StatusDot({ status, size = 9 }) {
   return <span style={{ width: size, height: size, borderRadius: '50%', background: STATUS_COLOR[status], display: 'inline-block', flexShrink: 0 }} />;
@@ -1631,7 +1631,7 @@ Object.assign(window, { HomeScreen, ChildrenScreen, GroupScreen, ChildScreen });
 // ════════════════════════════════════════════════════════════════
 //  ATTENDANCE — tap to cycle present → late → absent
 // ════════════════════════════════════════════════════════════════
-const CYCLE = { present: 'late', late: 'absent', absent: 'present' };
+const CYCLE = { present: 'absent', absent: 'present', late: 'present' };
 
 function AttendanceScreen({ actions }) {
   const initLocal = () => { const m = {}; DATA.CHILDREN.forEach(k => { m[k.id] = 'absent'; }); return m; };
@@ -1643,8 +1643,7 @@ function AttendanceScreen({ actions }) {
   const kids = DATA.CHILDREN.filter(k => filter === 'all' || k.group === filter);
   const counts = {
     present: DATA.CHILDREN.filter(k => local[k.id] === 'present').length,
-    late:    DATA.CHILDREN.filter(k => local[k.id] === 'late').length,
-    absent:  DATA.CHILDREN.filter(k => local[k.id] === 'absent').length,
+    absent:  DATA.CHILDREN.filter(k => local[k.id] !== 'present').length,
   };
   const hasChanges = DATA.CHILDREN.some(k => local[k.id] !== 'absent');
 
@@ -1680,7 +1679,6 @@ function AttendanceScreen({ actions }) {
       {/* count strip */}
       <div style={{ display: 'flex', gap: 10, padding: '0 20px 8px' }}>
         <CountStat n={counts.present} label={t('present')} color="var(--ok)" />
-        <CountStat n={counts.late}    label={t('late')}    color="var(--warn)" />
         <CountStat n={counts.absent}  label={t('absent')}  color="var(--no)" />
       </div>
 
