@@ -1859,6 +1859,32 @@ function WeekChart() {
 // ════════════════════════════════════════════════════════════════
 const TYPE_TINT = { birthday: '#FBD9E1', alert: '#FBE7A8', message: '#CDE8FB', sent: '#D4F0DF' };
 
+function SwipeToDelete({ onDelete, children }) {
+  const [offset, setOffset] = React.useState(0);
+  const [gone,   setGone]   = React.useState(false);
+  const startX = React.useRef(null);
+  if (gone) return null;
+  return (
+    <div style={{ overflow: 'hidden', borderRadius: 18, position: 'relative' }}>
+      <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 72,
+        background: '#e74c3c', display: 'grid', placeItems: 'center', borderRadius: 18 }}>
+        <span style={{ fontSize: 20 }}>🗑️</span>
+      </div>
+      <div
+        onTouchStart={e => { startX.current = e.touches[0].clientX; }}
+        onTouchMove={e => { const dx = e.touches[0].clientX - startX.current; if (dx < 0) setOffset(Math.max(dx, -120)); }}
+        onTouchEnd={() => {
+          if (offset < -72) { setGone(true); onDelete(); }
+          else setOffset(0);
+          startX.current = null;
+        }}
+        style={{ transform: `translateX(${offset}px)`, transition: offset === 0 ? 'transform 0.25s' : 'none', position: 'relative', zIndex: 1 }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function NotificationsScreen({ feed, go, actions }) {
   const unread = feed.filter(f => f.unread).length;
   return (
@@ -1867,37 +1893,31 @@ function NotificationsScreen({ feed, go, actions }) {
         <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink-soft)' }}>
           {unread ? `${unread} ${t('unread')}` : '—'}
         </div>
-        <div style={{ display: 'flex', gap: 12 }}>
-          {feed.some(x => !x.unread) && (
-            <button onClick={() => actions.deleteRead()} className="bk-press" style={{ border: 'none', cursor: 'pointer',
-              fontFamily: 'inherit', fontSize: 13, fontWeight: 700, color: 'var(--ink-faint)', background: 'none' }}>
-              {L('Удалить прочитанные', 'Clear read')}
-            </button>
-          )}
-          {unread > 0 && (
-            <button onClick={actions.markAllRead} className="bk-press" style={{ border: 'none', cursor: 'pointer',
-              fontFamily: 'inherit', fontSize: 13, fontWeight: 700, color: '#B07848', background: 'none' }}>
-              {t('markRead')}
-            </button>
-          )}
-        </div>
+        {unread > 0 && (
+          <button onClick={actions.markAllRead} className="bk-press" style={{ border: 'none', cursor: 'pointer',
+            fontFamily: 'inherit', fontSize: 13, fontWeight: 700, color: '#B07848', background: 'none' }}>
+            {t('markRead')}
+          </button>
+        )}
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {feed.map(item => (
-          <Card key={item.id} pad={13} onClick={() => item.unread && actions.markOneRead(item.id)}
-            style={{ display: 'flex', gap: 12, alignItems: 'flex-start', cursor: item.unread ? 'pointer' : 'default',
-            background: '#FBF7F2', opacity: item.unread ? 1 : 0.72 }}>
-            <div style={{ width: 42, height: 42, borderRadius: '50%', background: TYPE_TINT[item.type] || 'var(--accent-soft)',
-              display: 'grid', placeItems: 'center', fontSize: 21, flexShrink: 0 }}>{item.emoji}</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14.5, color: 'var(--ink)', fontWeight: 600, lineHeight: 1.4, textWrap: 'pretty' }}>{Lo(item)}</div>
-              <div style={{ fontSize: 12, color: 'var(--ink-faint)', fontWeight: 600, marginTop: 4 }}>
-                {item.timeEn ? L(item.time, item.timeEn) : item.time}
+          <SwipeToDelete key={item.id} onDelete={() => actions.deletePost(item.id)}>
+            <Card pad={13} onClick={() => item.unread && actions.markOneRead(item.id)}
+              style={{ display: 'flex', gap: 12, alignItems: 'flex-start', cursor: item.unread ? 'pointer' : 'default',
+              background: '#FBF7F2', opacity: item.unread ? 1 : 0.72 }}>
+              <div style={{ width: 42, height: 42, borderRadius: '50%', background: TYPE_TINT[item.type] || 'var(--accent-soft)',
+                display: 'grid', placeItems: 'center', fontSize: 21, flexShrink: 0 }}>{item.emoji}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14.5, color: 'var(--ink)', fontWeight: 600, lineHeight: 1.4, textWrap: 'pretty' }}>{Lo(item)}</div>
+                <div style={{ fontSize: 12, color: 'var(--ink-faint)', fontWeight: 600, marginTop: 4 }}>
+                  {item.timeEn ? L(item.time, item.timeEn) : item.time}
+                </div>
               </div>
-            </div>
-            {item.unread && <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#B07848', marginTop: 6, flexShrink: 0 }} />}
-          </Card>
+              {item.unread && <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#B07848', marginTop: 6, flexShrink: 0 }} />}
+            </Card>
+          </SwipeToDelete>
         ))}
       </div>
 
@@ -2447,7 +2467,7 @@ function App() {
     saveStatuses: (map) => setStatuses(() => ({ ...map })),
     markAllRead:  () => setFeed(f => f.map(x => ({ ...x, unread: false }))),
     markOneRead:  (id) => setFeed(f => f.map(x => x.id === id ? { ...x, unread: false } : x)),
-    deleteRead:   () => setFeed(f => f.filter(x => x.unread)),
+    deletePost:   (id) => setFeed(f => f.filter(x => x.id !== id)),
     addPost: ({ ru, en, emoji = '📋', type = 'alert' }) => setFeed(f => [{
       id: Date.now(), type, emoji,
       ru, en, time: t('justNow'), timeEn: t('justNow'), unread: true,
