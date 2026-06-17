@@ -1944,13 +1944,15 @@ function ComposeScreen({ back, actions }) {
   const [text,    setText]    = React.useState('');
   const [ruText,  setRuText]  = React.useState('');
   const [loading, setLoading] = React.useState(false);
-  const [type, setType] = React.useState('alert');
+  const [typeIdx, setTypeIdx] = React.useState(0);
   const types = [
-    { id: 'alert',   emoji: '📢', label: t('typeAlert')   },
-    { id: 'urgent',  emoji: '⚠️', label: t('typeUrgent')  },
-    { id: 'dayoff',  emoji: '🏖️', label: t('typeDayOff')  },
-    { id: 'event',   emoji: '📅', label: t('typeEvent')   },
+    { id: 'alert',  emoji: '📢', label: t('typeAlert'),  color: '#FBE0C0' },
+    { id: 'urgent', emoji: '⚠️', label: t('typeUrgent'), color: '#FBD9E1' },
+    { id: 'dayoff', emoji: '🏖️', label: t('typeDayOff'), color: '#CDE8FB' },
+    { id: 'event',  emoji: '📅', label: t('typeEvent'),  color: '#D4F0DF' },
   ];
+  const type = types[typeIdx].id;
+  const touchTypeRef = React.useRef(null);
 
   async function translate() {
     if (!text.trim()) return;
@@ -1966,7 +1968,7 @@ function ComposeScreen({ back, actions }) {
 
   function send() {
     if (!text.trim()) return;
-    const chosen = types.find(x => x.id === type);
+    const chosen = types[typeIdx];
     actions.addPost({ ru: ruText || text, en: text, emoji: chosen.emoji, type });
     actions.toast(t('noteSaved') + ' ✓');
     back();
@@ -1974,17 +1976,32 @@ function ComposeScreen({ back, actions }) {
 
   return (
     <div style={{ padding: '6px 20px 30px', display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {types.map(x => (
-            <button key={x.id} onClick={() => setType(x.id)} className="bk-press" style={{
-              border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13.5, fontWeight: 700,
-              padding: '9px 14px', borderRadius: 999,
-              background: type === x.id ? '#B07848' : '#FBF7F2',
-              color: type === x.id ? '#fff' : 'var(--ink-soft)',
-              boxShadow: type === x.id ? '0 6px 14px -6px #B07848' : '0 1px 2px rgba(60,40,20,0.05)' }}>
-              {x.emoji} {x.label}
-            </button>
+      <div
+        onTouchStart={e => { touchTypeRef.current = e.touches[0].clientX; }}
+        onTouchEnd={e => {
+          if (touchTypeRef.current === null) return;
+          const dx = e.changedTouches[0].clientX - touchTypeRef.current;
+          touchTypeRef.current = null;
+          if (dx < -50 && typeIdx < types.length - 1) setTypeIdx(i => i + 1);
+          else if (dx > 50 && typeIdx > 0) setTypeIdx(i => i - 1);
+        }}
+        style={{ borderRadius: 22, padding: '20px 18px 16px', background: types[typeIdx].color,
+          boxShadow: '0 1px 2px rgba(60,40,20,0.04), 0 12px 28px -20px rgba(60,40,20,0.35)',
+          userSelect: 'none' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <button onClick={() => typeIdx > 0 && setTypeIdx(i => i - 1)} style={{ border: 'none', background: 'none', padding: 0,
+            fontSize: 20, color: '#B07848', fontWeight: 800, opacity: typeIdx > 0 ? 1 : 0.2, cursor: typeIdx > 0 ? 'pointer' : 'default' }}>‹</button>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 40, lineHeight: 1, marginBottom: 6 }}>{types[typeIdx].emoji}</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{types[typeIdx].label}</div>
+          </div>
+          <button onClick={() => typeIdx < types.length - 1 && setTypeIdx(i => i + 1)} style={{ border: 'none', background: 'none', padding: 0,
+            fontSize: 20, color: '#B07848', fontWeight: 800, opacity: typeIdx < types.length - 1 ? 1 : 0.2, cursor: typeIdx < types.length - 1 ? 'pointer' : 'default' }}>›</button>
+        </div>
+        <div style={{ display: 'flex', gap: 5, justifyContent: 'center' }}>
+          {types.map((_, i) => (
+            <div key={i} onClick={() => setTypeIdx(i)} style={{ height: 5, borderRadius: 3, cursor: 'pointer', transition: 'all 0.2s',
+              width: i === typeIdx ? 18 : 5, background: i === typeIdx ? '#B07848' : 'rgba(176,120,72,0.3)' }} />
           ))}
         </div>
       </div>
