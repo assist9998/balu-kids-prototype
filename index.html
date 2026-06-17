@@ -1886,9 +1886,9 @@ function NotificationsScreen({ feed, go, actions }) {
 //  COMPOSE (internal notes/alerts for staff)
 // ════════════════════════════════════════════════════════════════
 function ComposeScreen({ back, actions }) {
-  const [text,       setText]       = React.useState('');
-  const [translated, setTranslated] = React.useState('');
-  const [loading,    setLoading]    = React.useState(false);
+  const [text,    setText]    = React.useState('');
+  const [ruText,  setRuText]  = React.useState('');
+  const [loading, setLoading] = React.useState(false);
   const [type, setType] = React.useState('alert');
   const types = [
     { id: 'alert',   emoji: '📢', label: t('typeAlert')   },
@@ -1903,28 +1903,19 @@ function ComposeScreen({ back, actions }) {
     try {
       const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text.trim())}&langpair=ru|en`);
       const data = await res.json();
-      setTranslated(data.responseData?.translatedText || '');
-    } catch {
-      setTranslated('');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function handleTextChange(val) {
-    setText(val);
-    setTranslated('');
+      const en = data.responseData?.translatedText;
+      if (en) { setRuText(text); setText(en); }
+    } catch {}
+    finally { setLoading(false); }
   }
 
   function send() {
     if (!text.trim()) return;
     const chosen = types.find(x => x.id === type);
-    actions.addPost({ ru: text, en: translated || text, emoji: chosen.emoji, type });
+    actions.addPost({ ru: ruText || text, en: text, emoji: chosen.emoji, type });
     actions.toast(t('noteSaved') + ' ✓');
     back();
   }
-
-  const canSend = text.trim() && translated;
 
   return (
     <div style={{ padding: '6px 20px 30px', display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -1944,7 +1935,8 @@ function ComposeScreen({ back, actions }) {
       </div>
 
       <div style={{ position: 'relative' }}>
-        <textarea value={text} onChange={e => handleTextChange(e.target.value)} placeholder={t('noteTextPlaceholder')}
+        <textarea value={text} onChange={e => { setText(e.target.value); setRuText(''); }}
+          placeholder={t('noteTextPlaceholder')}
           rows={4} style={{ width: '100%', boxSizing: 'border-box', resize: 'none', border: 'none',
           background: '#FBF7F2', borderRadius: 18, padding: 16, paddingBottom: 44, fontFamily: 'inherit', fontSize: 15.5,
           color: 'var(--ink)', fontWeight: 600, lineHeight: 1.4, outline: 'none',
@@ -1959,18 +1951,7 @@ function ComposeScreen({ back, actions }) {
         </button>
       </div>
 
-      {translated ? (
-        <div>
-          <SectionLabel>EN</SectionLabel>
-          <textarea value={translated} onChange={e => setTranslated(e.target.value)} rows={4}
-            style={{ width: '100%', boxSizing: 'border-box', resize: 'none', border: 'none',
-            background: '#FBF7F2', borderRadius: 18, padding: 16, fontFamily: 'inherit', fontSize: 15.5,
-            color: 'var(--ink)', fontWeight: 600, lineHeight: 1.4, outline: 'none',
-            boxShadow: '0 1px 2px rgba(60,40,20,0.05)' }} />
-        </div>
-      ) : null}
-
-      {canSend && (
+      {text.trim() && (
         <div style={{ position: 'sticky', bottom: 0, marginTop: 4, padding: '14px 0 26px',
           background: 'linear-gradient(to top, var(--bg) 62%, transparent)' }}>
           <button onClick={send} className="bk-press" style={{
