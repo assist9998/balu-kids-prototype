@@ -1867,17 +1867,26 @@ function NotificationsScreen({ feed, go, actions }) {
         <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink-soft)' }}>
           {unread ? `${unread} ${t('unread')}` : '—'}
         </div>
-        {unread > 0 && (
-          <button onClick={actions.markAllRead} className="bk-press" style={{ border: 'none', cursor: 'pointer',
-            fontFamily: 'inherit', fontSize: 13, fontWeight: 700, color: '#B07848', background: 'none' }}>
-            {t('markRead')}
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: 12 }}>
+          {feed.some(x => !x.unread) && (
+            <button onClick={() => actions.deleteRead()} className="bk-press" style={{ border: 'none', cursor: 'pointer',
+              fontFamily: 'inherit', fontSize: 13, fontWeight: 700, color: 'var(--ink-faint)', background: 'none' }}>
+              {L('Удалить прочитанные', 'Clear read')}
+            </button>
+          )}
+          {unread > 0 && (
+            <button onClick={actions.markAllRead} className="bk-press" style={{ border: 'none', cursor: 'pointer',
+              fontFamily: 'inherit', fontSize: 13, fontWeight: 700, color: '#B07848', background: 'none' }}>
+              {t('markRead')}
+            </button>
+          )}
+        </div>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {feed.map(item => (
-          <Card key={item.id} pad={13} style={{ display: 'flex', gap: 12, alignItems: 'flex-start',
+          <Card key={item.id} pad={13} onClick={() => item.unread && actions.markOneRead(item.id)}
+            style={{ display: 'flex', gap: 12, alignItems: 'flex-start', cursor: item.unread ? 'pointer' : 'default',
             background: '#FBF7F2', opacity: item.unread ? 1 : 0.72 }}>
             <div style={{ width: 42, height: 42, borderRadius: '50%', background: TYPE_TINT[item.type] || 'var(--accent-soft)',
               display: 'grid', placeItems: 'center', fontSize: 21, flexShrink: 0 }}>{item.emoji}</div>
@@ -1887,12 +1896,7 @@ function NotificationsScreen({ feed, go, actions }) {
                 {item.timeEn ? L(item.time, item.timeEn) : item.time}
               </div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
-              {item.unread && <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#B07848' }} />}
-              <button onClick={() => actions.deletePost(item.id)} className="bk-press" style={{
-                border: 'none', background: 'none', cursor: 'pointer', padding: 0,
-                fontSize: 16, color: 'var(--ink-faint)', lineHeight: 1 }}>×</button>
-            </div>
+            {item.unread && <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#B07848', marginTop: 6, flexShrink: 0 }} />}
           </Card>
         ))}
       </div>
@@ -2441,8 +2445,9 @@ function App() {
     setStatus: (id, st) => setStatuses(m => ({ ...m, [id]: st })),
     markAllPresent: (ids) => setStatuses(m => { const n = { ...m }; ids.forEach(i => n[i] = 'present'); return n; }),
     saveStatuses: (map) => setStatuses(() => ({ ...map })),
-    markAllRead: () => setFeed(f => f.map(x => ({ ...x, unread: false }))),
-    deletePost: (id) => setFeed(f => f.filter(x => x.id !== id)),
+    markAllRead:  () => setFeed(f => f.map(x => ({ ...x, unread: false }))),
+    markOneRead:  (id) => setFeed(f => f.map(x => x.id === id ? { ...x, unread: false } : x)),
+    deleteRead:   () => setFeed(f => f.filter(x => x.unread)),
     addPost: ({ ru, en, emoji = '📋', type = 'alert' }) => setFeed(f => [{
       id: Date.now(), type, emoji,
       ru, en, time: t('justNow'), timeEn: t('justNow'), unread: true,
