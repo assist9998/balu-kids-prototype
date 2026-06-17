@@ -1688,10 +1688,10 @@ function AttendanceScreen({ actions }) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 24px 12px' }}>
         <span style={{ fontSize: 12.5, color: 'var(--ink-faint)', fontWeight: 600 }}>{t('tapToCycle')}</span>
         <button onClick={toggleMarkAll} className="bk-press" style={{
-          border: allMarked ? 'none' : '2px solid #B07848', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 700,
+          border: '2px solid #B07848', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 700,
           color: allMarked ? '#fff' : '#B07848',
           background: allMarked ? '#B07848' : 'transparent',
-          padding: allMarked ? '7px 12px' : '5px 12px', borderRadius: 999,
+          padding: '5px 12px', borderRadius: 999,
           boxShadow: allMarked ? '0 6px 14px -6px #B07848' : 'none', transition: 'all 0.18s' }}>
           {allMarked ? `✓ ${t('markAll')}` : t('markAll')}
         </button>
