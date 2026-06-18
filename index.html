@@ -201,7 +201,7 @@
   ];
 
   // status: 'present' | 'absent' | 'late'
-  function kid(o) { return Object.assign({ status: 'present', allergyRu: '', allergyEn: '', noteRu: '', noteEn: '', contract: 'longterm' }, o); }
+  function kid(o) { return Object.assign({ status: 'present', allergyRu: '', allergyEn: '', noteRu: '', noteEn: '', contract: 'longterm', adaptation: false }, o); }
 
   const CHILDREN = [
     // Солнышки
@@ -215,7 +215,7 @@
       momRu: 'Мадина', momEn: 'Madina', momPhone: '+7 705 998 77 66', dadRu: 'Нуржан', dadEn: 'Nurzhan',
       status: 'absent', noteRu: 'Заболела, ОРВИ', noteEn: 'Sick — cold', rate: 81, contract: 'tourist' }),
     kid({ id: 4, group: 'toddler', emoji: '🧒🏻', ru: 'Даниэль Ким', en: 'Daniel Kim', dob: '09.09.2022', bday: '9 сен',
-      momRu: 'Елена', momEn: 'Elena', momPhone: '+7 700 555 44 33', dadRu: 'Виктор', dadEn: 'Victor', checkin: '08:05', rate: 99 }),
+      momRu: 'Елена', momEn: 'Elena', momPhone: '+7 700 555 44 33', dadRu: 'Виктор', dadEn: 'Victor', checkin: '08:05', rate: 99, adaptation: true }),
     kid({ id: 5, group: 'toddler', emoji: '👦🏻', ru: 'Арман Болат', en: 'Arman Bolat', dob: '17.11.2021', bday: '17 ноя',
       momRu: 'Сауле', momEn: 'Saule', momPhone: '+7 702 345 67 89', dadRu: 'Болат', dadEn: 'Bolat', checkin: '08:28',
       allergyRu: 'Лактоза', allergyEn: 'Lactose', rate: 92 }),
@@ -1203,6 +1203,13 @@ Object.assign(window, {
 function clsx() { return Array.prototype.filter.call(arguments, Boolean).join(' '); }
 
 // ── pastel avatar bubble ───────────────────────────────────────
+function AdaptBadge() {
+  return <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 999,
+    background: '#FBE0C0', color: '#7A3D00', marginLeft: 6, verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+    {L('Адаптация', 'Adaptation')}
+  </span>;
+}
+
 function Avatar({ emoji, color = '#eee', size = 46, ring }) {
   return (
     <div style={{
@@ -1510,7 +1517,7 @@ function GroupScreen({ params, go, statuses }) {
               style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2' }}>
               <Avatar emoji={kid.emoji} color={PALETTE[i % PALETTE.length]} size={46} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}{kid.adaptation && <AdaptBadge />}</div>
                 {kid.allergyRu && <div style={{ fontSize: 12.5, color: 'var(--ink-faint)', fontWeight: 600 }}>🥜</div>}
               </div>
               <StatusChip status={st} />
@@ -1546,9 +1553,10 @@ function ChildScreen({ params, statuses }) {
         <Avatar emoji={kid.emoji} color={kidColor} size={92} />
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{Lo(kid)}</div>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
             <span style={{ background: grp.color, color: grp.ink, fontSize: 13, fontWeight: 700, padding: '4px 12px', borderRadius: 999 }}>{grp.emoji} {Lo(grp)}</span>
             <StatusChip status={st} />
+            {kid.adaptation && <AdaptBadge />}
           </div>
         </div>
       </div>
@@ -1703,7 +1711,7 @@ function AttendanceScreen({ actions }) {
             <Card key={kid.id} pad={12} style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2' }}>
               <Avatar emoji={kid.emoji} color={PALETTE[kidIndex % PALETTE.length]} size={44} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}</div>
+                <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}{kid.adaptation && <AdaptBadge />}</div>
               </div>
               <StatusChip status={st} onClick={() => setStatus(kid.id, CYCLE[st])} />
             </Card>
