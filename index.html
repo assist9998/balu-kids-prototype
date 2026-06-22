@@ -1177,12 +1177,12 @@ function AdaptBadge() {
 }
 
 function ParacetamolBadge() {
-  return <span title={L('Можно парацетамол', 'Paracetamol allowed')}
+  return <span title={L('Нельзя парацетамол', 'No paracetamol')}
     style={{ fontSize: 13, marginLeft: 6, verticalAlign: 'middle' }}>💊</span>;
 }
 
 function PhotoConsentBadge() {
-  return <span title={L('Разрешено использовать фото', 'Photo use allowed')}
+  return <span title={L('Не снимать', 'Do not photograph')}
     style={{ fontSize: 13, marginLeft: 4, verticalAlign: 'middle' }}>📸</span>;
 }
 
@@ -1190,9 +1190,43 @@ function KidBadges({ kid }) {
   return (
     <>
       {kid.adaptation && <AdaptBadge />}
-      {kid.paracetamol && <ParacetamolBadge />}
-      {kid.photoConsent && <PhotoConsentBadge />}
+      {kid.paracetamol === 'no' && <ParacetamolBadge />}
+      {kid.photoConsent === 'no' && <PhotoConsentBadge />}
     </>
+  );
+}
+
+// "Scout badge" style — bigger circular icon + label, for the child's hero card.
+function ScoutBadge({ emoji, label, tone }) {
+  const palette = tone === 'warn'
+    ? { ring: '#E8836B', bg: '#FEF0EA', ink: '#9C3A1F' }
+    : { ring: '#D99027', bg: '#FBE7C8', ink: '#7A3D00' };
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, width: 66 }}>
+      <div style={{
+        width: 54, height: 54, borderRadius: '50%',
+        background: palette.bg, border: `2.5px solid ${palette.ring}`,
+        display: 'grid', placeItems: 'center', fontSize: 24,
+        boxShadow: `0 3px 8px -2px ${palette.ring}77`,
+      }}>{emoji}</div>
+      <div style={{ fontSize: 10.5, fontWeight: 800, color: palette.ink, textAlign: 'center', lineHeight: 1.2, textWrap: 'pretty' }}>
+        {label}
+      </div>
+    </div>
+  );
+}
+
+function ScoutBadgeRow({ kid }) {
+  const badges = [];
+  if (kid.allergyEn) badges.push({ emoji: '🥜', label: L('Аллергия', 'Allergy'), tone: 'warn' });
+  if (kid.paracetamol === 'no') badges.push({ emoji: '💊', label: L('Без парацетамола', 'No paracetamol'), tone: 'warn' });
+  if (kid.photoConsent === 'no') badges.push({ emoji: '📸', label: L('Не снимать', 'No photos'), tone: 'warn' });
+  if (kid.adaptation) badges.push({ emoji: '🌱', label: L('Адаптация', 'Adaptation'), tone: 'info' });
+  if (!badges.length) return null;
+  return (
+    <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap', margin: '16px 0 4px' }}>
+      {badges.map((b, i) => <ScoutBadge key={i} {...b} />)}
+    </div>
   );
 }
 
@@ -1605,9 +1639,9 @@ function ChildScreen({ params, statuses }) {
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
             <span style={{ background: grp.color, color: grp.ink, fontSize: 13, fontWeight: 700, padding: '4px 12px', borderRadius: 999 }}>{grp.emoji} {Lo(grp)}</span>
             <StatusChip status={st} />
-            <KidBadges kid={kid} />
           </div>
         </div>
+        <ScoutBadgeRow kid={kid} />
       </div>
 
       {pickerOpen && (
