@@ -126,10 +126,17 @@
     group:        { ru: 'Группа',            en: 'Group' },
     birthday:     { ru: 'День рождения',     en: 'Birthday' },
     parents:      { ru: 'Контакты',          en: 'Contacts' },
-    mother:       { ru: 'Родитель',          en: 'Parent' },
-    father:       { ru: 'Папа',              en: 'Father' },
+    parent1:      { ru: 'Контакт 1',         en: 'Contact 1' },
+    parent2:      { ru: 'Контакт 2',         en: 'Contact 2' },
     allergies:    { ru: 'Аллергии',          en: 'Allergies' },
     noAllergies:  { ru: 'Нет',               en: 'None' },
+    address:      { ru: 'Адрес',             en: 'Address' },
+    deposit:      { ru: 'Депозит',           en: 'Deposit' },
+    mealsIncluded:{ ru: 'Питание',           en: 'Meals' },
+    napTime:      { ru: 'Сон',               en: 'Nap' },
+    afterSchool:  { ru: 'После школы',       en: 'After school' },
+    startDate:    { ru: 'Дата начала',       en: 'Start date' },
+    yes:          { ru: 'Да',                en: 'Yes' },
     notes:        { ru: 'Заметки',           en: 'Notes' },
     call:         { ru: 'Позвонить',         en: 'Call' },
     message:      { ru: 'Написать',          en: 'Message' },
@@ -190,7 +197,9 @@
 
 </script>
 <script>
-// data.js — mock data for Балу Кидс. Bilingual where it matters. Exposed on window.DATA
+// data.js — Балу Кидс. CHILDREN грузится из API (Google Sheets), остальное демо/декоративное.
+window.API_BASE = "http://rmxois1uv0a24xrbi2dfcfac.95.179.188.141.sslip.io";
+
 (function () {
   // groups carry the reference pastel palette
   const GROUPS = [
@@ -200,70 +209,8 @@
     { id: 'primary', ru: 'Primary School',en: 'Primary School',emoji: '🎒', age: '6–8', color: '#FBD9E1', colorLight: '#FEF5F8', ink: '#a8456a' },
   ];
 
-  // status: 'present' | 'absent' | 'late'
-  function kid(o) { return Object.assign({ status: 'present', allergyRu: '', allergyEn: '', noteRu: '', noteEn: '', contract: 'longterm', adaptation: false }, o); }
-
-  const CHILDREN = [
-    // Солнышки
-    kid({ id: 1, group: 'toddler', emoji: '🧒🏻', ru: 'Алиса Жумабаева', en: 'Alisa Zhumabayeva', dob: '12.04.2022', bday: '12 апр',
-      momRu: 'Айгуль', momEn: 'Aigul', momPhone: '+7 701 234 56 78', dadRu: 'Ербол', dadEn: 'Yerbol', checkin: '08:12',
-      allergyRu: 'Орехи', allergyEn: 'Nuts', noteRu: 'Любит рисовать', noteEn: 'Loves drawing', rate: 96 }),
-    kid({ id: 2, group: 'toddler', emoji: '👦🏻', ru: 'Тимур Сапаров', en: 'Timur Saparov', dob: '03.02.2022', bday: '3 фев',
-      momRu: 'Динара', momEn: 'Dinara', momPhone: '+7 707 111 22 33', dadRu: 'Асхат', dadEn: 'Askhat', checkin: '08:40',
-      status: 'late', rate: 88 }),
-    kid({ id: 3, group: 'toddler', emoji: '👧🏻', ru: 'Сафия Нуржан', en: 'Safiya Nurzhan', dob: '21.06.2022', bday: '21 июн',
-      momRu: 'Мадина', momEn: 'Madina', momPhone: '+7 705 998 77 66', dadRu: 'Нуржан', dadEn: 'Nurzhan',
-      status: 'absent', noteRu: 'Заболела, ОРВИ', noteEn: 'Sick — cold', rate: 81, contract: 'tourist' }),
-    kid({ id: 4, group: 'toddler', emoji: '🧒🏻', ru: 'Даниэль Ким', en: 'Daniel Kim', dob: '09.09.2022', bday: '9 сен',
-      momRu: 'Елена', momEn: 'Elena', momPhone: '+7 700 555 44 33', dadRu: 'Виктор', dadEn: 'Victor', checkin: '08:05', rate: 99, adaptation: true }),
-    kid({ id: 5, group: 'toddler', emoji: '👦🏻', ru: 'Арман Болат', en: 'Arman Bolat', dob: '17.11.2021', bday: '17 ноя',
-      momRu: 'Сауле', momEn: 'Saule', momPhone: '+7 702 345 67 89', dadRu: 'Болат', dadEn: 'Bolat', checkin: '08:28',
-      allergyRu: 'Лактоза', allergyEn: 'Lactose', rate: 92 }),
-    kid({ id: 6, group: 'toddler', emoji: '👧🏻', ru: 'Зере Аман', en: 'Zere Aman', dob: '28.03.2022', bday: '28 мар',
-      momRu: 'Гульнара', momEn: 'Gulnara', momPhone: '+7 708 222 11 00', dadRu: 'Аман', dadEn: 'Aman', checkin: '08:33', rate: 94, contract: 'tourist' }),
-
-    // Звёздочки
-    kid({ id: 7, group: 'middle', emoji: '👦🏻', ru: 'Ислам Тлеу', en: 'Islam Tleu', dob: '14.01.2021', bday: '14 янв',
-      momRu: 'Жанна', momEn: 'Zhanna', momPhone: '+7 701 777 88 99', dadRu: 'Тлеухан', dadEn: 'Tleukhan', checkin: '08:02', rate: 97 }),
-    kid({ id: 8, group: 'middle', emoji: '👧🏻', ru: 'Амина Серик', en: 'Amina Serik', dob: '06.07.2021', bday: '6 июл',
-      momRu: 'Алия', momEn: 'Aliya', momPhone: '+7 705 333 22 11', dadRu: 'Серик', dadEn: 'Serik', checkin: '08:19',
-      allergyRu: 'Цитрусовые', allergyEn: 'Citrus', rate: 90 }),
-    kid({ id: 9, group: 'middle', emoji: '🧒🏻', ru: 'Нурлан Касым', en: 'Nurlan Kasym', dob: '30.05.2021', bday: '30 мая',
-      momRu: 'Бакыт', momEn: 'Bakyt', momPhone: '+7 707 444 55 66', dadRu: 'Касым', dadEn: 'Kasym',
-      status: 'late', checkin: '09:05', rate: 85, contract: 'tourist' }),
-    kid({ id: 10, group: 'middle', emoji: '👧🏻', ru: 'Лейла Омар', en: 'Leila Omar', dob: '11.10.2021', bday: '11 окт',
-      momRu: 'Жулдыз', momEn: 'Zhuldyz', momPhone: '+7 700 121 31 41', dadRu: 'Омар', dadEn: 'Omar', checkin: '08:25', rate: 95 }),
-    kid({ id: 11, group: 'middle', emoji: '👦🏻', ru: 'Дамир Аск', en: 'Damir Ask', dob: '22.12.2021', bday: '22 дек',
-      momRu: 'Камила', momEn: 'Kamila', momPhone: '+7 701 989 78 67', dadRu: 'Аскар', dadEn: 'Askar',
-      status: 'absent', noteRu: 'Семейные дела', noteEn: 'Family day', rate: 79 }),
-
-    // Капельки
-    kid({ id: 12, group: 'big', emoji: '👶🏻', ru: 'Адель Жан', en: 'Adel Zhan', dob: '04.08.2023', bday: '4 авг',
-      momRu: 'Назым', momEn: 'Nazym', momPhone: '+7 705 565 75 85', dadRu: 'Жанибек', dadEn: 'Zhanibek', checkin: '08:50',
-      noteRu: 'Соска в шкафчике', noteEn: 'Pacifier in cubby', rate: 91 }),
-    kid({ id: 13, group: 'big', emoji: '🧒🏻', ru: 'Мирас Кай', en: 'Miras Kai', dob: '19.09.2023', bday: '19 сен',
-      momRu: 'Айша', momEn: 'Aisha', momPhone: '+7 708 343 23 13', dadRu: 'Кайрат', dadEn: 'Kairat', checkin: '08:44', rate: 88 }),
-    kid({ id: 14, group: 'big', emoji: '👶🏻', ru: 'Сабина Ер', en: 'Sabina Yer', dob: '27.06.2023', bday: '27 июн',
-      momRu: 'Венера', momEn: 'Venera', momPhone: '+7 700 767 87 97', dadRu: 'Ерлан', dadEn: 'Yerlan',
-      allergyRu: 'Глютен', allergyEn: 'Gluten', rate: 93, contract: 'tourist' }),
-    kid({ id: 15, group: 'big', emoji: '🧒🏻', ru: 'Олжас Ныгмет', en: 'Olzhas Nygmet', dob: '02.11.2023', bday: '2 ноя',
-      momRu: 'Дана', momEn: 'Dana', momPhone: '+7 701 454 64 74', dadRu: 'Нурлыбек', dadEn: 'Nurlybek', checkin: '08:58', rate: 84 }),
-
-    // Облачка
-    kid({ id: 16, group: 'primary', emoji: '👦🏻', ru: 'Ерасыл Дос', en: 'Yerasyl Dos', dob: '15.03.2020', bday: '15 мар',
-      momRu: 'Айымгуль', momEn: 'Aiymgul', momPhone: '+7 705 656 76 86', dadRu: 'Дос', dadEn: 'Dos', checkin: '07:58', rate: 98 }),
-    kid({ id: 17, group: 'primary', emoji: '👧🏻', ru: 'Карина Аб', en: 'Karina Ab', dob: '08.05.2020', bday: '8 мая',
-      momRu: 'Лаура', momEn: 'Laura', momPhone: '+7 707 878 98 08', dadRu: 'Абзал', dadEn: 'Abzal', checkin: '08:15',
-      allergyRu: 'Мёд', allergyEn: 'Honey', noteRu: 'Помогает малышам', noteEn: 'Helps the little ones', rate: 96 }),
-    kid({ id: 18, group: 'primary', emoji: '👦🏻', ru: 'Санжар Тур', en: 'Sanzhar Tur', dob: '23.07.2020', bday: '23 июл',
-      momRu: 'Перизат', momEn: 'Perizat', momPhone: '+7 700 989 09 19', dadRu: 'Турсын', dadEn: 'Tursyn',
-      status: 'late', checkin: '09:12', rate: 82, contract: 'tourist' }),
-    kid({ id: 19, group: 'primary', emoji: '👧🏻', ru: 'Малика Жол', en: 'Malika Zhol', dob: '30.01.2020', bday: '30 янв',
-      momRu: 'Сабина', momEn: 'Sabina', momPhone: '+7 701 010 20 30', dadRu: 'Жолдас', dadEn: 'Zholdas', checkin: '08:22', rate: 94 }),
-    kid({ id: 20, group: 'primary', emoji: '🧒🏻', ru: 'Алихан Бек', en: 'Alikhan Bek', dob: '12.09.2020', bday: '12 сен',
-      momRu: 'Гаухар', momEn: 'Gaukhar', momPhone: '+7 705 111 21 31', dadRu: 'Бекзат', dadEn: 'Bekzat',
-      status: 'absent', noteRu: 'Отпуск с семьёй', noteEn: 'On vacation', rate: 77 }),
-  ];
+  // заполняется через window.loadChildren() при старте App — см. App()
+  const CHILDREN = [];
 
   // weekly attendance % (Mon–Fri)
   const WEEK = [
@@ -296,6 +243,12 @@
   ];
 
   window.DATA = { GROUPS, CHILDREN, CLUBS, WEEK, FEED };
+
+  window.loadChildren = async function () {
+    const res = await fetch(`${window.API_BASE}/children`);
+    if (!res.ok) throw new Error(`GET /children failed: ${res.status}`);
+    window.DATA.CHILDREN = await res.json();
+  };
 })();
 
 </script>
@@ -1210,6 +1163,26 @@ function AdaptBadge() {
   </span>;
 }
 
+function ParacetamolBadge() {
+  return <span title={L('Можно парацетамол', 'Paracetamol allowed')}
+    style={{ fontSize: 13, marginLeft: 6, verticalAlign: 'middle' }}>💊</span>;
+}
+
+function PhotoConsentBadge() {
+  return <span title={L('Разрешено использовать фото', 'Photo use allowed')}
+    style={{ fontSize: 13, marginLeft: 4, verticalAlign: 'middle' }}>📸</span>;
+}
+
+function KidBadges({ kid }) {
+  return (
+    <>
+      {kid.adaptation && <AdaptBadge />}
+      {kid.paracetamol && <ParacetamolBadge />}
+      {kid.photoConsent && <PhotoConsentBadge />}
+    </>
+  );
+}
+
 function Avatar({ emoji, color = '#eee', size = 46, ring }) {
   return (
     <div style={{
@@ -1517,8 +1490,8 @@ function GroupScreen({ params, go, statuses }) {
               style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2' }}>
               <Avatar emoji={kid.emoji} color={PALETTE[i % PALETTE.length]} size={46} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}{kid.adaptation && <AdaptBadge />}</div>
-                {kid.allergyRu && <div style={{ fontSize: 12.5, color: 'var(--ink-faint)', fontWeight: 600 }}>🥜</div>}
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}<KidBadges kid={kid} /></div>
+                {kid.allergyEn && <div style={{ fontSize: 12.5, color: 'var(--ink-faint)', fontWeight: 600 }}>🥜</div>}
               </div>
               <StatusChip status={st} />
             </Card>
@@ -1541,10 +1514,16 @@ function ChildScreen({ params, statuses }) {
   const kidColor = PALETTE[kidIndex % PALETTE.length];
   const info = [
     { label: t('age'),      value: ageFromDob(kid.dob) },
-    { label: t('birthday'), value: kid.bday },
+    { label: t('birthday'), value: kid.dob },
     { label: t('group'),    value: Lo(grp) },
-    { label: t('allergies'),value: kid.allergyRu ? L(kid.allergyRu, kid.allergyEn) : t('noAllergies'),
-      warn: !!kid.allergyRu },
+    { label: t('allergies'),value: kid.allergyEn ? kid.allergyEn : t('noAllergies'),
+      warn: !!kid.allergyEn },
+    ...(kid.address ? [{ label: t('address'), value: kid.address }] : []),
+    ...(kid.deposit ? [{ label: t('deposit'), value: kid.deposit }] : []),
+    ...(kid.startDate ? [{ label: t('startDate'), value: kid.startDate }] : []),
+    ...(kid.mealsIncluded ? [{ label: t('mealsIncluded'), value: t('yes') }] : []),
+    ...(kid.napTime ? [{ label: t('napTime'), value: t('yes') }] : []),
+    ...(kid.afterSchool ? [{ label: t('afterSchool'), value: t('yes') }] : []),
   ];
   return (
     <div style={{ padding: '4px 20px 30px' }}>
@@ -1556,7 +1535,7 @@ function ChildScreen({ params, statuses }) {
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
             <span style={{ background: grp.color, color: grp.ink, fontSize: 13, fontWeight: 700, padding: '4px 12px', borderRadius: 999 }}>{grp.emoji} {Lo(grp)}</span>
             <StatusChip status={st} />
-            {kid.adaptation && <AdaptBadge />}
+            <KidBadges kid={kid} />
           </div>
         </div>
       </div>
@@ -1589,7 +1568,8 @@ function ChildScreen({ params, statuses }) {
       {/* parents */}
       <SectionLabel>{t('parents')}</SectionLabel>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-        <ParentCard role={t('mother')} name={L(kid.momRu, kid.momEn)} phone={kid.momPhone} emoji="👩" />
+        {kid.parent1Name && <ParentCard role={t('parent1')} name={kid.parent1Name} phone={kid.parent1Phone} emoji="👤" />}
+        {kid.parent2Name && <ParentCard role={t('parent2')} name={kid.parent2Name} phone={kid.parent2Phone} emoji="👤" />}
       </div>
 
       {/* notes */}
@@ -1711,7 +1691,7 @@ function AttendanceScreen({ actions }) {
             <Card key={kid.id} pad={12} style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2' }}>
               <Avatar emoji={kid.emoji} color={PALETTE[kidIndex % PALETTE.length]} size={44} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}{kid.adaptation && <AdaptBadge />}</div>
+                <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}<KidBadges kid={kid} /></div>
               </div>
               <StatusChip status={st} onClick={() => setStatus(kid.id, CYCLE[st])} />
             </Card>
@@ -2519,11 +2499,21 @@ function App() {
   const [lang, setLang] = React.useState(() => localStorage.getItem('balu_lang') || 'ru');
   const [stack, setStack] = React.useState([{ name: 'home', params: {} }]);
   const [dir, setDir] = React.useState('fwd');
-  const [statuses, setStatuses] = React.useState(() => {
-    const m = {}; DATA.CHILDREN.forEach(k => m[k.id] = k.status); return m;
-  });
+  const [childrenReady, setChildrenReady] = React.useState(false);
+  const [loadError, setLoadError] = React.useState(null);
+  const [statuses, setStatuses] = React.useState({});
   const [feed, setFeed] = React.useState(() => DATA.FEED.map(f => ({ ...f })));
   const [toast, setToast] = React.useState(null);
+
+  React.useEffect(() => {
+    window.loadChildren()
+      .then(() => {
+        const m = {}; DATA.CHILDREN.forEach(k => m[k.id] = 'absent');
+        setStatuses(m);
+        setChildrenReady(true);
+      })
+      .catch(err => setLoadError(err.message));
+  }, []);
 
   // keep i18n + global lang in sync BEFORE children render
   window.__lang = lang;
@@ -2677,7 +2667,16 @@ function App() {
           ))}
         </svg>
         <div key={top.name + stack.length} className={dir === 'fwd' ? 'scr-fwd' : 'scr-back'} style={{ minHeight: '100%', position: 'relative', zIndex: 1 }}>
-          {renderScreen()}
+          {loadError ? (
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--no)', fontWeight: 700 }}>
+              {L('Не удалось загрузить данные детей', 'Failed to load children data')}<br />
+              <span style={{ fontSize: 12, color: 'var(--ink-faint)', fontWeight: 500 }}>{loadError}</span>
+            </div>
+          ) : !childrenReady ? (
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--ink-faint)', fontWeight: 700 }}>
+              {L('Загрузка…', 'Loading…')}
+            </div>
+          ) : renderScreen()}
         </div>
       </div>
 
