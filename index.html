@@ -130,8 +130,9 @@
     parent2:      { ru: 'Контакт 2',         en: 'Contact 2' },
     allergies:    { ru: 'Аллергии',          en: 'Allergies' },
     noAllergies:  { ru: 'Нет',               en: 'None' },
+    childInfo:    { ru: 'Информация о ребёнке', en: 'Child info' },
+    kindergartenInfo: { ru: 'Информация о садике', en: 'Kindergarten info' },
     address:      { ru: 'Адрес',             en: 'Address' },
-    deposit:      { ru: 'Депозит',           en: 'Deposit' },
     mealsIncluded:{ ru: 'Питание',           en: 'Meals' },
     napTime:      { ru: 'Сон',               en: 'Nap' },
     afterSchool:  { ru: 'После школы',       en: 'After school' },
@@ -1621,14 +1622,14 @@ function ChildScreen({ params, statuses }) {
   const PALETTE = ['#FBE7A8','#CDE8FB','#D4F0DF','#FBD9E1','#FBE0C0','#E8D5FB'];
   const kidIndex = DATA.CHILDREN.filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
   const kidColor = PALETTE[kidIndex % PALETTE.length];
-  const info = [
+  const childInfo = [
     { label: t('age'),      value: ageFromDob(kid.dob) },
     { label: t('birthday'), value: kid.dob },
     { label: t('group'),    value: Lo(grp) },
     { label: t('allergies'),value: kid.allergyEn ? kid.allergyEn : t('noAllergies'),
       warn: !!kid.allergyEn },
-    ...(kid.address ? [{ label: t('address'), value: kid.address }] : []),
-    ...(kid.deposit ? [{ label: t('deposit'), value: kid.deposit }] : []),
+  ];
+  const kinderInfo = [
     ...(kid.startDate ? [{ label: t('startDate'), value: kid.startDate }] : []),
     ...(kid.mealsIncluded ? [{ label: t('mealsIncluded'), value: t('yes') }] : []),
     ...(kid.napTime ? [{ label: t('napTime'), value: t('yes') }] : []),
@@ -1653,15 +1654,49 @@ function ChildScreen({ params, statuses }) {
         <EmojiPickerSheet kid={kid} onClose={() => { setPickerOpen(false); forceUpdate(n => n + 1); }} />
       )}
 
-      {/* info grid */}
+      {/* child info */}
+      <SectionLabel>{t('childInfo')}</SectionLabel>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
-        {info.map((row, i) => (
+        {childInfo.map((row, i) => (
           <Card key={i} pad={14} style={{ display: 'flex', flexDirection: 'column', gap: 3, background: '#FBF7F2' }}>
             <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: '0.03em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>{row.label}</div>
             <div style={{ fontSize: 16, fontWeight: 700, color: row.warn ? 'var(--no)' : 'var(--ink)' }}>{row.warn ? '🥜 ' : ''}{row.value}</div>
           </Card>
         ))}
       </div>
+
+      {/* parents */}
+      <SectionLabel>{t('parents')}</SectionLabel>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+        {kid.parent1Name && <ParentCard role={t('parent1')} name={kid.parent1Name} phone={kid.parent1Phone} emoji="👤" />}
+        {kid.parent2Name && <ParentCard role={t('parent2')} name={kid.parent2Name} phone={kid.parent2Phone} emoji="👤" />}
+      </div>
+
+      {/* address */}
+      {kid.address && (
+        <React.Fragment>
+          <SectionLabel>{t('address')}</SectionLabel>
+          <Card pad={14} style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 16, background: '#FBF7F2' }}>
+            <span style={{ fontSize: 18 }}>📍</span>
+            <div style={{ fontSize: 15, color: 'var(--ink)', fontWeight: 700 }}>{kid.address}</div>
+          </Card>
+        </React.Fragment>
+      )}
+
+      {/* kindergarten info */}
+      {kinderInfo.length > 0 && (
+        <React.Fragment>
+          <SectionLabel>{t('kindergartenInfo')}</SectionLabel>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
+            {kinderInfo.map((row, i) => (
+              <Card key={i} pad={14} style={{ display: 'flex', flexDirection: 'column', gap: 3, background: '#FBF7F2' }}>
+                <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: '0.03em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>{row.label}</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>{row.value}</div>
+              </Card>
+            ))}
+          </div>
+        </React.Fragment>
+      )}
 
       {/* attendance ring */}
       <Card pad={16} style={{ display: 'flex', alignItems: 'center', gap: 18, marginBottom: 16, background: '#FBF7F2' }}>
@@ -1677,13 +1712,6 @@ function ChildScreen({ params, statuses }) {
           </div>
         </div>
       </Card>
-
-      {/* parents */}
-      <SectionLabel>{t('parents')}</SectionLabel>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-        {kid.parent1Name && <ParentCard role={t('parent1')} name={kid.parent1Name} phone={kid.parent1Phone} emoji="👤" />}
-        {kid.parent2Name && <ParentCard role={t('parent2')} name={kid.parent2Name} phone={kid.parent2Phone} emoji="👤" />}
-      </div>
 
       {/* notes */}
       {kid.noteRu && (
