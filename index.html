@@ -1223,14 +1223,32 @@ function centerInsert(arr, item) {
   return [...arr.slice(0, i), item, ...arr.slice(i)];
 }
 
+function allergyEmoji(text) {
+  const s = text.toLowerCase();
+  if (s.includes('halal')) return '🍽️';
+  if (s.includes('pork') || s.includes('pig')) return '🚫🐖';
+  if (s.includes('gluten') || s.includes('wheat')) return '🚫🌾';
+  if (s.includes('milk') || s.includes('dairy') || s.includes('lactose')) return '🚫🥛';
+  if (s.includes('peanut') || s.includes('nut')) return '🥜';
+  if (s.includes('grapefruit') || s.includes('citrus') || s.includes('orange')) return '🍊';
+  if (s.includes('egg')) return '🥚';
+  if (s.includes('fish') || s.includes('seafood') || s.includes('shellfish')) return '🐟';
+  if (s.includes('soy')) return '🌱';
+  if (s.includes('chocolate') || s.includes('cocoa')) return '🍫';
+  if (s.includes('strawberry') || s.includes('berry')) return '🍓';
+  if (s.includes('dust')) return '🌫️';
+  if (s.includes('pollen')) return '🌼';
+  return '⚠️';
+}
+
 function ScoutBadgeRow({ kid, grp, status }) {
   const group = grp ? { emoji: grp.emoji, label: Lo(grp), bg: grp.color, ink: grp.ink } : null;
   const petals = [];
   if (status) petals.push(status === 'present'
     ? { dot: 'var(--ok)', label: t('present'), tone: 'amenity' }
     : { dot: 'var(--no)', label: t('absent'), tone: 'warn' });
-  if (kid.allergyEn) kid.allergyEn.split(',').map(a => a.trim()).filter(Boolean)
-    .forEach(a => petals.push({ emoji: '🥜', label: a, tone: 'warn' }));
+  if (kid.allergyEn) kid.allergyEn.split(/[,./]+/).map(a => a.trim()).filter(Boolean)
+    .forEach(a => petals.push({ emoji: allergyEmoji(a), label: a, tone: 'warn' }));
   if (kid.paracetamol === 'no') petals.push({ emoji: '💊🚫', label: L('Без парацетамола', 'No paracetamol'), tone: 'warn' });
   if (kid.photoConsent === 'no') petals.push({ emoji: '📸🚫', label: L('Не снимать', 'No photos'), tone: 'warn' });
   if (kid.adaptation) petals.push({ emoji: '🌱', label: L('Адаптация', 'Adaptation'), tone: 'info' });
