@@ -123,14 +123,9 @@
     inGroup:      { ru: 'в саду',            en: 'in' },
     profile:      { ru: 'Профиль',           en: 'Profile' },
     age:          { ru: 'Возраст',           en: 'Age' },
-    group:        { ru: 'Группа',            en: 'Group' },
     birthday:     { ru: 'День рождения',     en: 'Birthday' },
-    parents:      { ru: 'Контакты',          en: 'Contacts' },
-    allergies:    { ru: 'Аллергии',          en: 'Allergies' },
     noAllergies:  { ru: 'Нет',               en: 'None' },
-    childInfo:    { ru: 'Информация о ребёнке', en: 'Child info' },
     kindergartenInfo: { ru: 'Информация о садике', en: 'Kindergarten info' },
-    address:      { ru: 'Адрес',             en: 'Address' },
     mealsIncluded:{ ru: 'Питание',           en: 'Meals' },
     napTime:      { ru: 'Сон',               en: 'Nap' },
     afterSchool:  { ru: 'После школы',       en: 'After school' },
@@ -1196,7 +1191,7 @@ function KidBadges({ kid }) {
 }
 
 // "Scout badge" style — bigger circular icon + label, for the child's hero card.
-function ScoutBadge({ emoji, text, label, tone, ring, bg, ink }) {
+function ScoutBadge({ emoji, text, dot, label, tone, ring, bg, ink }) {
   const base = tone === 'warn'
     ? { ring: '#E8836B', bg: '#FEF0EA', ink: '#9C3A1F' }
     : tone === 'amenity'
@@ -1211,7 +1206,7 @@ function ScoutBadge({ emoji, text, label, tone, ring, bg, ink }) {
         display: 'grid', placeItems: 'center',
         fontSize: text ? 11 : 24, fontWeight: text ? 800 : 400, color: palette.ink,
         boxShadow: `0 3px 8px -2px ${palette.ring}77`,
-      }}>{text || emoji}</div>
+      }}>{dot ? <span style={{ width: 16, height: 16, borderRadius: '50%', background: dot }} /> : (text || emoji)}</div>
       <div style={{ fontSize: 10.5, fontWeight: 800, color: palette.ink, textAlign: 'center', lineHeight: 1.2, textWrap: 'pretty' }}>
         {label}
       </div>
@@ -1223,8 +1218,8 @@ function ScoutBadgeRow({ kid, grp, status }) {
   const badges = [];
   if (grp) badges.push({ emoji: grp.emoji, label: Lo(grp), ring: grp.ink, bg: grp.color, ink: grp.ink });
   if (status) badges.push(status === 'present'
-    ? { emoji: '✅', label: t('present'), tone: 'amenity' }
-    : { emoji: '🏠', label: t('absent'), tone: 'warn' });
+    ? { dot: 'var(--ok)', label: t('present'), tone: 'amenity' }
+    : { dot: 'var(--no)', label: t('absent'), tone: 'warn' });
   if (kid.allergyEn) badges.push({ emoji: '🥜', label: L('Аллергия', 'Allergy'), tone: 'warn' });
   if (kid.paracetamol === 'no') badges.push({ emoji: '💊', label: L('Без парацетамола', 'No paracetamol'), tone: 'warn' });
   if (kid.photoConsent === 'no') badges.push({ emoji: '📸', label: L('Не снимать', 'No photos'), tone: 'warn' });
@@ -1628,12 +1623,6 @@ function ChildScreen({ params, statuses }) {
   const PALETTE = ['#FBE7A8','#CDE8FB','#D4F0DF','#FBD9E1','#FBE0C0','#E8D5FB'];
   const kidIndex = DATA.CHILDREN.filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
   const kidColor = PALETTE[kidIndex % PALETTE.length];
-  const childInfo = [
-    { label: t('age'),      value: ageFromDob(kid.dob) },
-    { label: t('birthday'), value: kid.dob },
-    { label: t('allergies'),value: kid.allergyEn ? kid.allergyEn : t('noAllergies'),
-      warn: !!kid.allergyEn },
-  ];
   const kinderInfo = [
     ...(kid.startDate ? [{ label: t('startDate'), value: kid.startDate }] : []),
     ...(kid.mealsIncluded ? [{ label: t('mealsIncluded'), value: kid.mealsHalal ? `${t('yes')} (HALAL)` : t('yes') }] : []),
@@ -1655,34 +1644,67 @@ function ChildScreen({ params, statuses }) {
         <EmojiPickerSheet kid={kid} onClose={() => { setPickerOpen(false); forceUpdate(n => n + 1); }} />
       )}
 
-      {/* child info */}
-      <SectionLabel>{t('childInfo')}</SectionLabel>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
-        {childInfo.map((row, i) => (
-          <Card key={i} pad={14} style={{ display: 'flex', flexDirection: 'column', gap: 3, background: '#FBF7F2' }}>
-            <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: '0.03em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>{row.label}</div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: row.warn ? 'var(--no)' : 'var(--ink)' }}>{row.warn ? '🥜 ' : ''}{row.value}</div>
-          </Card>
-        ))}
-      </div>
+      {/* child info + contacts + address — hero plate, same style as home greeting card */}
+      <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 26, padding: 16, marginBottom: 16,
+        background: '#fde6df',
+        boxShadow: '0 1px 2px rgba(60,40,20,0.04), 0 16px 32px -24px rgba(60,40,20,0.55)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
+          <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'var(--card)',
+            display: 'grid', placeItems: 'center', fontSize: 26, flexShrink: 0,
+            boxShadow: '0 8px 18px -10px var(--accent)' }}>🎂</div>
+          <div style={{ flex: 1, minWidth: 0, lineHeight: 1.22 }}>
+            <div style={{ fontSize: 13.5, color: 'var(--ink-soft)', fontWeight: 600 }}>{t('age')}</div>
+            <div style={{ fontSize: 21, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{ageFromDob(kid.dob)}</div>
+          </div>
+          <div style={{ textAlign: 'right', lineHeight: 1.2, flexShrink: 0 }}>
+            <div style={{ fontSize: 11.5, color: 'var(--ink-faint)', fontWeight: 700 }}>{t('birthday')}</div>
+            <div style={{ fontSize: 14, color: 'var(--ink)', fontWeight: 800 }}>{kid.dob}</div>
+          </div>
+        </div>
 
-      {/* parents */}
-      <SectionLabel>{t('parents')}</SectionLabel>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-        {kid.parent1Name && <ParentCard name={kid.parent1Name} phone={kid.parent1Phone} emoji="👨‍👩‍👧" />}
-        {kid.parent2Name && <ParentCard name={kid.parent2Name} phone={kid.parent2Phone} emoji="👨‍👩‍👧" />}
-      </div>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 14,
+          background: 'var(--card)', borderRadius: 999, padding: '7px 14px 7px 11px',
+          boxShadow: '0 1px 2px rgba(60,40,20,0.05)' }}>
+          <span style={{ width: 9, height: 9, borderRadius: '50%', background: kid.allergyEn ? 'var(--no)' : 'var(--ok)', flexShrink: 0 }} />
+          <span style={{ fontSize: 13.5, color: 'var(--ink)', fontWeight: 700 }}>
+            {kid.allergyEn ? `🥜 ${kid.allergyEn}` : t('noAllergies')}
+          </span>
+        </div>
 
-      {/* address */}
-      {kid.address && (
-        <React.Fragment>
-          <SectionLabel>{t('address')}</SectionLabel>
-          <Card pad={14} style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 16, background: '#FBF7F2' }}>
-            <span style={{ fontSize: 18 }}>📍</span>
-            <div style={{ fontSize: 15, color: 'var(--ink)', fontWeight: 700 }}>{kid.address}</div>
-          </Card>
-        </React.Fragment>
-      )}
+        {(kid.parent1Name || kid.parent2Name || kid.address) && (
+          <div style={{ height: 1, background: 'rgba(60,40,20,0.08)', margin: '14px 0 12px' }} />
+        )}
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {kid.parent1Name && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--card)', borderRadius: 16, padding: '9px 12px',
+              boxShadow: '0 1px 2px rgba(60,40,20,0.05)' }}>
+              <span style={{ fontSize: 18 }}>👨‍👩‍👧</span>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--ink)' }}>{kid.parent1Name}</div>
+                <div style={{ fontSize: 12.5, color: 'var(--ink-soft)', fontWeight: 600 }}>{kid.parent1Phone}</div>
+              </div>
+            </div>
+          )}
+          {kid.parent2Name && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--card)', borderRadius: 16, padding: '9px 12px',
+              boxShadow: '0 1px 2px rgba(60,40,20,0.05)' }}>
+              <span style={{ fontSize: 18 }}>👨‍👩‍👧</span>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--ink)' }}>{kid.parent2Name}</div>
+                <div style={{ fontSize: 12.5, color: 'var(--ink-soft)', fontWeight: 600 }}>{kid.parent2Phone}</div>
+              </div>
+            </div>
+          )}
+          {kid.address && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--card)', borderRadius: 16, padding: '9px 12px',
+              boxShadow: '0 1px 2px rgba(60,40,20,0.05)' }}>
+              <span style={{ fontSize: 18 }}>📍</span>
+              <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--ink)' }}>{kid.address}</div>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* kindergarten info */}
       {kinderInfo.length > 0 && (
@@ -1725,18 +1747,6 @@ function ChildScreen({ params, statuses }) {
         </React.Fragment>
       )}
     </div>
-  );
-}
-
-function ParentCard({ name, phone, emoji }) {
-  return (
-    <Card pad={12} style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#FBF7F2' }}>
-      <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--card)', display: 'grid', placeItems: 'center', fontSize: 22, flexShrink: 0 }}>{emoji}</div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{name}</div>
-        <div style={{ fontSize: 13, color: 'var(--ink-soft)', fontWeight: 600 }}>{phone}</div>
-      </div>
-    </Card>
   );
 }
 
