@@ -1648,52 +1648,53 @@ function ChildScreen({ params, statuses }) {
       <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 26, padding: 16, marginBottom: 16,
         background: '#fde6df',
         boxShadow: '0 1px 2px rgba(60,40,20,0.04), 0 16px 32px -24px rgba(60,40,20,0.55)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
-          <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'var(--card)',
-            display: 'grid', placeItems: 'center', fontSize: 26, flexShrink: 0,
-            boxShadow: '0 8px 18px -10px var(--accent)' }}>🎂</div>
-          <div style={{ flex: 1, minWidth: 0, lineHeight: 1.22 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 13 }}>
+          <div style={{ lineHeight: 1.22 }}>
             <div style={{ fontSize: 13.5, color: 'var(--ink-soft)', fontWeight: 600 }}>{t('age')}</div>
             <div style={{ fontSize: 21, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{ageFromDob(kid.dob)}</div>
           </div>
           <div style={{ textAlign: 'right', lineHeight: 1.2, flexShrink: 0 }}>
             <div style={{ fontSize: 11.5, color: 'var(--ink-faint)', fontWeight: 700 }}>{t('birthday')}</div>
-            <div style={{ fontSize: 14, color: 'var(--ink)', fontWeight: 800 }}>{kid.dob}</div>
+            <div style={{ fontSize: 14, color: 'var(--ink)', fontWeight: 800 }}><span style={{ fontSize: 12 }}>🎂</span> {kid.dob}</div>
           </div>
         </div>
 
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 14,
-          background: 'var(--card)', borderRadius: 999, padding: '7px 14px 7px 11px',
-          boxShadow: '0 1px 2px rgba(60,40,20,0.05)' }}>
-          <span style={{ width: 9, height: 9, borderRadius: '50%', background: kid.allergyEn ? 'var(--no)' : 'var(--ok)', flexShrink: 0 }} />
-          <span style={{ fontSize: 13.5, color: 'var(--ink)', fontWeight: 700 }}>
-            {kid.allergyEn ? `🥜 ${kid.allergyEn}` : t('noAllergies')}
-          </span>
-        </div>
+        {kid.allergyEn && (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 14,
+            background: 'var(--card)', borderRadius: 999, padding: '7px 14px 7px 11px',
+            boxShadow: '0 1px 2px rgba(60,40,20,0.05)' }}>
+            <span style={{ width: 9, height: 9, borderRadius: '50%', background: 'var(--no)', flexShrink: 0 }} />
+            <span style={{ fontSize: 13.5, color: 'var(--ink)', fontWeight: 700 }}>🥜 {kid.allergyEn}</span>
+          </div>
+        )}
 
         {(kid.parent1Name || kid.parent2Name || kid.address) && (
           <div style={{ height: 1, background: 'rgba(60,40,20,0.08)', margin: '14px 0 12px' }} />
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {kid.parent1Name && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--card)', borderRadius: 16, padding: '9px 12px',
-              boxShadow: '0 1px 2px rgba(60,40,20,0.05)' }}>
-              <span style={{ fontSize: 18 }}>👨‍👩‍👧</span>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--ink)' }}>{kid.parent1Name}</div>
-                <div style={{ fontSize: 12.5, color: 'var(--ink-soft)', fontWeight: 600 }}>{kid.parent1Phone}</div>
-              </div>
-            </div>
-          )}
-          {kid.parent2Name && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--card)', borderRadius: 16, padding: '9px 12px',
-              boxShadow: '0 1px 2px rgba(60,40,20,0.05)' }}>
-              <span style={{ fontSize: 18 }}>👨‍👩‍👧</span>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--ink)' }}>{kid.parent2Name}</div>
-                <div style={{ fontSize: 12.5, color: 'var(--ink-soft)', fontWeight: 600 }}>{kid.parent2Phone}</div>
-              </div>
+          {(kid.parent1Name || kid.parent2Name) && (
+            <div style={{ display: 'flex', gap: 8 }}>
+              {kid.parent1Name && (
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, background: 'var(--card)', borderRadius: 16, padding: '9px 10px',
+                  boxShadow: '0 1px 2px rgba(60,40,20,0.05)' }}>
+                  <span style={{ fontSize: 16, flexShrink: 0 }}>👨‍👩‍👧</span>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{kid.parent1Name}</div>
+                    <div style={{ fontSize: 11.5, color: 'var(--ink-soft)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{kid.parent1Phone}</div>
+                  </div>
+                </div>
+              )}
+              {kid.parent2Name && (
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, background: 'var(--card)', borderRadius: 16, padding: '9px 10px',
+                  boxShadow: '0 1px 2px rgba(60,40,20,0.05)' }}>
+                  <span style={{ fontSize: 16, flexShrink: 0 }}>👨‍👩‍👧</span>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{kid.parent2Name}</div>
+                    <div style={{ fontSize: 11.5, color: 'var(--ink-soft)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{kid.parent2Phone}</div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
           {kid.address && (
