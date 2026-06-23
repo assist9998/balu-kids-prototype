@@ -1196,12 +1196,13 @@ function KidBadges({ kid }) {
 }
 
 // "Scout badge" style — bigger circular icon + label, for the child's hero card.
-function ScoutBadge({ emoji, text, label, tone }) {
-  const palette = tone === 'warn'
+function ScoutBadge({ emoji, text, label, tone, ring, bg, ink }) {
+  const base = tone === 'warn'
     ? { ring: '#E8836B', bg: '#FEF0EA', ink: '#9C3A1F' }
     : tone === 'amenity'
     ? { ring: '#5FAE8C', bg: '#E3F5EC', ink: '#1F6B4A' }
     : { ring: '#D99027', bg: '#FBE7C8', ink: '#7A3D00' };
+  const palette = { ring: ring || base.ring, bg: bg || base.bg, ink: ink || base.ink };
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, width: 66 }}>
       <div style={{
@@ -1218,8 +1219,12 @@ function ScoutBadge({ emoji, text, label, tone }) {
   );
 }
 
-function ScoutBadgeRow({ kid }) {
+function ScoutBadgeRow({ kid, grp, status }) {
   const badges = [];
+  if (grp) badges.push({ emoji: grp.emoji, label: Lo(grp), ring: grp.ink, bg: grp.color, ink: grp.ink });
+  if (status) badges.push(status === 'present'
+    ? { emoji: '✅', label: t('present'), tone: 'amenity' }
+    : { emoji: '🏠', label: t('absent'), tone: 'warn' });
   if (kid.allergyEn) badges.push({ emoji: '🥜', label: L('Аллергия', 'Allergy'), tone: 'warn' });
   if (kid.paracetamol === 'no') badges.push({ emoji: '💊', label: L('Без парацетамола', 'No paracetamol'), tone: 'warn' });
   if (kid.photoConsent === 'no') badges.push({ emoji: '📸', label: L('Не снимать', 'No photos'), tone: 'warn' });
@@ -1642,12 +1647,8 @@ function ChildScreen({ params, statuses }) {
         <Avatar emoji={kid.emoji} color={kidColor} size={92} onClick={() => setPickerOpen(true)} />
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{Lo(kid)}</div>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-            <span style={{ background: grp.color, color: grp.ink, fontSize: 13, fontWeight: 700, padding: '4px 12px', borderRadius: 999 }}>{grp.emoji} {Lo(grp)}</span>
-            <StatusChip status={st} />
-          </div>
         </div>
-        <ScoutBadgeRow kid={kid} />
+        <ScoutBadgeRow kid={kid} grp={grp} status={st} />
       </div>
 
       {pickerOpen && (
