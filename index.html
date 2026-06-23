@@ -1680,9 +1680,6 @@ function ChildScreen({ params, statuses }) {
   const kidIndex = DATA.CHILDREN.filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
   const kidColor = PALETTE[kidIndex % PALETTE.length];
   const kinderInfo = [
-    ...(kid.startDate ? [{ label: t('startDate'), value: kid.startDate }] : []),
-    ...(kid.mealsIncluded ? [{ label: t('mealsIncluded'), value: kid.mealsHalal ? `${t('yes')} (HALAL)` : t('yes') }] : []),
-    ...(kid.napTime ? [{ label: t('napTime'), value: t('yes') }] : []),
     ...(kid.afterSchool ? [{ label: t('afterSchool'), value: t('yes') }] : []),
   ];
   return (
@@ -1714,6 +1711,15 @@ function ChildScreen({ params, statuses }) {
             <div style={{ fontSize: 14, color: 'var(--ink)', fontWeight: 800 }}><span style={{ fontSize: 12 }}>🎂</span> {kid.dob}</div>
           </div>
         </div>
+
+        {kid.startDate && (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 14,
+            background: 'var(--card)', borderRadius: 999, padding: '7px 14px 7px 11px',
+            boxShadow: '0 1px 2px rgba(60,40,20,0.05)' }}>
+            <span style={{ fontSize: 13 }}>📅</span>
+            <span style={{ fontSize: 13.5, color: 'var(--ink)', fontWeight: 700 }}>{t('startDate')}: {kid.startDate}</span>
+          </div>
+        )}
 
         {(kid.parent1Name || kid.parent2Name || kid.address) && (
           <div style={{ height: 1, background: 'rgba(60,40,20,0.08)', margin: '14px 0 12px' }} />
