@@ -1229,7 +1229,7 @@ function ScoutBadgeRow({ kid, grp, status }) {
   if (status) petals.push(status === 'present'
     ? { dot: 'var(--ok)', label: t('present'), tone: 'amenity' }
     : { dot: 'var(--no)', label: t('absent'), tone: 'warn' });
-  if (kid.allergyEn) petals.push({ emoji: '🥜', label: L('Аллергия', 'Allergy'), tone: 'warn' });
+  if (kid.allergyEn) petals.push({ emoji: '🥜', label: kid.allergyEn, tone: 'warn' });
   if (kid.paracetamol === 'no') petals.push({ emoji: '💊🚫', label: L('Без парацетамола', 'No paracetamol'), tone: 'warn' });
   if (kid.photoConsent === 'no') petals.push({ emoji: '📸🚫', label: L('Не снимать', 'No photos'), tone: 'warn' });
   if (kid.adaptation) petals.push({ emoji: '🌱', label: L('Адаптация', 'Adaptation'), tone: 'info' });
