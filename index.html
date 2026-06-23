@@ -1191,35 +1191,21 @@ function KidBadges({ kid }) {
 }
 
 // "Scout badge" style — bigger circular icon + label, for the child's hero card.
-// deterministic per-slot wobble so it reads as "scattered", not random-on-every-render
-const SCATTER = [
-  { rot: -9, dy: -3, size: 56 },
-  { rot: 7,  dy: 5,  size: 49 },
-  { rot: -5, dy: 3,  size: 60 },
-  { rot: 11, dy: -6, size: 51 },
-  { rot: -8, dy: 4,  size: 58 },
-  { rot: 6,  dy: -3, size: 47 },
-  { rot: -11,dy: 2,  size: 55 },
-  { rot: 9,  dy: -4, size: 52 },
-];
-
-function ScoutBadge({ emoji, text, dot, label, tone, ring, bg, ink, scatter }) {
+function ScoutBadge({ emoji, text, dot, label, tone, ring, bg, ink, size = 54 }) {
   const base = tone === 'warn'
     ? { ring: '#E8836B', bg: '#FEF0EA', ink: '#9C3A1F' }
     : tone === 'amenity'
     ? { ring: '#5FAE8C', bg: '#E3F5EC', ink: '#1F6B4A' }
     : { ring: '#D99027', bg: '#FBE7C8', ink: '#7A3D00' };
   const palette = { ring: ring || base.ring, bg: bg || base.bg, ink: ink || base.ink };
-  const { rot, dy, size } = scatter;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, width: 66 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, width: 70 }}>
       <div style={{
         width: size, height: size, borderRadius: '50%',
         background: palette.bg, border: `2.5px solid ${palette.ring}`,
         display: 'grid', placeItems: 'center',
         fontSize: text ? 10.5 : size * 0.43, fontWeight: text ? 800 : 400, color: palette.ink,
         boxShadow: `0 4px 9px -3px ${palette.ring}88`,
-        transform: `rotate(${rot}deg) translateY(${dy}px)`,
       }}>{dot ? <span style={{ width: 16, height: 16, borderRadius: '50%', background: dot }} /> : (text || emoji)}</div>
       <div style={{ fontSize: 10.5, fontWeight: 800, color: palette.ink, textAlign: 'center', lineHeight: 1.2, textWrap: 'pretty' }}>
         {label}
@@ -1229,24 +1215,50 @@ function ScoutBadge({ emoji, text, dot, label, tone, ring, bg, ink, scatter }) {
 }
 
 function ScoutBadgeRow({ kid, grp, status }) {
-  const badges = [];
-  if (grp) badges.push({ emoji: grp.emoji, label: Lo(grp), ring: grp.ink, bg: grp.color, ink: grp.ink });
-  if (status) badges.push(status === 'present'
+  const center = grp ? { emoji: grp.emoji, label: Lo(grp), ring: grp.ink, bg: grp.color, ink: grp.ink } : null;
+  const petals = [];
+  if (status) petals.push(status === 'present'
     ? { dot: 'var(--ok)', label: t('present'), tone: 'amenity' }
     : { dot: 'var(--no)', label: t('absent'), tone: 'warn' });
-  if (kid.allergyEn) badges.push({ emoji: '🥜', label: L('Аллергия', 'Allergy'), tone: 'warn' });
-  if (kid.paracetamol === 'no') badges.push({ emoji: '💊', label: L('Без парацетамола', 'No paracetamol'), tone: 'warn' });
-  if (kid.photoConsent === 'no') badges.push({ emoji: '📸', label: L('Не снимать', 'No photos'), tone: 'warn' });
-  if (kid.adaptation) badges.push({ emoji: '🌱', label: L('Адаптация', 'Adaptation'), tone: 'info' });
-  if (kid.mealsIncluded) badges.push(kid.mealsHalal
+  if (kid.allergyEn) petals.push({ emoji: '🥜', label: L('Аллергия', 'Allergy'), tone: 'warn' });
+  if (kid.paracetamol === 'no') petals.push({ emoji: '💊', label: L('Без парацетамола', 'No paracetamol'), tone: 'warn' });
+  if (kid.photoConsent === 'no') petals.push({ emoji: '📸', label: L('Не снимать', 'No photos'), tone: 'warn' });
+  if (kid.adaptation) petals.push({ emoji: '🌱', label: L('Адаптация', 'Adaptation'), tone: 'info' });
+  if (kid.mealsIncluded) petals.push(kid.mealsHalal
     ? { text: 'HALAL', label: L('Питание', 'Meals'), tone: 'amenity' }
     : { emoji: '🍽️', label: L('Питание', 'Meals'), tone: 'amenity' });
-  if (kid.napTime) badges.push({ emoji: '😴', label: L('Сон', 'Nap time'), tone: 'amenity' });
-  if (kid.afterSchool) badges.push({ emoji: '🏫', label: L('После школы', 'After school'), tone: 'amenity' });
-  if (!badges.length) return null;
+  if (kid.napTime) petals.push({ emoji: '😴', label: L('Сон', 'Nap time'), tone: 'amenity' });
+  if (kid.afterSchool) petals.push({ emoji: '🏫', label: L('После школы', 'After school'), tone: 'amenity' });
+  if (!center && !petals.length) return null;
+
+  if (!center) {
+    return (
+      <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap', margin: '16px 0 4px' }}>
+        {petals.map((b, i) => <ScoutBadge key={i} {...b} />)}
+      </div>
+    );
+  }
+
+  // keep adjacent petal labels from overlapping: enough chord distance between slots
+  const R = Math.max(78, 80 / (2 * Math.sin(Math.PI / petals.length)));
+  const box = R * 2 + 86;
   return (
-    <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap', margin: '16px 0 4px' }}>
-      {badges.map((b, i) => <ScoutBadge key={i} {...b} scatter={SCATTER[i % SCATTER.length]} />)}
+    <div style={{ display: 'flex', justifyContent: 'center', margin: '12px 0 0' }}>
+      <div style={{ position: 'relative', width: box, height: box }}>
+        <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', zIndex: 2 }}>
+          <ScoutBadge {...center} size={70} />
+        </div>
+        {petals.map((b, i) => {
+          const angle = (-90 + i * (360 / petals.length)) * Math.PI / 180;
+          const x = R * Math.cos(angle);
+          const y = R * Math.sin(angle);
+          return (
+            <div key={i} style={{ position: 'absolute', left: `calc(50% + ${x}px)`, top: `calc(50% + ${y}px)`, transform: 'translate(-50%, -50%)' }}>
+              <ScoutBadge {...b} size={50} />
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
