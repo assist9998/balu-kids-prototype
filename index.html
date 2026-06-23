@@ -1191,46 +1191,30 @@ function KidBadges({ kid }) {
 }
 
 // "Scout badge" style — bigger circular icon + label, for the child's hero card.
-// deterministic per-slot wobble so it reads as "scattered", not random-on-every-render
-const SCATTER = [
-  { dy: -3, size: 56 },
-  { dy: 5,  size: 49 },
-  { dy: 3,  size: 60 },
-  { dy: -6, size: 51 },
-  { dy: 4,  size: 58 },
-  { dy: -3, size: 47 },
-  { dy: 2,  size: 55 },
-  { dy: -4, size: 52 },
-];
-
-function ScoutBadge({ emoji, text, dot, label, tone, ring, bg, ink, scatter }) {
+function ScoutBadge({ emoji, text, dot, label, tone, bg, ink }) {
   const base = tone === 'warn'
-    ? { ring: '#E8836B', bg: '#FEF0EA', ink: '#9C3A1F' }
+    ? { bg: '#FEF0EA', ink: '#9C3A1F' }
     : tone === 'amenity'
-    ? { ring: '#5FAE8C', bg: '#E3F5EC', ink: '#1F6B4A' }
-    : { ring: '#D99027', bg: '#FBE7C8', ink: '#7A3D00' };
-  const palette = { ring: ring || base.ring, bg: bg || base.bg, ink: ink || base.ink };
-  const { dy, size } = scatter;
+    ? { bg: '#E3F5EC', ink: '#1F6B4A' }
+    : { bg: '#FBE7C8', ink: '#7A3D00' };
+  const palette = { bg: bg || base.bg, ink: ink || base.ink };
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, width: 66 }}>
-      <div style={{
-        width: size, height: size, borderRadius: '50%',
-        background: palette.bg, border: `2.5px solid ${palette.ring}`,
-        display: 'grid', placeItems: 'center',
-        fontSize: text ? 10.5 : size * 0.43, fontWeight: text ? 800 : 400, color: palette.ink,
-        boxShadow: `0 4px 9px -3px ${palette.ring}88`,
-        transform: `translateY(${dy}px)`,
-      }}>{dot ? <span style={{ width: 16, height: 16, borderRadius: '50%', background: dot }} /> : (text || emoji)}</div>
-      <div style={{ fontSize: 10.5, fontWeight: 800, color: palette.ink, textAlign: 'center', lineHeight: 1.2, textWrap: 'pretty' }}>
-        {label}
-      </div>
-    </div>
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap',
+      padding: '7px 13px 7px 10px', borderRadius: 999,
+      background: palette.bg, color: palette.ink, fontSize: 13, fontWeight: 700,
+    }}>
+      {dot
+        ? <span style={{ width: 8, height: 8, borderRadius: '50%', background: dot, flexShrink: 0 }} />
+        : <span style={{ fontSize: text ? 11 : 15, fontWeight: text ? 800 : 400 }}>{text || emoji}</span>}
+      {label}
+    </span>
   );
 }
 
 function ScoutBadgeRow({ kid, grp, status }) {
   const badges = [];
-  if (grp) badges.push({ emoji: grp.emoji, label: Lo(grp), ring: grp.ink, bg: grp.color, ink: grp.ink });
+  if (grp) badges.push({ emoji: grp.emoji, label: Lo(grp), bg: grp.color, ink: grp.ink });
   if (status) badges.push(status === 'present'
     ? { dot: 'var(--ok)', label: t('present'), tone: 'amenity' }
     : { dot: 'var(--no)', label: t('absent'), tone: 'warn' });
@@ -1245,8 +1229,8 @@ function ScoutBadgeRow({ kid, grp, status }) {
   if (kid.afterSchool) badges.push({ emoji: '🏫', label: L('После школы', 'After school'), tone: 'amenity' });
   if (!badges.length) return null;
   return (
-    <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap', margin: '16px 0 4px' }}>
-      {badges.map((b, i) => <ScoutBadge key={i} {...b} scatter={SCATTER[i % SCATTER.length]} />)}
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', margin: '14px 0 4px' }}>
+      {badges.map((b, i) => <ScoutBadge key={i} {...b} />)}
     </div>
   );
 }
