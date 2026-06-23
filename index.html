@@ -1715,15 +1715,6 @@ function ChildScreen({ params, statuses }) {
           </div>
         </div>
 
-        {kid.allergyEn && (
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 14,
-            background: 'var(--card)', borderRadius: 999, padding: '7px 14px 7px 11px',
-            boxShadow: '0 1px 2px rgba(60,40,20,0.05)' }}>
-            <span style={{ width: 9, height: 9, borderRadius: '50%', background: 'var(--no)', flexShrink: 0 }} />
-            <span style={{ fontSize: 13.5, color: 'var(--ink)', fontWeight: 700 }}>🥜 {kid.allergyEn}</span>
-          </div>
-        )}
-
         {(kid.parent1Name || kid.parent2Name || kid.address) && (
           <div style={{ height: 1, background: 'rgba(60,40,20,0.08)', margin: '14px 0 12px' }} />
         )}
