@@ -1177,7 +1177,7 @@ function ParacetamolBadge() {
 
 function PhotoConsentBadge() {
   return <span title={L('Не снимать', 'Do not photograph')}
-    style={{ fontSize: 13, marginLeft: 4, verticalAlign: 'middle' }}>📸</span>;
+    style={{ fontSize: 13, marginLeft: 4, verticalAlign: 'middle' }}>📸🚫</span>;
 }
 
 function KidBadges({ kid }) {
@@ -1231,7 +1231,7 @@ function ScoutBadgeRow({ kid, grp, status }) {
     : { dot: 'var(--no)', label: t('absent'), tone: 'warn' });
   if (kid.allergyEn) petals.push({ emoji: '🥜', label: L('Аллергия', 'Allergy'), tone: 'warn' });
   if (kid.paracetamol === 'no') petals.push({ emoji: '💊🚫', label: L('Без парацетамола', 'No paracetamol'), tone: 'warn' });
-  if (kid.photoConsent === 'no') petals.push({ emoji: '📸', label: L('Не снимать', 'No photos'), tone: 'warn' });
+  if (kid.photoConsent === 'no') petals.push({ emoji: '📸🚫', label: L('Не снимать', 'No photos'), tone: 'warn' });
   if (kid.adaptation) petals.push({ emoji: '🌱', label: L('Адаптация', 'Adaptation'), tone: 'info' });
   if (kid.mealsIncluded) petals.push(kid.mealsHalal
     ? { text: 'HALAL', label: L('Питание', 'Meals'), tone: 'amenity' }
