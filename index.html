@@ -1200,6 +1200,8 @@ function KidBadges({ kid }) {
 function ScoutBadge({ emoji, label, tone }) {
   const palette = tone === 'warn'
     ? { ring: '#E8836B', bg: '#FEF0EA', ink: '#9C3A1F' }
+    : tone === 'amenity'
+    ? { ring: '#5FAE8C', bg: '#E3F5EC', ink: '#1F6B4A' }
     : { ring: '#D99027', bg: '#FBE7C8', ink: '#7A3D00' };
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, width: 66 }}>
@@ -1222,6 +1224,9 @@ function ScoutBadgeRow({ kid }) {
   if (kid.paracetamol === 'no') badges.push({ emoji: '💊', label: L('Без парацетамола', 'No paracetamol'), tone: 'warn' });
   if (kid.photoConsent === 'no') badges.push({ emoji: '📸', label: L('Не снимать', 'No photos'), tone: 'warn' });
   if (kid.adaptation) badges.push({ emoji: '🌱', label: L('Адаптация', 'Adaptation'), tone: 'info' });
+  if (kid.mealsIncluded) badges.push({ emoji: '🍽️', label: L('Питание', 'Meals'), tone: 'amenity' });
+  if (kid.napTime) badges.push({ emoji: '😴', label: L('Сон', 'Nap time'), tone: 'amenity' });
+  if (kid.afterSchool) badges.push({ emoji: '🏫', label: L('После школы', 'After school'), tone: 'amenity' });
   if (!badges.length) return null;
   return (
     <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap', margin: '16px 0 4px' }}>
