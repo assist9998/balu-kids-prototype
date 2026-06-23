@@ -1212,25 +1212,64 @@ function ScoutBadge({ emoji, text, dot, label, tone, bg, ink }) {
   );
 }
 
+function chunk3(items) {
+  const rows = [];
+  for (let i = 0; i < items.length; i += 3) rows.push(items.slice(i, i + 3));
+  return rows;
+}
+
+function centerInsert(arr, item) {
+  const i = Math.floor(arr.length / 2);
+  return [...arr.slice(0, i), item, ...arr.slice(i)];
+}
+
 function ScoutBadgeRow({ kid, grp, status }) {
-  const badges = [];
-  if (grp) badges.push({ emoji: grp.emoji, label: Lo(grp), bg: grp.color, ink: grp.ink });
-  if (status) badges.push(status === 'present'
+  const group = grp ? { emoji: grp.emoji, label: Lo(grp), bg: grp.color, ink: grp.ink } : null;
+  const petals = [];
+  if (status) petals.push(status === 'present'
     ? { dot: 'var(--ok)', label: t('present'), tone: 'amenity' }
     : { dot: 'var(--no)', label: t('absent'), tone: 'warn' });
-  if (kid.allergyEn) badges.push({ emoji: '🥜', label: L('Аллергия', 'Allergy'), tone: 'warn' });
-  if (kid.paracetamol === 'no') badges.push({ emoji: '💊', label: L('Без парацетамола', 'No paracetamol'), tone: 'warn' });
-  if (kid.photoConsent === 'no') badges.push({ emoji: '📸', label: L('Не снимать', 'No photos'), tone: 'warn' });
-  if (kid.adaptation) badges.push({ emoji: '🌱', label: L('Адаптация', 'Adaptation'), tone: 'info' });
-  if (kid.mealsIncluded) badges.push(kid.mealsHalal
+  if (kid.allergyEn) petals.push({ emoji: '🥜', label: L('Аллергия', 'Allergy'), tone: 'warn' });
+  if (kid.paracetamol === 'no') petals.push({ emoji: '💊', label: L('Без парацетамола', 'No paracetamol'), tone: 'warn' });
+  if (kid.photoConsent === 'no') petals.push({ emoji: '📸', label: L('Не снимать', 'No photos'), tone: 'warn' });
+  if (kid.adaptation) petals.push({ emoji: '🌱', label: L('Адаптация', 'Adaptation'), tone: 'info' });
+  if (kid.mealsIncluded) petals.push(kid.mealsHalal
     ? { text: 'HALAL', label: L('Питание', 'Meals'), tone: 'amenity' }
     : { emoji: '🍽️', label: L('Питание', 'Meals'), tone: 'amenity' });
-  if (kid.napTime) badges.push({ emoji: '😴', label: L('Сон', 'Nap time'), tone: 'amenity' });
-  if (kid.afterSchool) badges.push({ emoji: '🏫', label: L('После школы', 'After school'), tone: 'amenity' });
-  if (!badges.length) return null;
+  if (kid.napTime) petals.push({ emoji: '😴', label: L('Сон', 'Nap time'), tone: 'amenity' });
+  if (kid.afterSchool) petals.push({ emoji: '🏫', label: L('После школы', 'After school'), tone: 'amenity' });
+  if (!group && !petals.length) return null;
+
+  const n = petals.length;
+  let rows = [];
+  if (!group) {
+    rows = chunk3(petals);
+  } else {
+    const top = Math.min(Math.max(n - 2, 0), 3);
+    const topRow = petals.slice(0, top);
+    const bottomPetals = petals.slice(top);
+    if (bottomPetals.length + 1 <= 3) {
+      // room for group in the same row as the rest, centered
+      if (topRow.length) rows.push(topRow);
+      rows.push(centerInsert(bottomPetals, group));
+    } else {
+      // group gets its own centered row, sandwiched between petal rows
+      if (topRow.length) rows.push(topRow);
+      rows.push([group]);
+      rows.push(...chunk3(bottomPetals));
+    }
+  }
+
+  const totalCount = petals.length + (group ? 1 : 0);
+  const stagger = totalCount % 2 === 1;
   return (
-    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', margin: '14px 0 4px' }}>
-      {badges.map((b, i) => <ScoutBadge key={i} {...b} />)}
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, margin: '14px 0 4px' }}>
+      {rows.map((row, ri) => (
+        <div key={ri} style={{ display: 'flex', gap: 8, justifyContent: 'center',
+          transform: stagger && ri % 2 === 1 ? 'translateX(16px)' : 'none' }}>
+          {row.map((b, bi) => <ScoutBadge key={bi} {...b} />)}
+        </div>
+      ))}
     </div>
   );
 }
