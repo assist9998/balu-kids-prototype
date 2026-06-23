@@ -1196,7 +1196,7 @@ function KidBadges({ kid }) {
 }
 
 // "Scout badge" style — bigger circular icon + label, for the child's hero card.
-function ScoutBadge({ emoji, label, tone }) {
+function ScoutBadge({ emoji, text, label, tone }) {
   const palette = tone === 'warn'
     ? { ring: '#E8836B', bg: '#FEF0EA', ink: '#9C3A1F' }
     : tone === 'amenity'
@@ -1207,9 +1207,10 @@ function ScoutBadge({ emoji, label, tone }) {
       <div style={{
         width: 54, height: 54, borderRadius: '50%',
         background: palette.bg, border: `2.5px solid ${palette.ring}`,
-        display: 'grid', placeItems: 'center', fontSize: 24,
+        display: 'grid', placeItems: 'center',
+        fontSize: text ? 11 : 24, fontWeight: text ? 800 : 400, color: palette.ink,
         boxShadow: `0 3px 8px -2px ${palette.ring}77`,
-      }}>{emoji}</div>
+      }}>{text || emoji}</div>
       <div style={{ fontSize: 10.5, fontWeight: 800, color: palette.ink, textAlign: 'center', lineHeight: 1.2, textWrap: 'pretty' }}>
         {label}
       </div>
@@ -1223,7 +1224,9 @@ function ScoutBadgeRow({ kid }) {
   if (kid.paracetamol === 'no') badges.push({ emoji: '💊', label: L('Без парацетамола', 'No paracetamol'), tone: 'warn' });
   if (kid.photoConsent === 'no') badges.push({ emoji: '📸', label: L('Не снимать', 'No photos'), tone: 'warn' });
   if (kid.adaptation) badges.push({ emoji: '🌱', label: L('Адаптация', 'Adaptation'), tone: 'info' });
-  if (kid.mealsIncluded) badges.push({ emoji: '🍽️', label: L('Питание', 'Meals'), tone: 'amenity' });
+  if (kid.mealsIncluded) badges.push(kid.mealsHalal
+    ? { text: 'HALAL', label: L('Питание', 'Meals'), tone: 'amenity' }
+    : { emoji: '🍽️', label: L('Питание', 'Meals'), tone: 'amenity' });
   if (kid.napTime) badges.push({ emoji: '😴', label: L('Сон', 'Nap time'), tone: 'amenity' });
   if (kid.afterSchool) badges.push({ emoji: '🏫', label: L('После школы', 'After school'), tone: 'amenity' });
   if (!badges.length) return null;
@@ -1629,7 +1632,7 @@ function ChildScreen({ params, statuses }) {
   ];
   const kinderInfo = [
     ...(kid.startDate ? [{ label: t('startDate'), value: kid.startDate }] : []),
-    ...(kid.mealsIncluded ? [{ label: t('mealsIncluded'), value: t('yes') }] : []),
+    ...(kid.mealsIncluded ? [{ label: t('mealsIncluded'), value: kid.mealsHalal ? `${t('yes')} (HALAL)` : t('yes') }] : []),
     ...(kid.napTime ? [{ label: t('napTime'), value: t('yes') }] : []),
     ...(kid.afterSchool ? [{ label: t('afterSchool'), value: t('yes') }] : []),
   ];
