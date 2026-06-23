@@ -1226,9 +1226,9 @@ function centerInsert(arr, item) {
 function allergyEmoji(text) {
   const s = text.toLowerCase();
   if (s.includes('halal')) return '🍽️';
-  if (s.includes('pork') || s.includes('pig')) return '🚫🐖';
-  if (s.includes('gluten') || s.includes('wheat')) return '🚫🌾';
-  if (s.includes('milk') || s.includes('dairy') || s.includes('lactose')) return '🚫🥛';
+  if (s.includes('pork') || s.includes('pig')) return '🐖🚫';
+  if (s.includes('gluten') || s.includes('wheat')) return '🌾🚫';
+  if (s.includes('milk') || s.includes('dairy') || s.includes('lactose')) return '🥛🚫';
   if (s.includes('peanut') || s.includes('nut')) return '🥜';
   if (s.includes('grapefruit') || s.includes('citrus') || s.includes('orange')) return '🍊';
   if (s.includes('egg')) return '🥚';
