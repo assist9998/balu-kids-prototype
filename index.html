@@ -259,6 +259,21 @@ window.API_BASE = "https://rmxois1uv0a24xrbi2dfcfac.95.179.188.141.sslip.io";
     if (!res.ok) throw new Error(`POST /attendance failed: ${res.status}`);
   };
 
+  window.loadPayments = async function (month) {
+    const res = await fetch(`${window.API_BASE}/payments/${encodeURIComponent(month)}`);
+    if (!res.ok) throw new Error(`GET /payments failed: ${res.status}`);
+    return res.json();
+  };
+
+  window.savePayments = async function (month, rows) {
+    const res = await fetch(`${window.API_BASE}/payments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ month, rows }),
+    });
+    if (!res.ok) throw new Error(`POST /payments failed: ${res.status}`);
+  };
+
   window.login = async function (password) {
     const res = await fetch(`${window.API_BASE}/auth/login`, {
       method: 'POST',
@@ -1259,8 +1274,8 @@ function ScoutBadgeRow({ kid, grp, status }) {
   if (status) petals.push(status === 'present'
     ? { dot: 'var(--ok)', label: t('present'), tone: 'ok' }
     : { dot: 'var(--ink-faint)', label: t('absent'), tone: 'neutral' });
-  if (kid.contract === 'tourist') petals.push({ emoji: '🧳', label: 'Tourist', tone: 'info' });
-  if (kid.contract && kid.contract !== 'tourist') petals.push({ emoji: '🏠', label: 'Long term', tone: 'ok' });
+  if (kid.contract === 'tourist') petals.push({ emoji: '🧳', label: kid.dayType ? `Tourist · ${kid.dayType}` : 'Tourist', tone: 'info' });
+  if (kid.contract && kid.contract !== 'tourist') petals.push({ emoji: '🏠', label: kid.dayType ? `Long term · ${kid.dayType}` : 'Long term', tone: 'ok' });
   petals.push(...careBadges(kid));
   if (kid.napTime) petals.push({ emoji: '😴', label: 'Nap time', tone: 'info' });
   if (kid.afterSchool) petals.push({ emoji: '🏫', label: 'After school', tone: 'amenity' });
@@ -2209,9 +2224,12 @@ function ComposeScreen({ back, actions }) {
 }
 
 const PAY_PALETTE   = ['#FBE7A8','#CDE8FB','#D4F0DF','#FBD9E1','#FBE0C0','#E8D5FB'];
-const PAY_MONTHLY   = { toddler: 400, middle: 450, big: 500, primary: 550 };
-const PAY_DAILY     = { toddler: 35,  middle: 40,  big: 45,  primary: 50  };
 const PAY_CLUB_PRICE = { chess: 60, swimming: 80 };
+
+function fmtMoney(n) {
+  if (!n) return '0';
+  return n % 1000 === 0 ? `${n / 1000}k` : String(n);
+}
 
 function PayStats({ cp, cu, total, filter, onFilter }) {
   const statBox = (id, count, label, color) => {
@@ -2234,7 +2252,7 @@ function PayStats({ cp, cu, total, filter, onFilter }) {
       {statBox('unpaid', cu, L('Не оплатили', 'Unpaid'), 'var(--no)')}
       {!window.__isStaff && (
         <div style={{ flex: 1.4, background: '#FBF7F2', borderRadius: 18, padding: '12px 8px', textAlign: 'center' }}>
-          <div style={{ fontSize: 22, fontWeight: 600, color: '#B07848', lineHeight: 1 }}>${total}</div>
+          <div style={{ fontSize: 22, fontWeight: 600, color: '#B07848', lineHeight: 1 }}>{fmtMoney(total)}</div>
           <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 600, marginTop: 4 }}>{L('Собрано', 'Collected')}</div>
         </div>
       )}
@@ -2269,11 +2287,12 @@ function KidPayRow({ kid, isPaid, onToggle, amount, tourDays, onDaysChange, tour
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}</div>
           <span style={{ background: grp.color, color: grp.ink, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999 }}>{grp.emoji} {Lo(grp)}</span>
+          {kid.dayType && <span style={{ background: '#E7E1D9', color: '#6B5C4A', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, marginLeft: 6 }}>{kid.dayType}</span>}
         </div>
         <div style={{ textAlign: 'right' }} onClick={tourDays !== undefined ? e => { e.stopPropagation(); onToggle(); } : undefined}>
           {isPaid ? paidBadge : unpaidBadge(window.__isStaff
             ? (tourDays !== undefined ? `${tourDays} ${L('дн.','days')}` : L('Не оплачено', 'Unpaid'))
-            : (tourDays !== undefined ? `$${amount} · ${tourDays} ${L('дн.','days')}` : `$${amount}`))}
+            : (tourDays !== undefined ? `${fmtMoney(amount)} · ${tourDays} ${L('дн.','days')}` : fmtMoney(amount)))}
         </div>
       </Card>
 
@@ -2297,7 +2316,7 @@ function KidPayRow({ kid, isPaid, onToggle, amount, tourDays, onDaysChange, tour
             </div>
             {!window.__isStaff && (
               <div style={{ textAlign: 'center', fontSize: 16, fontWeight: 700, color: 'var(--ink-soft)', marginBottom: 24 }}>
-                ${amount}
+                {fmtMoney(amount)}
               </div>
             )}
             <button onClick={() => setShowDays(false)} className="bk-press" style={{ width: '100%', border: 'none',
@@ -2375,30 +2394,40 @@ function PaymentsGardenScreen() {
     const i = GARDEN_MONTHS.findIndex(x => x.id === m);
     return i === -1 ? 0 : i;
   }, []);
-  const maxMonthIdx = Math.min(curCalMonthIdx + 1, GARDEN_MONTHS.length - 1);
+  const maxMonthIdx = GARDEN_MONTHS.length - 1;
   const [monthIdx,  setMonthIdx] = React.useState(curCalMonthIdx);
   const touchStart = React.useRef(null);
 
-  const initPaid = () => {
+  const initEmpty = () => {
     const m = {};
-    GARDEN_MONTHS.forEach((mo, mi) => {
-      m[mo.id] = {};
-      DATA.CHILDREN.forEach((k, i) => { m[mo.id][k.id] = mi === 0 && i % 3 !== 2; });
-    });
+    GARDEN_MONTHS.forEach(mo => { m[mo.id] = {}; });
     return m;
   };
-  const initDays = () => {
-    const m = {};
-    GARDEN_MONTHS.forEach(mo => { m[mo.id] = {}; DATA.CHILDREN.forEach(k => { m[mo.id][k.id] = 1; }); });
-    return m;
-  };
-  const [paid,      setPaid]      = React.useState(initPaid);
-  const [saved,     setSaved]     = React.useState(initPaid);
-  const [days,      setDays]      = React.useState(initDays);
-  const [savedDays, setSavedDays] = React.useState(initDays);
+  const [paid,      setPaid]      = React.useState(initEmpty);
+  const [saved,     setSaved]     = React.useState(initEmpty);
+  const [days,      setDays]      = React.useState(initEmpty);
+  const [savedDays, setSavedDays] = React.useState(initEmpty);
+  const [loadedMonths, setLoadedMonths] = React.useState({});
   const [secDays,  setSecDays]  = React.useState(() => { const m = {}; GARDEN_MONTHS.forEach(mo => { m[mo.id] = new Date().getDate(); }); return m; });
 
-  const mo       = GARDEN_MONTHS[monthIdx];
+  const mo = GARDEN_MONTHS[monthIdx];
+
+  React.useEffect(() => {
+    if (loadedMonths[mo.id]) return;
+    window.loadPayments(mo.id).then(remote => {
+      const p = {}, d = {};
+      DATA.CHILDREN.forEach(k => {
+        p[k.id] = !!(remote[k.id] && remote[k.id].paid);
+        d[k.id] = (remote[k.id] && remote[k.id].days) || 1;
+      });
+      setPaid(prev => ({ ...prev, [mo.id]: p }));
+      setSaved(prev => ({ ...prev, [mo.id]: p }));
+      setDays(prev => ({ ...prev, [mo.id]: d }));
+      setSavedDays(prev => ({ ...prev, [mo.id]: d }));
+      setLoadedMonths(prev => ({ ...prev, [mo.id]: true }));
+    }).catch(() => setLoadedMonths(prev => ({ ...prev, [mo.id]: true })));
+  }, [mo.id]);
+
   const curPaid  = paid[mo.id];
   const curDays  = days[mo.id];
   const isTour   = tariff === 'tourist';
@@ -2406,7 +2435,7 @@ function PaymentsGardenScreen() {
   const allKids = DATA.CHILDREN
     .filter(k => isTour ? k.contract === 'tourist' : k.contract !== 'tourist')
     .filter(k => group === 'all' || k.group === group);
-  const getAmount   = kid => isTour ? (curDays[kid.id] || 1) * PAY_DAILY[kid.group] : PAY_MONTHLY[kid.group];
+  const getAmount   = kid => isTour ? (curDays[kid.id] || 1) * Number(kid.price || 0) : Number(kid.price || 0);
   const countPaid   = allKids.filter(k =>  curPaid[k.id]).length;
   const countUnpaid = allKids.filter(k => !curPaid[k.id]).length;
   const total       = allKids.filter(k =>  curPaid[k.id]).reduce((s, k) => s + getAmount(k), 0);
@@ -2428,6 +2457,18 @@ function PaymentsGardenScreen() {
   function handleSave() {
     setSaved(JSON.parse(JSON.stringify(paid)));
     setSavedDays(JSON.parse(JSON.stringify(days)));
+    const curPaidNow = paid[mo.id] || {};
+    const curDaysNow = days[mo.id] || {};
+    const rows = DATA.CHILDREN.map(k => {
+      const kIsTour = k.contract === 'tourist';
+      return {
+        kid_id: k.id,
+        paid: !!curPaidNow[k.id],
+        days: curDaysNow[k.id] || 1,
+        amount: kIsTour ? (curDaysNow[k.id] || 1) * Number(k.price || 0) : Number(k.price || 0),
+      };
+    });
+    window.savePayments(mo.id, rows).catch(() => {});
   }
   function prevMonth() { if (monthIdx > 0) { setMonthIdx(i => i - 1); setPayFilter('all'); } }
   function nextMonth() { if (monthIdx < maxMonthIdx) { setMonthIdx(i => i + 1); setPayFilter('all'); } }
@@ -2813,6 +2854,7 @@ function App() {
   function back() { setDir('back'); setStack(s => s.length > 1 ? s.slice(0, -1) : s); }
   function home() { setDir('back'); setStack([{ name: 'home', params: {} }]); }
   function toggleLang() { const n = lang === 'ru' ? 'en' : 'ru'; setLang(n); localStorage.setItem('balu_lang', n); }
+  function logout() { localStorage.removeItem('balu_role'); setRole(null); }
 
   function showToast(msg) { setToast(msg); clearTimeout(window.__tt); window.__tt = setTimeout(() => setToast(null), 1900); }
 
@@ -2893,13 +2935,20 @@ function App() {
               </>
             )}
           </div>
-          {/* right: lang toggle only */}
-          <button onClick={toggleLang} className="bk-press" style={{ display: 'flex', border: 'none', cursor: 'pointer',
-            borderRadius: 999, overflow: 'hidden', fontFamily: 'inherit', fontSize: 12, fontWeight: 800,
-            background: '#B07848', padding: 2, gap: 2 }}>
-            <span style={{ padding: '5px 10px', borderRadius: 999, background: lang === 'ru' ? '#F2A81D' : 'transparent', color: lang === 'ru' ? '#3E2510' : '#fff', transition: 'all 0.2s' }}>RU</span>
-            <span style={{ padding: '5px 10px', borderRadius: 999, background: lang === 'en' ? '#F2A81D' : 'transparent', color: lang === 'en' ? '#3E2510' : '#fff', transition: 'all 0.2s' }}>EN</span>
-          </button>
+          {/* right: logout + lang toggle */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button onClick={logout} className="bk-press" title={L('Выйти', 'Log out')} style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30,
+              border: 'none', cursor: 'pointer', borderRadius: 999, background: '#FBF7F2', color: '#B07848', fontSize: 14 }}>
+              ⏻
+            </button>
+            <button onClick={toggleLang} className="bk-press" style={{ display: 'flex', border: 'none', cursor: 'pointer',
+              borderRadius: 999, overflow: 'hidden', fontFamily: 'inherit', fontSize: 12, fontWeight: 800,
+              background: '#B07848', padding: 2, gap: 2 }}>
+              <span style={{ padding: '5px 10px', borderRadius: 999, background: lang === 'ru' ? '#F2A81D' : 'transparent', color: lang === 'ru' ? '#3E2510' : '#fff', transition: 'all 0.2s' }}>RU</span>
+              <span style={{ padding: '5px 10px', borderRadius: 999, background: lang === 'en' ? '#F2A81D' : 'transparent', color: lang === 'en' ? '#3E2510' : '#fff', transition: 'all 0.2s' }}>EN</span>
+            </button>
+          </div>
         </div>
       </div>
 
