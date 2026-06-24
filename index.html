@@ -259,6 +259,17 @@ window.API_BASE = "https://rmxois1uv0a24xrbi2dfcfac.95.179.188.141.sslip.io";
     if (!res.ok) throw new Error(`POST /attendance failed: ${res.status}`);
   };
 
+  window.login = async function (password) {
+    const res = await fetch(`${window.API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.role;
+  };
+
   window.setChildEmoji = async function (childId, emoji) {
     const res = await fetch(`${window.API_BASE}/children/${encodeURIComponent(childId)}/emoji`, {
       method: 'PUT',
@@ -1972,11 +1983,13 @@ function SummaryScreen({ statuses, go }) {
               <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 700, marginTop: 4 }}>{s.label}</div>
             </div>
           ))}
-          <div style={{ flex: 1.4, textAlign: 'center', borderRadius: 14, padding: '12px 8px',
-            background: '#fff', boxShadow: '0 1px 4px rgba(60,40,20,0.07)' }}>
-            <div style={{ fontSize: 22, fontWeight: 800, color: '#B07848', lineHeight: 1, fontFamily: 'var(--font-display)' }}>${totalCollected}</div>
-            <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 700, marginTop: 4 }}>{L('Собрано', 'Collected')}</div>
-          </div>
+          {!window.__isStaff && (
+            <div style={{ flex: 1.4, textAlign: 'center', borderRadius: 14, padding: '12px 8px',
+              background: '#fff', boxShadow: '0 1px 4px rgba(60,40,20,0.07)' }}>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#B07848', lineHeight: 1, fontFamily: 'var(--font-display)' }}>${totalCollected}</div>
+              <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 700, marginTop: 4 }}>{L('Собрано', 'Collected')}</div>
+            </div>
+          )}
         </div>
       </Card>
 
@@ -2219,10 +2232,12 @@ function PayStats({ cp, cu, total, filter, onFilter }) {
     <div style={{ display: 'flex', gap: 10, padding: '0 20px 16px' }}>
       {statBox('paid',   cp, L('Оплатили', 'Paid'),      'var(--ok)')}
       {statBox('unpaid', cu, L('Не оплатили', 'Unpaid'), 'var(--no)')}
-      <div style={{ flex: 1.4, background: '#FBF7F2', borderRadius: 18, padding: '12px 8px', textAlign: 'center' }}>
-        <div style={{ fontSize: 22, fontWeight: 600, color: '#B07848', lineHeight: 1 }}>${total}</div>
-        <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 600, marginTop: 4 }}>{L('Собрано', 'Collected')}</div>
-      </div>
+      {!window.__isStaff && (
+        <div style={{ flex: 1.4, background: '#FBF7F2', borderRadius: 18, padding: '12px 8px', textAlign: 'center' }}>
+          <div style={{ fontSize: 22, fontWeight: 600, color: '#B07848', lineHeight: 1 }}>${total}</div>
+          <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 600, marginTop: 4 }}>{L('Собрано', 'Collected')}</div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2256,7 +2271,9 @@ function KidPayRow({ kid, isPaid, onToggle, amount, tourDays, onDaysChange, tour
           <span style={{ background: grp.color, color: grp.ink, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999 }}>{grp.emoji} {Lo(grp)}</span>
         </div>
         <div style={{ textAlign: 'right' }} onClick={tourDays !== undefined ? e => { e.stopPropagation(); onToggle(); } : undefined}>
-          {isPaid ? paidBadge : unpaidBadge(tourDays !== undefined ? `$${amount} · ${tourDays} ${L('дн.','days')}` : `$${amount}`)}
+          {isPaid ? paidBadge : unpaidBadge(window.__isStaff
+            ? (tourDays !== undefined ? `${tourDays} ${L('дн.','days')}` : L('Не оплачено', 'Unpaid'))
+            : (tourDays !== undefined ? `$${amount} · ${tourDays} ${L('дн.','days')}` : `$${amount}`))}
         </div>
       </Card>
 
@@ -2278,9 +2295,11 @@ function KidPayRow({ kid, isPaid, onToggle, amount, tourDays, onDaysChange, tour
                 textAlign: 'center', fontFamily: 'var(--font-display)' }}>{tourDays}</span>
               <button style={bigBtn} onClick={() => onDaysChange(tourDays + 1)}>+</button>
             </div>
-            <div style={{ textAlign: 'center', fontSize: 16, fontWeight: 700, color: 'var(--ink-soft)', marginBottom: 24 }}>
-              ${amount}
-            </div>
+            {!window.__isStaff && (
+              <div style={{ textAlign: 'center', fontSize: 16, fontWeight: 700, color: 'var(--ink-soft)', marginBottom: 24 }}>
+                ${amount}
+              </div>
+            )}
             <button onClick={() => setShowDays(false)} className="bk-press" style={{ width: '100%', border: 'none',
               cursor: 'pointer', fontFamily: 'var(--font-display)', background: '#B07848', color: '#fff',
               fontSize: 17, fontWeight: 800, padding: 15, borderRadius: 18,
@@ -2698,6 +2717,62 @@ function persistAttendance(statuses) {
   try { localStorage.setItem('balu_attendance', JSON.stringify({ date: todayStr(), statuses })); } catch {}
 }
 
+// Role is re-checked once per day — same daily-reset pattern as attendance.
+function loadStoredRole() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem('balu_role'));
+    return parsed && parsed.date === todayStr() ? parsed.role : null;
+  } catch { return null; }
+}
+
+function persistRole(role) {
+  try { localStorage.setItem('balu_role', JSON.stringify({ date: todayStr(), role })); } catch {}
+}
+
+function LoginGate({ onLogin }) {
+  const [password, setPassword] = React.useState('');
+  const [error, setError] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
+
+  async function submit(e) {
+    e.preventDefault();
+    if (!password.trim()) return;
+    setLoading(true);
+    setError(false);
+    const role = await window.login(password.trim());
+    setLoading(false);
+    if (role) onLogin(role);
+    else setError(true);
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center',
+      justifyContent: 'center', gap: 18, padding: 24, background: 'var(--bg)' }}>
+      <div style={{ fontSize: 44 }}>🐻</div>
+      <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>
+        {L('Balu Kids', 'Balu Kids')}
+      </div>
+      <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, width: '100%', maxWidth: 280 }}>
+        <input
+          type="password" inputMode="numeric" autoFocus value={password}
+          onChange={e => { setPassword(e.target.value); setError(false); }}
+          placeholder={L('Пароль', 'Password')}
+          style={{ width: '100%', textAlign: 'center', fontSize: 22, letterSpacing: '0.1em', fontFamily: 'inherit',
+            padding: '14px 16px', borderRadius: 16, border: error ? '2px solid var(--no)' : '2px solid transparent',
+            background: '#FBF7F2', color: 'var(--ink)', outline: 'none' }} />
+        {error && <div style={{ fontSize: 13, color: 'var(--no)', fontWeight: 600 }}>{L('Неверный пароль', 'Wrong password')}</div>}
+        <button type="submit" disabled={loading || !password.trim()} className="bk-press" style={{
+          width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-display)',
+          background: '#B07848', color: '#fff', fontSize: 16, fontWeight: 800,
+          padding: 14, borderRadius: 16, opacity: loading || !password.trim() ? 0.6 : 1,
+          boxShadow: '0 10px 24px -8px #B07848' }}>
+          {loading ? '…' : L('Войти', 'Log in')}
+        </button>
+      </form>
+    </div>
+  );
+}
+
 function App() {
   const [tw, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [lang, setLang] = React.useState(() => localStorage.getItem('balu_lang') || 'ru');
@@ -2708,6 +2783,7 @@ function App() {
   const [statuses, setStatuses] = React.useState({});
   const [feed, setFeed] = React.useState(() => DATA.FEED.map(f => ({ ...f })));
   const [toast, setToast] = React.useState(null);
+  const [role, setRole] = React.useState(() => loadStoredRole());
 
   React.useEffect(() => {
     window.loadChildren()
@@ -2727,6 +2803,9 @@ function App() {
   // keep i18n + global lang in sync BEFORE children render
   window.__lang = lang;
   setI18nLang(lang);
+  window.__isStaff = role === 'staff';
+
+  if (!role) return <LoginGate onLogin={r => { persistRole(r); setRole(r); }} />;
 
   const top = stack[stack.length - 1];
 
