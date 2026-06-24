@@ -2042,7 +2042,7 @@ function WeekChart() {
 // ════════════════════════════════════════════════════════════════
 //  NOTIFICATIONS — feed
 // ════════════════════════════════════════════════════════════════
-const TYPE_TINT = { birthday: '#FBD9E1', alert: '#FBE7A8', message: '#CDE8FB', sent: '#D4F0DF' };
+const TYPE_TINT = { birthday: '#FBD9E1', alert: '#FBE7A8', message: '#CDE8FB', sent: '#D4F0DF', urgent: '#FBD9E1' };
 
 function LongPressCard({ onDelete, onTap, children, style }) {
   const [confirm, setConfirm] = React.useState(false);
@@ -2840,6 +2840,25 @@ function App() {
   React.useEffect(() => {
     if (childrenReady) persistAttendance(statuses);
   }, [statuses, childrenReady]);
+
+  React.useEffect(() => {
+    if (!childrenReady) return;
+    const today = todayStr();
+    const overdue = DATA.CHILDREN.filter(k => k.paidUntil && k.paidUntil < today);
+    setFeed(f => {
+      const manual = f.filter(x => !x.auto);
+      const autoItems = overdue.map(k => {
+        const parts = k.paidUntil.split('-');
+        const since = `${parts[2]}.${parts[1]}`;
+        return {
+          id: `overdue-${k.id}`, auto: true, type: 'urgent', emoji: '⚠️',
+          ru: `Просрочена оплата — ${Lo(k)}`, en: `Payment overdue — ${Lo(k)}`,
+          time: `с ${since}`, timeEn: `since ${since}`, unread: true,
+        };
+      });
+      return [...autoItems, ...manual];
+    });
+  }, [childrenReady]);
 
   // keep i18n + global lang in sync BEFORE children render
   window.__lang = lang;
