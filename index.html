@@ -1274,6 +1274,7 @@ function ScoutBadgeRow({ kid, grp, status }) {
   if (status) petals.push(status === 'present'
     ? { dot: 'var(--ok)', label: t('present'), tone: 'ok' }
     : { dot: 'var(--ink-faint)', label: t('absent'), tone: 'neutral' });
+  if (kid.paidUntil && kid.paidUntil < todayStr()) petals.push({ emoji: '⚠️', label: 'Overdue', tone: 'warn' });
   if (kid.contract === 'tourist') petals.push({ emoji: '🧳', label: kid.dayType ? `Tourist · ${kid.dayType}` : 'Tourist', tone: 'info' });
   if (kid.contract && kid.contract !== 'tourist') petals.push({ emoji: '🏠', label: kid.dayType ? `Long term · ${kid.dayType}` : 'Long term', tone: 'ok' });
   petals.push(...careBadges(kid));
@@ -1825,7 +1826,7 @@ Object.assign(window, { HomeScreen, ChildrenScreen, GroupScreen, ChildScreen });
 // ════════════════════════════════════════════════════════════════
 const CYCLE = { present: 'absent', absent: 'present', late: 'present' };
 
-function AttendanceScreen({ statuses, actions }) {
+function AttendanceScreen({ statuses, actions, go }) {
   const initLocal = () => { const m = {}; DATA.CHILDREN.forEach(k => { m[k.id] = statuses[k.id] || 'absent'; }); return m; };
   const [local,      setLocal]      = React.useState(initLocal);
   const [savedLocal, setSavedLocal] = React.useState(initLocal);
@@ -1895,7 +1896,8 @@ function AttendanceScreen({ statuses, actions }) {
           const PALETTE = ['#FBE7A8','#CDE8FB','#D4F0DF','#FBD9E1','#FBE0C0','#E8D5FB'];
           const kidIndex = DATA.CHILDREN.filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
           return (
-            <Card key={kid.id} pad={12} style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2' }}>
+            <Card key={kid.id} pad={12} onClick={() => go('child', { childId: kid.id })}
+              style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2' }}>
               <Avatar emoji={kid.emoji} color={PALETTE[kidIndex % PALETTE.length]} size={44} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}</div>
@@ -1905,7 +1907,9 @@ function AttendanceScreen({ statuses, actions }) {
                   </div>
                 )}
               </div>
-              <StatusChip status={st} onClick={() => setStatus(kid.id, CYCLE[st])} />
+              <div onClick={e => e.stopPropagation()} style={{ padding: 6 }}>
+                <StatusChip status={st} onClick={() => setStatus(kid.id, CYCLE[st])} />
+              </div>
             </Card>
           );
         })}
@@ -2916,7 +2920,7 @@ function App() {
       case 'children':      return <ChildrenScreen go={go} statuses={statuses} />;
       case 'group':         return <GroupScreen params={p} go={go} statuses={statuses} />;
       case 'child':         return <ChildScreen params={p} statuses={statuses} />;
-      case 'attendance':    return <AttendanceScreen statuses={statuses} actions={actions} />;
+      case 'attendance':    return <AttendanceScreen statuses={statuses} actions={actions} go={go} />;
       case 'payments':         return <PaymentsScreen go={go} />;
       case 'payments-garden':  return <PaymentsGardenScreen />;
       case 'payments-clubs':   return <PaymentsClubsScreen />;
