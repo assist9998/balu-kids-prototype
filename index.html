@@ -244,6 +244,21 @@ window.API_BASE = "https://rmxois1uv0a24xrbi2dfcfac.95.179.188.141.sslip.io";
     window.DATA.CHILDREN = await res.json();
   };
 
+  window.loadAttendance = async function (date) {
+    const res = await fetch(`${window.API_BASE}/attendance/${encodeURIComponent(date)}`);
+    if (!res.ok) throw new Error(`GET /attendance failed: ${res.status}`);
+    return res.json();
+  };
+
+  window.saveAttendance = async function (date, statuses) {
+    const res = await fetch(`${window.API_BASE}/attendance`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date, statuses }),
+    });
+    if (!res.ok) throw new Error(`POST /attendance failed: ${res.status}`);
+  };
+
   window.setChildEmoji = async function (childId, emoji) {
     const res = await fetch(`${window.API_BASE}/children/${encodeURIComponent(childId)}/emoji`, {
       method: 'PUT',
@@ -1784,8 +1799,8 @@ Object.assign(window, { HomeScreen, ChildrenScreen, GroupScreen, ChildScreen });
 // ════════════════════════════════════════════════════════════════
 const CYCLE = { present: 'absent', absent: 'present', late: 'present' };
 
-function AttendanceScreen({ actions }) {
-  const initLocal = () => { const m = {}; DATA.CHILDREN.forEach(k => { m[k.id] = 'absent'; }); return m; };
+function AttendanceScreen({ statuses, actions }) {
+  const initLocal = () => { const m = {}; DATA.CHILDREN.forEach(k => { m[k.id] = statuses[k.id] || 'absent'; }); return m; };
   const [local,      setLocal]      = React.useState(initLocal);
   const [savedLocal, setSavedLocal] = React.useState(initLocal);
   const [allMarked,  setAllMarked]  = React.useState(false);
@@ -2665,6 +2680,24 @@ const TITLES = {
   activities: 'activities', summary: 'daySummary', notifications: 'notifications', compose: 'compose',
 };
 
+// Attendance is marked fresh each day; persisted in localStorage so a reload
+// during the same day doesn't lose today's marks (no backend for this yet).
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function loadStoredAttendance() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem('balu_attendance'));
+    return parsed && parsed.date === todayStr() ? parsed.statuses : null;
+  } catch { return null; }
+}
+
+function persistAttendance(statuses) {
+  try { localStorage.setItem('balu_attendance', JSON.stringify({ date: todayStr(), statuses })); } catch {}
+}
+
 function App() {
   const [tw, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [lang, setLang] = React.useState(() => localStorage.getItem('balu_lang') || 'ru');
@@ -2678,13 +2711,18 @@ function App() {
 
   React.useEffect(() => {
     window.loadChildren()
-      .then(() => {
-        const m = {}; DATA.CHILDREN.forEach(k => m[k.id] = 'absent');
+      .then(() => window.loadAttendance(todayStr()).catch(() => loadStoredAttendance() || {}))
+      .then(remote => {
+        const m = {}; DATA.CHILDREN.forEach(k => m[k.id] = remote[k.id] || 'absent');
         setStatuses(m);
         setChildrenReady(true);
       })
       .catch(err => setLoadError(err.message));
   }, []);
+
+  React.useEffect(() => {
+    if (childrenReady) persistAttendance(statuses);
+  }, [statuses, childrenReady]);
 
   // keep i18n + global lang in sync BEFORE children render
   window.__lang = lang;
@@ -2702,7 +2740,7 @@ function App() {
   const actions = {
     setStatus: (id, st) => setStatuses(m => ({ ...m, [id]: st })),
     markAllPresent: (ids) => setStatuses(m => { const n = { ...m }; ids.forEach(i => n[i] = 'present'); return n; }),
-    saveStatuses: (map) => setStatuses(() => ({ ...map })),
+    saveStatuses: (map) => { setStatuses(() => ({ ...map })); window.saveAttendance(todayStr(), map).catch(() => {}); },
     markAllRead:  () => setFeed(f => f.map(x => ({ ...x, unread: false }))),
     markOneRead:  (id) => setFeed(f => f.map(x => x.id === id ? { ...x, unread: false } : x)),
     deletePost:   (id) => setFeed(f => f.filter(x => x.id !== id)),
