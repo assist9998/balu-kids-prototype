@@ -139,7 +139,7 @@
     // ── attendance ─────────────────────────────────────────────
     markDay:      { ru: 'Отметить день',     en: 'Mark the day' },
     present:      { ru: 'В саду',            en: 'Present' },
-    absent:       { ru: 'Отсутствует',       en: 'Absent' },
+    absent:       { ru: 'Дома',              en: 'Away' },
     late:         { ru: 'Опоздал',           en: 'Late' },
     checkedAt:    { ru: 'Пришёл в',          en: 'Checked in' },
     markAll:      { ru: 'Все в саду',        en: 'All present' },
@@ -1162,75 +1162,43 @@ Object.assign(window, {
 
 function clsx() { return Array.prototype.filter.call(arguments, Boolean).join(' '); }
 
-// ── pastel avatar bubble ───────────────────────────────────────
-function AdaptBadge() {
-  return <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 999,
-    background: '#FBE0C0', color: '#7A3D00', marginLeft: 6, verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
-    {L('Адаптация', 'Adaptation')}
-  </span>;
-}
-
-function ParacetamolBadge() {
-  return <span title={L('Нельзя парацетамол', 'No paracetamol')}
-    style={{ fontSize: 13, marginLeft: 6, verticalAlign: 'middle' }}>💊🚫</span>;
-}
-
-function PhotoConsentBadge() {
-  return <span title={L('Не снимать', 'Do not photograph')}
-    style={{ fontSize: 13, marginLeft: 4, verticalAlign: 'middle' }}>📸🚫</span>;
-}
-
-function KidBadges({ kid }) {
-  return (
-    <>
-      {kid.adaptation && <AdaptBadge />}
-      {kid.paracetamol === 'no' && <ParacetamolBadge />}
-      {kid.photoConsent === 'no' && <PhotoConsentBadge />}
-    </>
-  );
-}
-
 // "Scout badge" style — bigger circular icon + label, for the child's hero card.
-function ScoutBadge({ emoji, text, dot, label, tone, bg, ink }) {
-  const base = tone === 'warn'
-    ? { bg: '#FEF0EA', ink: '#9C3A1F' }
-    : tone === 'amenity'
-    ? { bg: '#E3F5EC', ink: '#1F6B4A' }
-    : { bg: '#FBE7C8', ink: '#7A3D00' };
+// Reused at compact size (see `careBadges`) for the group list and attendance roster.
+const BADGE_TONES = {
+  warn:    { bg: '#FBD9E1', ink: '#9C3A1F' },
+  ok:      { bg: '#D4F0DF', ink: '#1F6B4A' },
+  info:    { bg: '#CDE8FB', ink: '#1F5F86' },
+  amenity: { bg: '#FBE0C0', ink: '#7A3D00' },
+  special: { bg: '#E8D5FB', ink: '#6B3FA0' },
+  emerald: { bg: '#C7F0DD', ink: '#0E7C54' },
+  halal:   { bg: '#7FE3B4', ink: '#06492E' },
+  neutral: { bg: '#E7E1D9', ink: '#6B5C4A' },
+};
+
+function ScoutBadge({ emoji, text, dot, label, tone, bg, ink, compact }) {
+  const base = BADGE_TONES[tone] || BADGE_TONES.amenity;
   const palette = { bg: bg || base.bg, ink: ink || base.ink };
   return (
     <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap',
-      padding: '7px 13px 7px 10px', borderRadius: 999,
-      background: palette.bg, color: palette.ink, fontSize: 13, fontWeight: 700,
+      display: 'inline-flex', alignItems: 'center', gap: compact ? 3 : 6, whiteSpace: 'nowrap',
+      padding: compact ? '2px 7px 2px 5px' : '7px 13px 7px 10px', borderRadius: 999, border: `1px solid ${palette.ink}33`,
+      background: palette.bg, color: palette.ink, fontSize: compact ? 9.5 : 13, fontWeight: 700,
     }}>
       {dot
-        ? <span style={{ width: 8, height: 8, borderRadius: '50%', background: dot, flexShrink: 0 }} />
-        : <span style={{ fontSize: text ? 11 : 15, fontWeight: text ? 800 : 400 }}>{text || emoji}</span>}
+        ? <span style={{ width: compact ? 5 : 8, height: compact ? 5 : 8, borderRadius: '50%', background: dot, flexShrink: 0 }} />
+        : <span style={{ fontSize: text ? (compact ? 8 : 11) : (compact ? 10 : 15), fontWeight: text ? 800 : 400 }}>{text || emoji}</span>}
       {label}
     </span>
   );
 }
 
-function chunk3(items) {
-  const rows = [];
-  for (let i = 0; i < items.length; i += 3) rows.push(items.slice(i, i + 3));
-  return rows;
-}
-
-function centerInsert(arr, item) {
-  const i = Math.floor(arr.length / 2);
-  return [...arr.slice(0, i), item, ...arr.slice(i)];
-}
-
 function allergyEmoji(text) {
   const s = text.toLowerCase();
-  if (s.includes('halal')) return '🍽️';
   if (s.includes('pork') || s.includes('pig')) return '🐖🚫';
   if (s.includes('gluten') || s.includes('wheat')) return '🌾🚫';
   if (s.includes('milk') || s.includes('dairy') || s.includes('lactose')) return '🥛🚫';
   if (s.includes('peanut') || s.includes('nut')) return '🥜';
-  if (s.includes('grapefruit') || s.includes('citrus') || s.includes('orange')) return '🍊';
+  if (s.includes('grapefruit') || s.includes('citrus') || s.includes('orange')) return '🍊🚫';
   if (s.includes('egg')) return '🥚';
   if (s.includes('fish') || s.includes('seafood') || s.includes('shellfish')) return '🐟';
   if (s.includes('soy')) return '🌱';
@@ -1241,54 +1209,41 @@ function allergyEmoji(text) {
   return '⚠️';
 }
 
+function careBadges(kid, { includeMeals = true } = {}) {
+  const badges = [];
+  if (kid.allergyEn) kid.allergyEn.split(/[,./]+/).map(a => a.trim()).filter(Boolean)
+    .forEach(a => {
+      if (a.toLowerCase().includes('halal')) { badges.push({ text: 'HALAL', label: 'Meals', tone: 'halal' }); return; }
+      const withNo = a.toLowerCase().startsWith('no ') ? a : `No ${a}`;
+      const label = withNo.charAt(0).toUpperCase() + withNo.slice(1);
+      badges.push({ emoji: allergyEmoji(a), label, tone: 'warn' });
+    });
+  if (kid.paracetamol === 'no') badges.push({ emoji: '💊🚫', label: 'No paracetamol', tone: 'warn' });
+  if (kid.photoConsent === 'no') badges.push({ emoji: '📸🚫', label: 'No photos', tone: 'warn' });
+  if (kid.adaptation) badges.push({ emoji: '🌱', label: 'Adaptation', tone: 'special' });
+  if (includeMeals && kid.mealsIncluded) badges.push(kid.mealsHalal
+    ? { text: 'HALAL', label: 'Meals', tone: 'halal' }
+    : { emoji: '🍽️', label: 'Meals', tone: 'emerald' });
+  return badges;
+}
+
 function ScoutBadgeRow({ kid, grp, status }) {
   const group = grp ? { emoji: grp.emoji, label: Lo(grp), bg: grp.color, ink: grp.ink } : null;
   const petals = [];
   if (status) petals.push(status === 'present'
-    ? { dot: 'var(--ok)', label: t('present'), tone: 'amenity' }
-    : { dot: 'var(--no)', label: t('absent'), tone: 'warn' });
-  if (kid.allergyEn) kid.allergyEn.split(/[,./]+/).map(a => a.trim()).filter(Boolean)
-    .forEach(a => petals.push({ emoji: allergyEmoji(a), label: a, tone: 'warn' }));
-  if (kid.paracetamol === 'no') petals.push({ emoji: '💊🚫', label: L('Без парацетамола', 'No paracetamol'), tone: 'warn' });
-  if (kid.photoConsent === 'no') petals.push({ emoji: '📸🚫', label: L('Не снимать', 'No photos'), tone: 'warn' });
-  if (kid.adaptation) petals.push({ emoji: '🌱', label: L('Адаптация', 'Adaptation'), tone: 'info' });
-  if (kid.mealsIncluded) petals.push(kid.mealsHalal
-    ? { text: 'HALAL', label: L('Питание', 'Meals'), tone: 'amenity' }
-    : { emoji: '🍽️', label: L('Питание', 'Meals'), tone: 'amenity' });
-  if (kid.napTime) petals.push({ emoji: '😴', label: L('Сон', 'Nap time'), tone: 'amenity' });
-  if (kid.afterSchool) petals.push({ emoji: '🏫', label: L('После школы', 'After school'), tone: 'amenity' });
-  if (!group && !petals.length) return null;
+    ? { dot: 'var(--ok)', label: t('present'), tone: 'ok' }
+    : { dot: 'var(--ink-faint)', label: t('absent'), tone: 'neutral' });
+  if (kid.contract === 'tourist') petals.push({ emoji: '🧳', label: 'Tourist', tone: 'info' });
+  if (kid.contract && kid.contract !== 'tourist') petals.push({ emoji: '🏠', label: 'Long term', tone: 'ok' });
+  petals.push(...careBadges(kid));
+  if (kid.napTime) petals.push({ emoji: '😴', label: 'Nap time', tone: 'info' });
+  if (kid.afterSchool) petals.push({ emoji: '🏫', label: 'After school', tone: 'amenity' });
+  const all = group ? [group, ...petals] : petals;
+  if (!all.length) return null;
 
-  const n = petals.length;
-  let rows = [];
-  if (!group) {
-    rows = chunk3(petals);
-  } else {
-    const top = Math.min(Math.max(n - 2, 0), 3);
-    const topRow = petals.slice(0, top);
-    const bottomPetals = petals.slice(top);
-    if (bottomPetals.length + 1 <= 3) {
-      // room for group in the same row as the rest, centered
-      if (topRow.length) rows.push(topRow);
-      rows.push(centerInsert(bottomPetals, group));
-    } else {
-      // group gets its own centered row, sandwiched between petal rows
-      if (topRow.length) rows.push(topRow);
-      rows.push([group]);
-      rows.push(...chunk3(bottomPetals));
-    }
-  }
-
-  const totalCount = petals.length + (group ? 1 : 0);
-  const stagger = totalCount % 2 === 1;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, margin: '14px 0 4px' }}>
-      {rows.map((row, ri) => (
-        <div key={ri} style={{ display: 'flex', gap: 8, justifyContent: 'center',
-          transform: stagger && ri % 2 === 1 ? 'translateX(16px)' : 'none' }}>
-          {row.map((b, bi) => <ScoutBadge key={bi} {...b} />)}
-        </div>
-      ))}
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', margin: '14px 0 4px' }}>
+      {all.map((b, bi) => <ScoutBadge key={bi} {...b} />)}
     </div>
   );
 }
@@ -1360,8 +1315,9 @@ function EmojiPickerSheet({ kid, onClose }) {
 }
 
 // ── status: dot, chip ──────────────────────────────────────────
-const STATUS_COLOR = { present: 'var(--ok)', absent: 'var(--no)', late: 'var(--no)' };
+const STATUS_COLOR = { present: 'var(--ok)', absent: '#6B5C4A', late: '#6B5C4A' };
 const STATUS_KEY   = { present: 'present', absent: 'absent', late: 'absent' };
+const STATUS_TONE  = { present: { bg: '#D4F0DF', ink: '#1F6B4A' }, absent: { bg: '#E7E1D9', ink: '#6B5C4A' }, late: { bg: '#E7E1D9', ink: '#6B5C4A' } };
 
 function StatusDot({ status, size = 9 }) {
   return <span style={{ width: size, height: size, borderRadius: '50%', background: STATUS_COLOR[status], display: 'inline-block', flexShrink: 0 }} />;
@@ -1369,15 +1325,15 @@ function StatusDot({ status, size = 9 }) {
 
 function StatusChip({ status, onClick }) {
   const label = t(STATUS_KEY[status]);
-  const c = STATUS_COLOR[status];
+  const tone = STATUS_TONE[status];
   return (
     <button onClick={onClick} className="bk-press" style={{
-      display: 'inline-flex', alignItems: 'center', gap: 6,
-      padding: '6px 11px 6px 9px', borderRadius: 999, border: 'none', cursor: onClick ? 'pointer' : 'default',
-      background: `color-mix(in srgb, ${c} 16%, transparent)`, color: c,
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 64,
+      padding: '6px 11px', borderRadius: 999, border: 'none', cursor: onClick ? 'pointer' : 'default',
+      background: tone.bg, color: tone.ink,
       fontFamily: 'inherit', fontWeight: 700, fontSize: 13, letterSpacing: '-0.01em',
     }}>
-      <StatusDot status={status} size={8} />{label}
+      {label}
     </button>
   );
 }
@@ -1648,17 +1604,19 @@ function GroupScreen({ params, go, statuses }) {
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {kids.map((kid, i) => {
-          const st = statuses[kid.id];
           const PALETTE = ['#FBE7A8','#CDE8FB','#D4F0DF','#FBD9E1','#FBE0C0','#E8D5FB'];
           return (
             <Card key={kid.id} pad={12} onClick={() => go('child', { childId: kid.id })}
               style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2' }}>
               <Avatar emoji={kid.emoji} color={PALETTE[i % PALETTE.length]} size={46} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}<KidBadges kid={kid} /></div>
-                {kid.allergyEn && <div style={{ fontSize: 12.5, color: 'var(--ink-faint)', fontWeight: 600 }}>🥜</div>}
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}</div>
+                {careBadges(kid, { includeMeals: false }).length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 5 }}>
+                    {careBadges(kid, { includeMeals: false }).map((b, bi) => <ScoutBadge key={bi} compact {...b} />)}
+                  </div>
+                )}
               </div>
-              <StatusChip status={st} />
             </Card>
           );
         })}
@@ -1713,11 +1671,14 @@ function ChildScreen({ params, statuses }) {
         </div>
 
         {kid.startDate && (
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 14,
-            background: 'var(--card)', borderRadius: 999, padding: '7px 14px 7px 11px',
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 14,
+            background: 'var(--card)', borderRadius: 16, padding: '9px 12px',
             boxShadow: '0 1px 2px rgba(60,40,20,0.05)' }}>
-            <span style={{ fontSize: 13 }}>📅</span>
-            <span style={{ fontSize: 13.5, color: 'var(--ink)', fontWeight: 700 }}>{t('startDate')}: {kid.startDate}</span>
+            <span style={{ fontSize: 18 }}>📅</span>
+            <div style={{ lineHeight: 1.15 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>{t('startDate')}</div>
+              <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--ink)' }}>{kid.startDate}</div>
+            </div>
           </div>
         )}
 
@@ -1869,8 +1830,8 @@ function AttendanceScreen({ actions }) {
 
       {/* count strip */}
       <div style={{ display: 'flex', gap: 10, padding: '0 20px 8px' }}>
-        <CountStat n={counts.present} label={t('present')} color="var(--ok)" />
-        <CountStat n={counts.absent}  label={t('absent')}  color="var(--no)" />
+        <CountStat n={counts.present} label={t('present')} tone={STATUS_TONE.present} />
+        <CountStat n={counts.absent}  label={t('absent')}  tone={STATUS_TONE.absent} />
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 24px 12px' }}>
@@ -1896,7 +1857,12 @@ function AttendanceScreen({ actions }) {
             <Card key={kid.id} pad={12} style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2' }}>
               <Avatar emoji={kid.emoji} color={PALETTE[kidIndex % PALETTE.length]} size={44} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}<KidBadges kid={kid} /></div>
+                <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}</div>
+                {careBadges(kid, { includeMeals: false }).length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 5 }}>
+                    {careBadges(kid, { includeMeals: false }).map((b, bi) => <ScoutBadge key={bi} compact {...b} />)}
+                  </div>
+                )}
               </div>
               <StatusChip status={st} onClick={() => setStatus(kid.id, CYCLE[st])} />
             </Card>
@@ -1909,11 +1875,11 @@ function AttendanceScreen({ actions }) {
   );
 }
 
-function CountStat({ n, label, color }) {
+function CountStat({ n, label, tone }) {
   return (
-    <div style={{ flex: 1, background: '#FBF7F2', borderRadius: 18, padding: '12px 8px', textAlign: 'center',
+    <div style={{ flex: 1, background: tone.bg, borderRadius: 18, padding: '12px 8px', textAlign: 'center',
       boxShadow: '0 1px 2px rgba(60,40,20,0.04)' }}>
-      <div style={{ fontSize: 26, fontWeight: 800, color, lineHeight: 1, fontFamily: 'var(--font-display)' }}>{n}</div>
+      <div style={{ fontSize: 26, fontWeight: 800, color: tone.ink, lineHeight: 1, fontFamily: 'var(--font-display)' }}>{n}</div>
       <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 700, marginTop: 4 }}>{label}</div>
     </div>
   );
