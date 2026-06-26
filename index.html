@@ -305,6 +305,14 @@ window.API_BASE = "https://rmxois1uv0a24xrbi2dfcfac.95.179.188.141.sslip.io";
     return res.json();
   };
 
+  window.deleteChild = async function (childId) {
+    const res = await fetch(`${window.API_BASE}/children/${encodeURIComponent(childId)}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error(`DELETE /children failed: ${res.status}`);
+    return res.json();
+  };
+
   window.setChildEmoji = async function (childId, emoji) {
     const res = await fetch(`${window.API_BASE}/children/${encodeURIComponent(childId)}/emoji`, {
       method: 'PUT',
@@ -1714,6 +1722,8 @@ function ChildScreen({ params, statuses, back }) {
   const [, forceUpdate] = React.useState(0);
   const [pickerOpen, setPickerOpen] = React.useState(false);
   const [editOpen, setEditOpen] = React.useState(false);
+  const [deleteConfirm, setDeleteConfirm] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
   const kid = DATA.CHILDREN.find(k => k.id === params.childId);
   const grp = DATA.GROUPS.find(g => g.id === kid.group);
   const st = statuses[kid.id];
@@ -1726,16 +1736,21 @@ function ChildScreen({ params, statuses, back }) {
   return (
     <div style={{ padding: '4px 20px 30px' }}>
       {/* hero */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, margin: '4px 0 22px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, margin: '4px 0 22px' }}>
         <Avatar emoji={kid.emoji} color={kidColor} size={92} onClick={() => setPickerOpen(true)} />
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{Lo(kid)}</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>
+            {Lo(kid)}
+            <span onClick={() => setEditOpen(true)} style={{ marginLeft: 6, fontSize: 16, cursor: 'pointer', opacity: 0.55, userSelect: 'none' }}>✏️</span>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
           <button onClick={() => setEditOpen(true)} className="bk-press" style={{
-            marginTop: 7, border: 'none', background: '#EDE8E0', cursor: 'pointer',
-            borderRadius: 999, padding: '5px 14px', fontFamily: 'inherit',
-            fontSize: 12.5, fontWeight: 700, color: '#B07848' }}>
-            ✏️ {L('Изменить', 'Edit')}
-          </button>
+            border: 'none', cursor: 'pointer', background: '#EDE8E0',
+            borderRadius: 999, padding: '5px 12px', fontFamily: 'inherit', fontSize: 14 }}>✏️</button>
+          <button onClick={() => setDeleteConfirm(true)} className="bk-press" style={{
+            border: 'none', cursor: 'pointer', background: '#EDE8E0',
+            borderRadius: 999, padding: '5px 12px', fontFamily: 'inherit', fontSize: 14 }}>🗑️</button>
         </div>
         <ScoutBadgeRow kid={kid} grp={grp} status={st} />
       </div>
@@ -1754,6 +1769,48 @@ function ChildScreen({ params, statuses, back }) {
               forceUpdate(n => n + 1);
             }
           }} />
+      )}
+
+      {deleteConfirm && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+          onClick={() => setDeleteConfirm(false)}>
+          <div style={{ background: 'var(--bg)', borderRadius: 24, padding: 24, width: '100%', maxWidth: 320 }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)', marginBottom: 8 }}>
+              {L(`Удалить ${kid.id.split(' ')[0]}?`, `Delete ${kid.id.split(' ')[0]}?`)}
+            </div>
+            <div style={{ fontSize: 14, color: 'var(--ink-soft)', lineHeight: 1.45, marginBottom: 22 }}>
+              {L('Ребёнок будет удалён из таблицы. Это действие нельзя отменить.', 'The child will be removed from the spreadsheet. This cannot be undone.')}
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setDeleteConfirm(false)} className="bk-press" style={{
+                flex: 1, border: 'none', cursor: 'pointer', background: '#EDE8E0',
+                borderRadius: 14, padding: 13, fontFamily: 'var(--font-display)',
+                fontSize: 15, fontWeight: 800, color: 'var(--ink-soft)' }}>
+                {L('Отмена', 'Cancel')}
+              </button>
+              <button onClick={async () => {
+                setDeleting(true);
+                try {
+                  await window.deleteChild(kid.id);
+                  await window.loadChildren();
+                  back();
+                } catch(e) {
+                  setDeleting(false);
+                  setDeleteConfirm(false);
+                  alert(e.message);
+                }
+              }} disabled={deleting} className="bk-press" style={{
+                flex: 1, border: 'none', cursor: deleting ? 'default' : 'pointer',
+                background: '#E05555', borderRadius: 14, padding: 13,
+                fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 800,
+                color: '#fff', opacity: deleting ? 0.7 : 1 }}>
+                {deleting ? '…' : L('Удалить', 'Delete')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* child info + contacts + address — hero plate, same style as home greeting card */}
@@ -1925,6 +1982,52 @@ const _FINP = {
   color: 'var(--ink)', fontWeight: 600, outline: 'none',
 };
 
+const ALLERGENS = [
+  { id: 'nuts',      en: 'Nuts',      ru: 'Орехи' },
+  { id: 'dairy',     en: 'Dairy',     ru: 'Молоко' },
+  { id: 'eggs',      en: 'Eggs',      ru: 'Яйца' },
+  { id: 'gluten',    en: 'Gluten',    ru: 'Глютен' },
+  { id: 'soy',       en: 'Soy',       ru: 'Соя' },
+  { id: 'fish',      en: 'Fish',      ru: 'Рыба' },
+  { id: 'shellfish', en: 'Shellfish', ru: 'Моллюски' },
+  { id: 'sesame',    en: 'Sesame',    ru: 'Кунжут' },
+];
+
+function parseAllergens(str) {
+  const s = str || '';
+  const found = ALLERGENS.filter(a =>
+    new RegExp('\\b' + a.en + '\\b', 'i').test(s) ||
+    new RegExp('\\b' + a.ru + '\\b', 'i').test(s)
+  ).map(a => a.id);
+  let note = s;
+  for (const a of ALLERGENS.filter(x => found.includes(x.id))) {
+    note = note.replace(new RegExp(',?\\s*' + a.en + '\\s*,?', 'gi'), ',');
+    note = note.replace(new RegExp(',?\\s*' + a.ru + '\\s*,?', 'gi'), ',');
+  }
+  note = note.replace(/^[,\s]+|[,\s]+$/g, '').trim();
+  return { allergens: found, allergyNote: note };
+}
+
+function FMultiPills({ value, options, onChange }) {
+  const toggle = id => {
+    const next = value.includes(id) ? value.filter(x => x !== id) : [...value, id];
+    onChange(next);
+  };
+  return (
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      {options.map(o => (
+        <button key={o.id} onClick={() => toggle(o.id)} className="bk-press" style={{
+          border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 700,
+          padding: '7px 14px', borderRadius: 999,
+          background: value.includes(o.id) ? '#B07848' : '#EDE8E0',
+          color: value.includes(o.id) ? '#fff' : 'var(--ink-soft)', transition: 'all 0.15s' }}>
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function ChildFormSheet({ kid, onClose, onSaved }) {
   const isEdit = !!kid;
 
@@ -1932,11 +2035,13 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
     if (!kid) return {
       firstName: '', lastName: '', group: 'big', contractType: 'longterm',
       birthday: '', startDate: '', dayType: '', price: '',
-      allergies: '', paracetamol: '', photoConsent: '', adaptation: false,
+      allergens: [], allergyNote: '',
+      paracetamol: '', photoConsent: '', adaptation: false,
       mealsIncluded: '', napTime: false, afterSchool: false,
       parent1Name: '', parent1Phone: '', parent2Name: '', parent2Phone: '', address: '',
     };
     const parts = (kid.id || '').split(' ');
+    const { allergens, allergyNote } = parseAllergens(kid.allergyEn || '');
     return {
       firstName: parts[0] || '',
       lastName: parts.slice(1).join(' ') || '',
@@ -1946,7 +2051,8 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
       startDate: kid.startDate || '',
       dayType: kid.dayType || '',
       price: kid.price || '',
-      allergies: kid.allergyEn || '',
+      allergens,
+      allergyNote,
       paracetamol: kid.paracetamol === true ? 'yes' : '',
       photoConsent: kid.photoConsent === true ? 'yes' : '',
       adaptation: !!kid.adaptation,
@@ -1971,7 +2077,12 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
     if (!fn && !ln) { setError(L('Введите имя', 'Enter name')); return; }
     setSaving(true); setError(null);
     try {
-      const payload = { ...form, firstName: fn, lastName: ln };
+      const allergyStr = [
+        ...ALLERGENS.filter(a => form.allergens.includes(a.id)).map(a => a.en),
+        ...(form.allergyNote ? [form.allergyNote] : []),
+      ].join(', ');
+      const { allergens: _a, allergyNote: _n, ...rest } = form;
+      const payload = { ...rest, firstName: fn, lastName: ln, allergies: allergyStr };
       let newId;
       if (isEdit) {
         await window.updateChild(kid.id, payload);
@@ -2059,19 +2170,17 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
           </div>
 
           <div style={SEC}>{L('Оплата', 'Payment')}</div>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <div style={{ flex: 1 }}>
-              <FRow label={L('Тип дня', 'Day type')}>
-                <input style={_FINP} value={form.dayType}
-                  onChange={e => set('dayType')(e.target.value)} placeholder="Full day" />
-              </FRow>
-            </div>
-            <div style={{ flex: 1 }}>
-              <FRow label={L('Цена', 'Price')}>
-                <input style={_FINP} type="number" value={form.price}
-                  onChange={e => set('price')(e.target.value)} placeholder="0" />
-              </FRow>
-            </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <FRow label={L('Тип дня', 'Day type')}>
+              <FPills value={form.dayType} onChange={set('dayType')} options={[
+                { id: 'Full day',  label: L('Полный день', 'Full day') },
+                { id: 'Half day',  label: L('Полдня', 'Half day') },
+              ]} />
+            </FRow>
+            <FRow label={L('Цена', 'Price')}>
+              <input style={{ ..._FINP, maxWidth: 160 }} type="number" value={form.price}
+                onChange={e => set('price')(e.target.value)} placeholder="0" />
+            </FRow>
           </div>
 
           <div style={SEC}>{L('Уход', 'Care')}</div>
@@ -2091,9 +2200,15 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
 
           <div style={SEC}>{L('Здоровье', 'Health')}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <FRow label={L('Аллергии / заметки', 'Allergies / notes')}>
-              <textarea style={{ ..._FINP, resize: 'none' }} rows={2} value={form.allergies}
-                onChange={e => set('allergies')(e.target.value)} placeholder="Nuts, Dairy…" />
+            <FRow label={L('Аллергены', 'Allergens')}>
+              <FMultiPills
+                value={form.allergens}
+                options={ALLERGENS.map(a => ({ id: a.id, label: window.LANG === 'en' ? a.en : a.ru }))}
+                onChange={set('allergens')} />
+            </FRow>
+            <FRow label={L('Заметки', 'Notes')}>
+              <input style={_FINP} value={form.allergyNote}
+                onChange={e => set('allergyNote')(e.target.value)} placeholder={L('Другое…', 'Other…')} />
             </FRow>
             <FRow label={L('Парацетамол', 'Paracetamol')}>
               <FPills value={form.paracetamol} onChange={set('paracetamol')} options={[
