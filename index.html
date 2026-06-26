@@ -1296,7 +1296,7 @@ function careBadges(kid, { includeMeals = true } = {}) {
   return badges;
 }
 
-function ScoutBadgeRow({ kid, grp, status }) {
+function ScoutBadgeRow({ kid, grp, status, onEdit, onDelete }) {
   const group = grp ? { emoji: grp.emoji, label: Lo(grp), bg: grp.color, ink: grp.ink } : null;
   const petals = [];
   if (status) petals.push(status === 'present'
@@ -1309,11 +1309,19 @@ function ScoutBadgeRow({ kid, grp, status }) {
   if (kid.napTime) petals.push({ emoji: '😴', label: 'Nap time', tone: 'info' });
   if (kid.afterSchool) petals.push({ emoji: '🏫', label: 'After school', tone: 'amenity' });
   const all = group ? [group, ...petals] : petals;
-  if (!all.length) return null;
+
+  const actionStyle = {
+    display: 'inline-flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap',
+    padding: '7px 12px', borderRadius: 999, border: '1px solid rgba(107,92,74,0.2)',
+    background: '#E7E1D9', color: '#6B5C4A', fontSize: 13, fontWeight: 700,
+    fontFamily: 'inherit', cursor: 'pointer',
+  };
 
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', margin: '14px 0 4px' }}>
       {all.map((b, bi) => <ScoutBadge key={bi} {...b} />)}
+      {onEdit && <button onClick={onEdit} className="bk-press" style={actionStyle}>✏️</button>}
+      {onDelete && <button onClick={onDelete} className="bk-press" style={actionStyle}>🗑️</button>}
     </div>
   );
 }
@@ -1741,18 +1749,12 @@ function ChildScreen({ params, statuses, back }) {
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>
             {Lo(kid)}
-            <span onClick={() => setEditOpen(true)} style={{ marginLeft: 6, fontSize: 16, cursor: 'pointer', opacity: 0.55, userSelect: 'none' }}>✏️</span>
+            <span onClick={() => setEditOpen(true)} style={{ marginLeft: 6, fontSize: 16, cursor: 'pointer', opacity: 0.5, userSelect: 'none' }}>✏️</span>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <button onClick={() => setEditOpen(true)} className="bk-press" style={{
-            border: 'none', cursor: 'pointer', background: '#EDE8E0',
-            borderRadius: 999, padding: '5px 12px', fontFamily: 'inherit', fontSize: 14 }}>✏️</button>
-          <button onClick={() => setDeleteConfirm(true)} className="bk-press" style={{
-            border: 'none', cursor: 'pointer', background: '#EDE8E0',
-            borderRadius: 999, padding: '5px 12px', fontFamily: 'inherit', fontSize: 14 }}>🗑️</button>
-        </div>
-        <ScoutBadgeRow kid={kid} grp={grp} status={st} />
+        <ScoutBadgeRow kid={kid} grp={grp} status={st}
+          onEdit={() => setEditOpen(true)}
+          onDelete={() => setDeleteConfirm(true)} />
       </div>
 
       {pickerOpen && (
