@@ -285,6 +285,26 @@ window.API_BASE = "https://rmxois1uv0a24xrbi2dfcfac.95.179.188.141.sslip.io";
     return data.role;
   };
 
+  window.updateChild = async function (childId, data) {
+    const res = await fetch(`${window.API_BASE}/children/${encodeURIComponent(childId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error(`PUT /children failed: ${res.status}`);
+    return res.json();
+  };
+
+  window.addChild = async function (data) {
+    const res = await fetch(`${window.API_BASE}/children`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error(`POST /children failed: ${res.status}`);
+    return res.json();
+  };
+
   window.setChildEmoji = async function (childId, emoji) {
     const res = await fetch(`${window.API_BASE}/children/${encodeURIComponent(childId)}/emoji`, {
       method: 'PUT',
@@ -1602,6 +1622,7 @@ function HomeList({ tiles, go }) {
 //  CHILDREN → groups
 // ════════════════════════════════════════════════════════════════
 function ChildrenScreen({ go, statuses }) {
+  const [addOpen, setAddOpen] = React.useState(false);
   return (
     <div style={{ padding: '4px 20px 28px' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -1625,6 +1646,25 @@ function ChildrenScreen({ go, statuses }) {
           );
         })}
       </div>
+
+      {/* Add child FAB */}
+      <div style={{ position: 'sticky', bottom: 18, display: 'flex', justifyContent: 'flex-end',
+        marginTop: 18, pointerEvents: 'none' }}>
+        <button onClick={() => setAddOpen(true)} className="bk-press" style={{
+          pointerEvents: 'auto', height: 52, paddingInline: 20, borderRadius: 999, border: 'none',
+          cursor: 'pointer', background: '#B07848', color: '#fff',
+          fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 15,
+          display: 'flex', alignItems: 'center', gap: 8,
+          boxShadow: '0 12px 26px -8px #B07848' }}>
+          <span style={{ fontSize: 20, lineHeight: 1, fontWeight: 400 }}>+</span>
+          {L('Добавить', 'Add child')}
+        </button>
+      </div>
+
+      {addOpen && (
+        <ChildFormSheet kid={null} onClose={() => setAddOpen(false)}
+          onSaved={newId => { setAddOpen(false); go('child', { childId: newId }); }} />
+      )}
     </div>
   );
 }
@@ -1670,9 +1710,10 @@ function GroupScreen({ params, go, statuses }) {
 // ════════════════════════════════════════════════════════════════
 //  CHILD PROFILE
 // ════════════════════════════════════════════════════════════════
-function ChildScreen({ params, statuses }) {
+function ChildScreen({ params, statuses, back }) {
   const [, forceUpdate] = React.useState(0);
   const [pickerOpen, setPickerOpen] = React.useState(false);
+  const [editOpen, setEditOpen] = React.useState(false);
   const kid = DATA.CHILDREN.find(k => k.id === params.childId);
   const grp = DATA.GROUPS.find(g => g.id === kid.group);
   const st = statuses[kid.id];
@@ -1689,12 +1730,30 @@ function ChildScreen({ params, statuses }) {
         <Avatar emoji={kid.emoji} color={kidColor} size={92} onClick={() => setPickerOpen(true)} />
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{Lo(kid)}</div>
+          <button onClick={() => setEditOpen(true)} className="bk-press" style={{
+            marginTop: 7, border: 'none', background: '#EDE8E0', cursor: 'pointer',
+            borderRadius: 999, padding: '5px 14px', fontFamily: 'inherit',
+            fontSize: 12.5, fontWeight: 700, color: '#B07848' }}>
+            ✏️ {L('Изменить', 'Edit')}
+          </button>
         </div>
         <ScoutBadgeRow kid={kid} grp={grp} status={st} />
       </div>
 
       {pickerOpen && (
         <EmojiPickerSheet kid={kid} onClose={() => { setPickerOpen(false); forceUpdate(n => n + 1); }} />
+      )}
+
+      {editOpen && (
+        <ChildFormSheet kid={kid} onClose={() => setEditOpen(false)}
+          onSaved={newId => {
+            if (newId !== kid.id) {
+              back();
+            } else {
+              setEditOpen(false);
+              forceUpdate(n => n + 1);
+            }
+          }} />
       )}
 
       {/* child info + contacts + address — hero plate, same style as home greeting card */}
@@ -1807,6 +1866,308 @@ function ChildScreen({ params, statuses }) {
   );
 }
 
+// ════════════════════════════════════════════════════════════════
+//  CHILD FORM — shared by edit (ChildScreen) and add (ChildrenScreen)
+// ════════════════════════════════════════════════════════════════
+
+function FRow({ label, hint, children }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+      <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        {label}{hint && <span style={{ fontWeight: 500, textTransform: 'none', letterSpacing: 0, marginLeft: 4 }}>{hint}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function FHRow({ label, children }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 36 }}>
+      <div style={{ fontSize: 14.5, fontWeight: 600, color: 'var(--ink)' }}>{label}</div>
+      {children}
+    </div>
+  );
+}
+
+function FToggle({ value, onChange }) {
+  return (
+    <button onClick={() => onChange(!value)} className="bk-press" style={{
+      border: 'none', cursor: 'pointer', width: 46, height: 26, borderRadius: 13, flexShrink: 0,
+      background: value ? '#B07848' : '#D8D0C6', position: 'relative', transition: 'background 0.2s',
+    }}>
+      <div style={{ position: 'absolute', top: 3, left: value ? 23 : 3, width: 20, height: 20,
+        borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.22)',
+        transition: 'left 0.18s' }} />
+    </button>
+  );
+}
+
+function FPills({ value, options, onChange }) {
+  return (
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      {options.map(o => (
+        <button key={o.id} onClick={() => onChange(o.id)} className="bk-press" style={{
+          border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 700,
+          padding: '7px 14px', borderRadius: 999,
+          background: value === o.id ? '#B07848' : '#EDE8E0',
+          color: value === o.id ? '#fff' : 'var(--ink-soft)', transition: 'all 0.15s' }}>
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+const _FINP = {
+  boxSizing: 'border-box', width: '100%', border: 'none', background: '#EDE8E0',
+  borderRadius: 12, padding: '10px 12px', fontFamily: 'inherit', fontSize: 15,
+  color: 'var(--ink)', fontWeight: 600, outline: 'none',
+};
+
+function ChildFormSheet({ kid, onClose, onSaved }) {
+  const isEdit = !!kid;
+
+  const [form, setForm] = React.useState(() => {
+    if (!kid) return {
+      firstName: '', lastName: '', group: 'big', contractType: 'longterm',
+      birthday: '', startDate: '', dayType: '', price: '',
+      allergies: '', paracetamol: '', photoConsent: '', adaptation: false,
+      mealsIncluded: '', napTime: false, afterSchool: false,
+      parent1Name: '', parent1Phone: '', parent2Name: '', parent2Phone: '', address: '',
+    };
+    const parts = (kid.id || '').split(' ');
+    return {
+      firstName: parts[0] || '',
+      lastName: parts.slice(1).join(' ') || '',
+      group: kid.group || 'big',
+      contractType: kid.contract || 'longterm',
+      birthday: kid.dob || '',
+      startDate: kid.startDate || '',
+      dayType: kid.dayType || '',
+      price: kid.price || '',
+      allergies: kid.allergyEn || '',
+      paracetamol: kid.paracetamol || '',
+      photoConsent: kid.photoConsent || '',
+      adaptation: !!kid.adaptation,
+      mealsIncluded: kid.mealsHalal ? 'halal' : kid.mealsIncluded ? 'yes' : '',
+      napTime: !!kid.napTime,
+      afterSchool: !!kid.afterSchool,
+      parent1Name: kid.parent1Name || '',
+      parent1Phone: kid.parent1Phone || '',
+      parent2Name: kid.parent2Name || '',
+      parent2Phone: kid.parent2Phone || '',
+      address: kid.address || '',
+    };
+  });
+
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState(null);
+
+  function set(field) { return val => setForm(f => ({ ...f, [field]: val })); }
+
+  async function handleSave() {
+    const fn = form.firstName.trim(), ln = form.lastName.trim();
+    if (!fn && !ln) { setError(L('Введите имя', 'Enter name')); return; }
+    setSaving(true); setError(null);
+    try {
+      const payload = { ...form, firstName: fn, lastName: ln };
+      let newId;
+      if (isEdit) {
+        await window.updateChild(kid.id, payload);
+        newId = [fn, ln].filter(Boolean).join(' ');
+      } else {
+        const res = await window.addChild(payload);
+        newId = res.id;
+      }
+      await window.loadChildren();
+      onSaved(newId);
+    } catch(e) {
+      setError(e.message);
+      setSaving(false);
+    }
+  }
+
+  const SEC = { fontSize: 10.5, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+    color: 'var(--ink-soft)', padding: '20px 0 8px' };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'flex-end',
+      background: 'rgba(0,0,0,0.4)' }} onClick={onClose}>
+      <div style={{ width: '100%', background: 'var(--bg)', borderRadius: '24px 24px 0 0',
+        maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}
+        onClick={e => e.stopPropagation()}>
+
+        {/* Handle + title */}
+        <div style={{ flexShrink: 0, padding: '12px 20px 12px',
+          borderBottom: '1px solid rgba(60,40,20,0.07)' }}>
+          <div style={{ width: 40, height: 4, background: 'rgba(60,40,20,0.15)', borderRadius: 2, margin: '0 auto 12px' }} />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>
+              {isEdit ? L('Редактировать', 'Edit child') : L('Новый ребёнок', 'Add child')}
+            </div>
+            <button onClick={onClose} style={{ border: 'none', background: 'none', fontSize: 24,
+              cursor: 'pointer', color: 'var(--ink-faint)', lineHeight: 1, padding: 4 }}>×</button>
+          </div>
+        </div>
+
+        {/* Scrollable fields */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px 8px' }}>
+
+          <div style={SEC}>{L('Основное', 'Basic')}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <FRow label={L('Имя', 'First name')}>
+                  <input style={_FINP} value={form.firstName}
+                    onChange={e => set('firstName')(e.target.value)} placeholder="Имя" />
+                </FRow>
+              </div>
+              <div style={{ flex: 1 }}>
+                <FRow label={L('Фамилия', 'Last name')}>
+                  <input style={_FINP} value={form.lastName}
+                    onChange={e => set('lastName')(e.target.value)} placeholder="Фамилия" />
+                </FRow>
+              </div>
+            </div>
+            <FRow label={L('Группа', 'Group')}>
+              <FPills value={form.group} onChange={set('group')} options={[
+                { id: 'toddler', label: 'Toddler' }, { id: 'middle', label: 'Middle' },
+                { id: 'big', label: 'Big' }, { id: 'primary', label: 'Primary' },
+              ]} />
+            </FRow>
+            <FRow label={L('Договор', 'Contract')}>
+              <FPills value={form.contractType} onChange={set('contractType')} options={[
+                { id: 'longterm', label: L('Долгосрочный', 'Long-term') },
+                { id: 'tourist', label: L('Турист', 'Tourist') },
+              ]} />
+            </FRow>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <FRow label={L('День рождения', 'Birthday')} hint="DD.MM.YYYY">
+                  <input style={_FINP} value={form.birthday}
+                    onChange={e => set('birthday')(e.target.value)} placeholder="01.01.2020" />
+                </FRow>
+              </div>
+              <div style={{ flex: 1 }}>
+                <FRow label={L('Начало', 'Start date')}>
+                  <input style={_FINP} value={form.startDate}
+                    onChange={e => set('startDate')(e.target.value)} placeholder="01.06.2025" />
+                </FRow>
+              </div>
+            </div>
+          </div>
+
+          <div style={SEC}>{L('Оплата', 'Payment')}</div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <FRow label={L('Тип дня', 'Day type')}>
+                <input style={_FINP} value={form.dayType}
+                  onChange={e => set('dayType')(e.target.value)} placeholder="Full day" />
+              </FRow>
+            </div>
+            <div style={{ flex: 1 }}>
+              <FRow label={L('Цена', 'Price')}>
+                <input style={_FINP} type="number" value={form.price}
+                  onChange={e => set('price')(e.target.value)} placeholder="0" />
+              </FRow>
+            </div>
+          </div>
+
+          <div style={SEC}>{L('Уход', 'Care')}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <FRow label={L('Питание', 'Meals')}>
+              <FPills value={form.mealsIncluded} onChange={set('mealsIncluded')} options={[
+                { id: '', label: '—' }, { id: 'yes', label: L('Да', 'Yes') }, { id: 'halal', label: 'Halal' },
+              ]} />
+            </FRow>
+            <FHRow label={L('Тихий час', 'Nap time')}>
+              <FToggle value={form.napTime} onChange={set('napTime')} />
+            </FHRow>
+            <FHRow label={L('После школы', 'After school')}>
+              <FToggle value={form.afterSchool} onChange={set('afterSchool')} />
+            </FHRow>
+          </div>
+
+          <div style={SEC}>{L('Здоровье', 'Health')}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <FRow label={L('Аллергии / заметки', 'Allergies / notes')}>
+              <textarea style={{ ..._FINP, resize: 'none' }} rows={2} value={form.allergies}
+                onChange={e => set('allergies')(e.target.value)} placeholder="Nuts, Dairy…" />
+            </FRow>
+            <FRow label={L('Парацетамол', 'Paracetamol')}>
+              <FPills value={form.paracetamol} onChange={set('paracetamol')} options={[
+                { id: '', label: '—' }, { id: 'yes', label: L('Да', 'Yes') }, { id: 'no', label: L('Нет', 'No') },
+              ]} />
+            </FRow>
+            <FRow label={L('Фото', 'Photos')}>
+              <FPills value={form.photoConsent} onChange={set('photoConsent')} options={[
+                { id: '', label: '—' }, { id: 'yes', label: L('Да', 'Yes') }, { id: 'no', label: L('Нет', 'No') },
+              ]} />
+            </FRow>
+            <FHRow label={L('Адаптация', 'Adaptation')}>
+              <FToggle value={form.adaptation} onChange={set('adaptation')} />
+            </FHRow>
+          </div>
+
+          <div style={SEC}>{L('Родители', 'Parents')}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 24 }}>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <FRow label={L('Родитель 1', 'Parent 1')}>
+                  <input style={_FINP} value={form.parent1Name}
+                    onChange={e => set('parent1Name')(e.target.value)} placeholder={L('Имя', 'Name')} />
+                </FRow>
+              </div>
+              <div style={{ flex: 1 }}>
+                <FRow label={L('Телефон 1', 'Phone 1')}>
+                  <input style={_FINP} type="tel" value={form.parent1Phone}
+                    onChange={e => set('parent1Phone')(e.target.value)} placeholder="+7…" />
+                </FRow>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <FRow label={L('Родитель 2', 'Parent 2')}>
+                  <input style={_FINP} value={form.parent2Name}
+                    onChange={e => set('parent2Name')(e.target.value)} placeholder={L('Имя', 'Name')} />
+                </FRow>
+              </div>
+              <div style={{ flex: 1 }}>
+                <FRow label={L('Телефон 2', 'Phone 2')}>
+                  <input style={_FINP} type="tel" value={form.parent2Phone}
+                    onChange={e => set('parent2Phone')(e.target.value)} placeholder="+7…" />
+                </FRow>
+              </div>
+            </div>
+            <FRow label={L('Адрес', 'Address')}>
+              <input style={_FINP} value={form.address}
+                onChange={e => set('address')(e.target.value)} placeholder="…" />
+            </FRow>
+          </div>
+        </div>
+
+        {/* Sticky save */}
+        <div style={{ flexShrink: 0, padding: '10px 20px 28px', background: 'var(--bg)',
+          boxShadow: '0 -4px 16px rgba(60,40,20,0.06)' }}>
+          {error && (
+            <div style={{ textAlign: 'center', color: 'var(--no)', fontSize: 13, fontWeight: 600, marginBottom: 10 }}>
+              {error}
+            </div>
+          )}
+          <button onClick={handleSave} disabled={saving} className="bk-press" style={{
+            width: '100%', border: 'none', cursor: saving ? 'default' : 'pointer',
+            fontFamily: 'var(--font-display)', background: '#B07848', color: '#fff',
+            fontSize: 17, fontWeight: 800, padding: 15, borderRadius: 18,
+            opacity: saving ? 0.7 : 1, boxShadow: '0 10px 24px -8px #B07848' }}>
+            {saving ? L('Сохраняется…', 'Saving…') : L('Сохранить', 'Save')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ageFromDob(dob) {
   const [d, m, y] = dob.split('.').map(Number);
   const now = new Date(2026, 5, 16);
@@ -1815,7 +2176,7 @@ function ageFromDob(dob) {
   return `${a} ${t('years')}`;
 }
 
-Object.assign(window, { HomeScreen, ChildrenScreen, GroupScreen, ChildScreen });
+Object.assign(window, { HomeScreen, ChildrenScreen, GroupScreen, ChildScreen, ChildFormSheet });
 
 </script>
 <script type="text/babel">
@@ -2919,7 +3280,7 @@ function App() {
       case 'home':          return <HomeScreen go={go} statuses={statuses} feed={feed} homeStyle={homeStyle} />;
       case 'children':      return <ChildrenScreen go={go} statuses={statuses} />;
       case 'group':         return <GroupScreen params={p} go={go} statuses={statuses} />;
-      case 'child':         return <ChildScreen params={p} statuses={statuses} />;
+      case 'child':         return <ChildScreen params={p} statuses={statuses} back={back} />;
       case 'attendance':    return <AttendanceScreen statuses={statuses} actions={actions} go={go} />;
       case 'payments':         return <PaymentsScreen go={go} />;
       case 'payments-garden':  return <PaymentsGardenScreen />;
