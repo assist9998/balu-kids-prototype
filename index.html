@@ -1767,7 +1767,7 @@ function ChildScreen({ params, statuses, back }) {
           </div>
           <div style={{ textAlign: 'right', lineHeight: 1.2, flexShrink: 0 }}>
             <div style={{ fontSize: 11.5, color: 'var(--ink-faint)', fontWeight: 700 }}>{t('birthday')}</div>
-            <div style={{ fontSize: 14, color: 'var(--ink)', fontWeight: 800 }}><span style={{ fontSize: 12 }}>🎂</span> {kid.dob}</div>
+            <div style={{ fontSize: 14, color: 'var(--ink)', fontWeight: 800 }}><span style={{ fontSize: 12 }}>🎂</span> {kid.dob || '—'}</div>
           </div>
         </div>
 
@@ -1947,8 +1947,8 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
       dayType: kid.dayType || '',
       price: kid.price || '',
       allergies: kid.allergyEn || '',
-      paracetamol: kid.paracetamol || '',
-      photoConsent: kid.photoConsent || '',
+      paracetamol: kid.paracetamol === true ? 'yes' : '',
+      photoConsent: kid.photoConsent === true ? 'yes' : '',
       adaptation: !!kid.adaptation,
       mealsIncluded: kid.mealsHalal ? 'halal' : kid.mealsIncluded ? 'yes' : '',
       napTime: !!kid.napTime,
@@ -2169,8 +2169,10 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
 }
 
 function ageFromDob(dob) {
+  if (!dob) return '—';
   const [d, m, y] = dob.split('.').map(Number);
-  const now = new Date(2026, 5, 16);
+  if (!d || !m || !y || isNaN(d) || isNaN(m) || isNaN(y)) return '—';
+  const now = new Date();
   let a = now.getFullYear() - y;
   if (now.getMonth() + 1 < m || (now.getMonth() + 1 === m && now.getDate() < d)) a--;
   return `${a} ${t('years')}`;
