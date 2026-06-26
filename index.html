@@ -1985,14 +1985,14 @@ const _FINP = {
 };
 
 const ALLERGENS = [
-  { id: 'nuts',      en: 'Nuts',      ru: 'Орехи' },
-  { id: 'dairy',     en: 'Dairy',     ru: 'Молоко' },
-  { id: 'eggs',      en: 'Eggs',      ru: 'Яйца' },
-  { id: 'gluten',    en: 'Gluten',    ru: 'Глютен' },
-  { id: 'soy',       en: 'Soy',       ru: 'Соя' },
-  { id: 'fish',      en: 'Fish',      ru: 'Рыба' },
-  { id: 'shellfish', en: 'Shellfish', ru: 'Моллюски' },
-  { id: 'sesame',    en: 'Sesame',    ru: 'Кунжут' },
+  { id: 'nuts',       en: 'Nuts',       ru: 'Орехи' },
+  { id: 'dairy',      en: 'Dairy',      ru: 'Молоко' },
+  { id: 'eggs',       en: 'Eggs',       ru: 'Яйца' },
+  { id: 'gluten',     en: 'Gluten',     ru: 'Глютен' },
+  { id: 'soy',        en: 'Soy',        ru: 'Соя' },
+  { id: 'fish',       en: 'Fish',       ru: 'Рыба' },
+  { id: 'shellfish',  en: 'Shellfish',  ru: 'Морепродукты' },
+  { id: 'strawberry', en: 'Strawberry', ru: 'Клубника' },
 ];
 
 function parseAllergens(str) {
@@ -2189,7 +2189,7 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <FRow label={L('Питание', 'Meals')}>
               <FPills value={form.mealsIncluded} onChange={set('mealsIncluded')} options={[
-                { id: '', label: '—' }, { id: 'yes', label: L('Да', 'Yes') }, { id: 'halal', label: 'Halal' },
+                { id: '', label: L('Нет', 'No') }, { id: 'yes', label: L('Да', 'Yes') }, { id: 'halal', label: 'Halal' },
               ]} />
             </FRow>
             <FHRow label={L('Тихий час', 'Nap time')}>
@@ -2205,7 +2205,7 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
             <FRow label={L('Аллергены', 'Allergens')}>
               <FMultiPills
                 value={form.allergens}
-                options={ALLERGENS.map(a => ({ id: a.id, label: window.LANG === 'en' ? a.en : a.ru }))}
+                options={ALLERGENS.map(a => ({ id: a.id, label: L(a.ru, a.en) }))}
                 onChange={set('allergens')} />
             </FRow>
             <FRow label={L('Заметки', 'Notes')}>
@@ -2228,39 +2228,30 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
           </div>
 
           <div style={SEC}>{L('Родители', 'Parents')}</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 24 }}>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <div style={{ flex: 1 }}>
-                <FRow label={L('Родитель 1', 'Parent 1')}>
-                  <input style={_FINP} value={form.parent1Name}
-                    onChange={e => set('parent1Name')(e.target.value)} placeholder={L('Имя', 'Name')} />
-                </FRow>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingBottom: 24 }}>
+            {[
+              { chip: L('Родитель 1', 'Parent 1'), name: 'parent1Name', phone: 'parent1Phone' },
+              { chip: L('Родитель 2', 'Parent 2'), name: 'parent2Name', phone: 'parent2Phone' },
+            ].map(p => (
+              <div key={p.name}>
+                <span style={{ display: 'inline-block', marginBottom: 7, background: '#EDE8E0',
+                  borderRadius: 999, padding: '3px 11px', fontSize: 11.5, fontWeight: 700,
+                  color: 'var(--ink-soft)' }}>{p.chip}</span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input style={{ ..._FINP, flex: 1 }} value={form[p.name]}
+                    onChange={e => set(p.name)(e.target.value)} placeholder={L('Имя', 'Name')} />
+                  <input style={{ ..._FINP, flex: 1 }} type="tel" value={form[p.phone]}
+                    onChange={e => set(p.phone)(e.target.value)} placeholder="+7 / phone" />
+                </div>
               </div>
-              <div style={{ flex: 1 }}>
-                <FRow label={L('Телефон 1', 'Phone 1')}>
-                  <input style={_FINP} type="tel" value={form.parent1Phone}
-                    onChange={e => set('parent1Phone')(e.target.value)} placeholder="+7…" />
-                </FRow>
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <div style={{ flex: 1 }}>
-                <FRow label={L('Родитель 2', 'Parent 2')}>
-                  <input style={_FINP} value={form.parent2Name}
-                    onChange={e => set('parent2Name')(e.target.value)} placeholder={L('Имя', 'Name')} />
-                </FRow>
-              </div>
-              <div style={{ flex: 1 }}>
-                <FRow label={L('Телефон 2', 'Phone 2')}>
-                  <input style={_FINP} type="tel" value={form.parent2Phone}
-                    onChange={e => set('parent2Phone')(e.target.value)} placeholder="+7…" />
-                </FRow>
-              </div>
-            </div>
-            <FRow label={L('Адрес', 'Address')}>
+            ))}
+            <div>
+              <span style={{ display: 'inline-block', marginBottom: 7, background: '#EDE8E0',
+                borderRadius: 999, padding: '3px 11px', fontSize: 11.5, fontWeight: 700,
+                color: 'var(--ink-soft)' }}>{L('Адрес', 'Address')}</span>
               <input style={_FINP} value={form.address}
                 onChange={e => set('address')(e.target.value)} placeholder="…" />
-            </FRow>
+            </div>
           </div>
         </div>
 
