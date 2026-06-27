@@ -1747,14 +1747,9 @@ function ChildScreen({ params, statuses, back }) {
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, margin: '4px 0 22px' }}>
         <Avatar emoji={kid.emoji} color={kidColor} size={92} onClick={() => setPickerOpen(true)} />
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>
-            {Lo(kid)}
-            <span onClick={() => setEditOpen(true)} style={{ marginLeft: 6, fontSize: 16, cursor: 'pointer', opacity: 0.5, userSelect: 'none' }}>✏️</span>
-          </div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{Lo(kid)}</div>
         </div>
-        <ScoutBadgeRow kid={kid} grp={grp} status={st}
-          onEdit={() => setEditOpen(true)}
-          onDelete={() => setDeleteConfirm(true)} />
+        <ScoutBadgeRow kid={kid} grp={grp} status={st} />
       </div>
 
       {pickerOpen && (
@@ -1921,6 +1916,22 @@ function ChildScreen({ params, statuses, back }) {
           </Card>
         </React.Fragment>
       )}
+
+      {/* actions */}
+      <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
+        <button onClick={() => setEditOpen(true)} className="bk-press" style={{
+          flex: 1, border: 'none', cursor: 'pointer', background: '#EDE8E0',
+          borderRadius: 16, padding: 14, fontFamily: 'var(--font-display)',
+          fontSize: 15, fontWeight: 800, color: 'var(--ink-soft)' }}>
+          {L('Изменить', 'Edit')}
+        </button>
+        <button onClick={() => setDeleteConfirm(true)} className="bk-press" style={{
+          flex: 1, border: 'none', cursor: 'pointer', background: '#FBE8E8',
+          borderRadius: 16, padding: 14, fontFamily: 'var(--font-display)',
+          fontSize: 15, fontWeight: 800, color: '#C04040' }}>
+          {L('Удалить', 'Delete')}
+        </button>
+      </div>
     </div>
   );
 }
