@@ -1966,7 +1966,7 @@ function FPills({ value, options, onChange }) {
   return (
     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
       {options.map(o => (
-        <button key={o.id} onClick={() => onChange(o.id)} className="bk-press" style={{
+        <button key={o.id} onClick={() => onChange(value === o.id ? '' : o.id)} className="bk-press" style={{
           border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 700,
           padding: '7px 14px', borderRadius: 999,
           background: value === o.id ? '#B07848' : '#EDE8E0',
@@ -2167,7 +2167,7 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
             </FRow>
             <div style={{ display: 'flex', gap: 10 }}>
               <div style={{ flex: 1 }}>
-                <FRow label={L('День рождения', 'Birthday')} hint="DD.MM.YYYY">
+                <FRow label={L('День рождения', 'Birthday')}>
                   <input style={_FINP} value={form.birthday}
                     onChange={e => set('birthday')(e.target.value)} placeholder="01.01.2020" />
                 </FRow>
@@ -2224,12 +2224,12 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
             </FRow>
             <FRow label={L('Парацетамол', 'Paracetamol')}>
               <FPills value={form.paracetamol} onChange={set('paracetamol')} options={[
-                { id: '', label: '—' }, { id: 'yes', label: L('Да', 'Yes') }, { id: 'no', label: L('Нет', 'No') },
+                { id: 'yes', label: L('Да', 'Yes') }, { id: 'no', label: L('Нет', 'No') },
               ]} />
             </FRow>
             <FRow label={L('Фото', 'Photos')}>
               <FPills value={form.photoConsent} onChange={set('photoConsent')} options={[
-                { id: '', label: '—' }, { id: 'yes', label: L('Да', 'Yes') }, { id: 'no', label: L('Нет', 'No') },
+                { id: 'yes', label: L('Да', 'Yes') }, { id: 'no', label: L('Нет', 'No') },
               ]} />
             </FRow>
             <FHRow label={L('Адаптация', 'Adaptation')}>
@@ -2238,30 +2238,22 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
           </div>
 
           <div style={SEC}>{L('Родители', 'Parents')}</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingBottom: 24 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 24 }}>
             {[
-              { chip: L('Родитель 1', 'Parent 1'), name: 'parent1Name', phone: 'parent1Phone' },
-              { chip: L('Родитель 2', 'Parent 2'), name: 'parent2Name', phone: 'parent2Phone' },
+              { name: 'parent1Name', phone: 'parent1Phone' },
+              { name: 'parent2Name', phone: 'parent2Phone' },
             ].map(p => (
-              <div key={p.name}>
-                <span style={{ display: 'inline-block', marginBottom: 7, background: '#EDE8E0',
-                  borderRadius: 999, padding: '3px 11px', fontSize: 11.5, fontWeight: 700,
-                  color: 'var(--ink-soft)' }}>{p.chip}</span>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <input style={{ ..._FINP, flex: 1 }} value={form[p.name]}
-                    onChange={e => set(p.name)(e.target.value)} placeholder={L('Имя', 'Name')} />
-                  <input style={{ ..._FINP, flex: 1 }} type="tel" value={form[p.phone]}
-                    onChange={e => set(p.phone)(e.target.value)} placeholder="+7 / phone" />
-                </div>
+              <div key={p.name} style={{ display: 'flex', gap: 8 }}>
+                <input style={{ ..._FINP, flex: 1 }} value={form[p.name]}
+                  onChange={e => set(p.name)(e.target.value)} placeholder={L('Имя родителя', 'Parent name')} />
+                <input style={{ ..._FINP, flex: 1 }} type="tel" value={form[p.phone]}
+                  onChange={e => set(p.phone)(e.target.value)} placeholder="+7 / phone" />
               </div>
             ))}
-            <div>
-              <span style={{ display: 'inline-block', marginBottom: 7, background: '#EDE8E0',
-                borderRadius: 999, padding: '3px 11px', fontSize: 11.5, fontWeight: 700,
-                color: 'var(--ink-soft)' }}>{L('Адрес', 'Address')}</span>
+            <FRow label={L('Адрес', 'Address')} style={{ marginTop: 6 }}>
               <input style={_FINP} value={form.address}
                 onChange={e => set('address')(e.target.value)} placeholder="…" />
-            </div>
+            </FRow>
           </div>
         </div>
 
