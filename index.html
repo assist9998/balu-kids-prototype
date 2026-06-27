@@ -177,6 +177,32 @@
     typeDayOff:        { ru: 'Выходной',       en: 'Day off'      },
     typeEvent:         { ru: 'Мероприятие',    en: 'Event'        },
     compose:           { ru: 'Новая заметка',  en: 'New note' },
+
+    // ── staff / team ───────────────────────────────────────────
+    team:              { ru: 'Команда',         en: 'Team' },
+    team_sub:          { ru: 'Педагоги и персонал', en: 'Staff & teachers' },
+    staff:             { ru: 'Сотрудники',      en: 'Staff' },
+    contractEnd:       { ru: 'Договор до',      en: 'Contract until' },
+    contractExpiring:  { ru: 'Скоро истекает',  en: 'Expiring soon' },
+    contractExpired:   { ru: 'Истёк',           en: 'Expired' },
+    staffWorking:      { ru: 'Работает',        en: 'Working' },
+    staffAbsent:       { ru: 'Нет на месте',    en: 'Absent' },
+    staffLate:         { ru: 'Опоздал(а)',       en: 'Late' },
+    staffSick:         { ru: 'Болеет',          en: 'Sick' },
+    staffDayOff:       { ru: 'Выходной',        en: 'Day off' },
+    staffUnpaid:       { ru: 'Без оплаты',      en: 'Unpaid leave' },
+    staffExtra:        { ru: 'Переработка',     en: 'Extra work' },
+    arrivalTime:       { ru: 'Время прихода',   en: 'Arrival time' },
+    staffLog:          { ru: 'Журнал',          en: 'Log' },
+    staffMonthly:      { ru: 'Месяц',           en: 'Monthly' },
+    position:          { ru: 'Должность',       en: 'Position' },
+    phone:             { ru: 'Телефон',         en: 'Phone' },
+    noStaff:           { ru: 'Сотрудников нет', en: 'No staff' },
+    monthSummary:      { ru: 'Итог за месяц',   en: 'Monthly summary' },
+    daysWorked:        { ru: 'Отработано',      en: 'Days worked' },
+    daysSick:          { ru: 'Болезни',         en: 'Sick days' },
+    daysDayOff:        { ru: 'Выходные',        en: 'Days off' },
+    daysAbsent:        { ru: 'Пропущено',       en: 'Absent days' },
   };
 
   let LANG = 'ru';
@@ -283,8 +309,34 @@ window.API_BASE = "https://rmxois1uv0a24xrbi2dfcfac.95.179.188.141.sslip.io";
       body: JSON.stringify({ password }),
     });
     if (!res.ok) return null;
-    const data = await res.json();
-    return data.role;
+    return await res.json();  // {role, name?}
+  };
+
+  window.loadStaff = async function () {
+    const res = await fetch(`${window.API_BASE}/staff`);
+    if (!res.ok) throw new Error(`GET /staff failed: ${res.status}`);
+    return res.json();
+  };
+
+  window.getStaffAttendance = async function (date) {
+    const res = await fetch(`${window.API_BASE}/staff-attendance/${encodeURIComponent(date)}`);
+    if (!res.ok) throw new Error(`GET /staff-attendance failed: ${res.status}`);
+    return res.json();
+  };
+
+  window.saveStaffAttendance = async function (date, records) {
+    const res = await fetch(`${window.API_BASE}/staff-attendance`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date, records }),
+    });
+    if (!res.ok) throw new Error(`POST /staff-attendance failed: ${res.status}`);
+  };
+
+  window.getStaffMonthly = async function (month) {
+    const res = await fetch(`${window.API_BASE}/staff-attendance-month/${encodeURIComponent(month)}`);
+    if (!res.ok) throw new Error(`GET /staff-attendance-month failed: ${res.status}`);
+    return res.json();
   };
 
   window.updateChild = async function (childId, data) {
@@ -1606,6 +1658,10 @@ function HomeScreen({ go, statuses, feed, homeStyle }) {
       badge: `${rate}%` },
     { key: 'notifications', emoji: '⭐', color: '#FBD9E1', colorLight: '#FDF0F3', colorDark: '#C9ADBA', ink: '#a8456a', go: 'notifications',
       badge: unread ? `${unread} ${t('unread')}` : null, dot: unread > 0, count: unread },
+    ...(window.__isDirector ? [
+      { key: 'team', emoji: '👩‍🏫', color: '#E8E0D5', colorLight: '#F2EDE8', colorDark: '#C0B5A8', ink: '#5a4a30', go: 'team',
+        badge: null },
+    ] : []),
   ];
 
   const hour = new Date().getHours();
@@ -3528,10 +3584,412 @@ const FONTS = {
   Clean:   { display: "'Onest', system-ui",     body: "'Onest', system-ui" },
 };
 
+// ── Staff helpers ─────────────────────────────────────────────────────────────
+
+const STAFF_STATUSES = [
+  { id: 'present', emoji: '✅', ru: 'Работает',    en: 'Working'      },
+  { id: 'absent',  emoji: '❌', ru: 'Нет на месте', en: 'Absent'      },
+  { id: 'late',    emoji: '🕐', ru: 'Опоздал(а)',  en: 'Late'         },
+  { id: 'sick',    emoji: '🤒', ru: 'Болеет',      en: 'Sick'         },
+  { id: 'day-off', emoji: '🏖️', ru: 'Выходной',   en: 'Day off'      },
+  { id: 'unpaid',  emoji: '💸', ru: 'Без оплаты',  en: 'Unpaid'      },
+  { id: 'extra',   emoji: '⏰', ru: 'Переработка', en: 'Extra work'   },
+];
+
+const SSTAFF_COLOR = {
+  present: '#D4F0DF', absent: '#FFE0E0', late: '#FBE7A8',
+  sick: '#FBD9E1', 'day-off': '#E8D5FB', unpaid: '#E8E0D5', extra: '#CDE8FB',
+};
+const SSTAFF_INK = {
+  present: '#1f7a55', absent: '#a03030', late: '#8a6410',
+  sick: '#a8456a', 'day-off': '#5a2a86', unpaid: '#5a4a30', extra: '#1f5f86',
+};
+
+function staffStatusLabel(id) {
+  const s = STAFF_STATUSES.find(x => x.id === id);
+  if (!s) return id;
+  return `${s.emoji} ${window.__lang === 'en' ? s.en : s.ru}`;
+}
+
+function contractDaysLeft(contractEnd) {
+  if (!contractEnd) return null;
+  const parts = contractEnd.match(/(\d{2})\.(\d{2})\.(\d{4})/);
+  let d;
+  if (parts) {
+    d = new Date(`${parts[3]}-${parts[2]}-${parts[1]}`);
+  } else {
+    d = new Date(contractEnd);
+  }
+  if (isNaN(d)) return null;
+  return Math.round((d - new Date()) / 86400000);
+}
+
+function positionEmoji(pos) {
+  const p = (pos || '').toLowerCase();
+  if (p.includes('логопед')) return '🗣️';
+  if (p.includes('психолог')) return '🧠';
+  if (p.includes('повар') || p.includes('cook')) return '👨‍🍳';
+  if (p.includes('охран') || p.includes('security')) return '💂';
+  if (p.includes('медик') || p.includes('nurse') || p.includes('врач')) return '🩺';
+  if (p.includes('музык') || p.includes('music')) return '🎵';
+  if (p.includes('физ') || p.includes('sport') || p.includes('gym')) return '🏃';
+  return '👩‍🏫';
+}
+
+// ── TeamScreen ────────────────────────────────────────────────────────────────
+
+function TeamScreen({ go }) {
+  const [staff, setStaff] = React.useState(null);
+
+  React.useEffect(() => {
+    window.loadStaff().then(setStaff).catch(() => setStaff([]));
+  }, []);
+
+  const today = todayStr();
+
+  return (
+    <div style={{ padding: '8px 20px 32px' }}>
+      {/* Quick action buttons */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+        <button onClick={() => go('staff-daily', { date: today })} className="bk-press" style={{
+          flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+          background: '#CDE8FB', color: '#1f5f86', fontSize: 13, fontWeight: 800,
+          padding: '11px 14px', borderRadius: 14 }}>
+          📋 {L('Журнал сегодня', "Today's log")}
+        </button>
+        <button onClick={() => go('staff-monthly')} className="bk-press" style={{
+          flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+          background: '#E8E0D5', color: '#5a4a30', fontSize: 13, fontWeight: 800,
+          padding: '11px 14px', borderRadius: 14 }}>
+          📊 {L('Итог за месяц', 'Monthly')}
+        </button>
+      </div>
+
+      {staff === null && (
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--ink-faint)', fontSize: 13 }}>…</div>
+      )}
+      {staff !== null && staff.length === 0 && (
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--ink-faint)', fontSize: 14 }}>
+          {L('Нет сотрудников. Добавьте их в лист «Staff» таблицы.', 'No staff found. Add them to the Staff sheet.')}
+        </div>
+      )}
+      {(staff || []).map(s => {
+        const days = contractDaysLeft(s.contractEnd);
+        const isExpired   = days !== null && days < 0;
+        const isExpiring  = days !== null && days >= 0 && days <= 30;
+        return (
+          <button key={s.name} onClick={() => go('staff-daily', { name: s.name, date: today })}
+            className="bk-press" style={{
+            width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+            background: 'var(--card)', borderRadius: 18, padding: '14px 16px',
+            marginBottom: 12, display: 'flex', alignItems: 'center', gap: 14,
+            boxShadow: '0 2px 10px rgba(60,40,20,0.07)', textAlign: 'left' }}>
+            <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#EDE8E0',
+              display: 'grid', placeItems: 'center', fontSize: 24, flexShrink: 0 }}>
+              {positionEmoji(s.position)}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--ink)' }}>{s.name}</div>
+              <div style={{ fontSize: 12.5, color: 'var(--ink-soft)', fontWeight: 600, marginTop: 2 }}>{s.position}</div>
+              {s.contractEnd && (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 5,
+                  background: isExpired ? '#FFE0E0' : isExpiring ? '#FBE7A8' : '#EDE8E0',
+                  color: isExpired ? '#a03030' : isExpiring ? '#8a6410' : '#8a7a60',
+                  padding: '3px 10px', borderRadius: 999, fontSize: 11.5, fontWeight: 700 }}>
+                  {isExpired ? '⚠️' : isExpiring ? '⏳' : '📄'}
+                  {L('Договор до', 'Until')} {s.contractEnd}
+                  {isExpired && ` — ${L('истёк', 'EXPIRED')}`}
+                  {isExpiring && !isExpired && ` (${days} ${L('дн', 'd')})`}
+                </div>
+              )}
+            </div>
+            {s.phone ? (
+              <a href={`tel:${s.phone}`} onClick={e => e.stopPropagation()}
+                style={{ width: 36, height: 36, borderRadius: '50%', background: '#D4F0DF',
+                  display: 'grid', placeItems: 'center', fontSize: 16, flexShrink: 0,
+                  textDecoration: 'none' }}>📞</a>
+            ) : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── StaffDailyScreen ──────────────────────────────────────────────────────────
+
+function StaffDailyScreen({ params }) {
+  const initDate = (params && params.date) || todayStr();
+  const [date, setDate] = React.useState(initDate);
+  const [staff, setStaff] = React.useState([]);
+  const [records, setRecords] = React.useState({});
+  const [saving, setSaving] = React.useState(false);
+  const [saved, setSaved]   = React.useState(false);
+
+  React.useEffect(() => {
+    Promise.all([window.loadStaff(), window.getStaffAttendance(date)])
+      .then(([s, rec]) => { setStaff(s); setRecords(rec); })
+      .catch(() => {});
+  }, [date]);
+
+  function prevDay() {
+    const d = new Date(date); d.setDate(d.getDate() - 1);
+    setDate(d.toISOString().slice(0, 10));
+  }
+  function nextDay() {
+    const d = new Date(date); d.setDate(d.getDate() + 1);
+    setDate(d.toISOString().slice(0, 10));
+  }
+
+  function setStatus(name, status) {
+    setRecords(r => ({ ...r, [name]: { ...(r[name] || {}), status } }));
+  }
+  function setTime(name, time) {
+    setRecords(r => ({ ...r, [name]: { ...(r[name] || {}), arrival_time: time } }));
+  }
+
+  async function save() {
+    setSaving(true);
+    try {
+      await window.saveStaffAttendance(date, records);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1600);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const [dd, mm, yyyy] = (() => {
+    const d = new Date(date + 'T12:00:00');
+    const RU_MONTHS = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+    const EN_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return [d.getDate(), window.__lang === 'en' ? EN_MONTHS[d.getMonth()] : RU_MONTHS[d.getMonth()], d.getFullYear()];
+  })();
+
+  return (
+    <div style={{ padding: '8px 20px 32px' }}>
+      {/* Date navigation */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+        <button onClick={prevDay} className="bk-press" style={{
+          border: 'none', cursor: 'pointer', background: '#EDE8E0', borderRadius: 12,
+          width: 38, height: 38, display: 'grid', placeItems: 'center', fontSize: 18, color: 'var(--ink)' }}>‹</button>
+        <div style={{ flex: 1, textAlign: 'center', fontWeight: 800, fontSize: 15, color: 'var(--ink)' }}>
+          {dd} {mm} {yyyy}
+        </div>
+        <button onClick={nextDay} className="bk-press" style={{
+          border: 'none', cursor: 'pointer', background: '#EDE8E0', borderRadius: 12,
+          width: 38, height: 38, display: 'grid', placeItems: 'center', fontSize: 18, color: 'var(--ink)' }}>›</button>
+      </div>
+
+      {staff.length === 0 && (
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--ink-faint)', fontSize: 13 }}>
+          {L('Нет сотрудников', 'No staff')}
+        </div>
+      )}
+
+      {staff.map(s => {
+        const rec    = records[s.name] || {};
+        const status = rec.status || 'present';
+        const isLate = status === 'late';
+        return (
+          <div key={s.name} style={{ background: 'var(--card)', borderRadius: 18, padding: '14px 16px',
+            marginBottom: 12, boxShadow: '0 2px 10px rgba(60,40,20,0.07)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+              <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#EDE8E0',
+                display: 'grid', placeItems: 'center', fontSize: 20, flexShrink: 0 }}>
+                {positionEmoji(s.position)}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--ink)' }}>{s.name}</div>
+                <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{s.position}</div>
+              </div>
+              <div style={{ background: SSTAFF_COLOR[status] || '#EDE8E0',
+                color: SSTAFF_INK[status] || '#5a4a30',
+                padding: '4px 11px', borderRadius: 999, fontSize: 12, fontWeight: 800 }}>
+                {STAFF_STATUSES.find(x => x.id === status)?.emoji}
+              </div>
+            </div>
+            {/* Status pills */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+              {STAFF_STATUSES.map(opt => (
+                <button key={opt.id} onClick={() => setStatus(s.name, opt.id)} className="bk-press" style={{
+                  border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700,
+                  padding: '6px 12px', borderRadius: 999,
+                  background: status === opt.id ? (SSTAFF_COLOR[opt.id] || '#B07848') : '#F0EBE3',
+                  color: status === opt.id ? (SSTAFF_INK[opt.id] || '#fff') : 'var(--ink-soft)',
+                  outline: status === opt.id ? `2px solid ${SSTAFF_INK[opt.id] || '#B07848'}` : 'none',
+                  transition: 'all 0.12s' }}>
+                  {opt.emoji} {window.__lang === 'en' ? opt.en : opt.ru}
+                </button>
+              ))}
+            </div>
+            {/* Time picker for late */}
+            {isLate && (
+              <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 700 }}>
+                  🕐 {L('Время прихода', 'Arrival')}:
+                </span>
+                <input type="time" value={rec.arrival_time || ''}
+                  onChange={e => setTime(s.name, e.target.value)}
+                  style={{ border: '1.5px solid #DDD8CF', borderRadius: 10, padding: '5px 10px',
+                    fontFamily: 'inherit', fontSize: 13, background: '#FBF7F2', color: 'var(--ink)', outline: 'none' }} />
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {staff.length > 0 && (
+        <button onClick={save} disabled={saving} className="bk-press" style={{
+          width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-display)',
+          background: saved ? '#D4F0DF' : '#B07848', color: saved ? '#1f7a55' : '#fff',
+          fontSize: 15, fontWeight: 800, padding: 14, borderRadius: 16, marginTop: 8,
+          transition: 'background 0.2s', opacity: saving ? 0.7 : 1 }}>
+          {saving ? '…' : saved ? `✅ ${L('Сохранено', 'Saved')}` : L('Сохранить', 'Save')}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── StaffMonthlyScreen ────────────────────────────────────────────────────────
+
+function StaffMonthlyScreen() {
+  const now = new Date();
+  const [month, setMonth] = React.useState(
+    `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  );
+  const [staff, setStaff] = React.useState([]);
+  const [data, setData]   = React.useState({});
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    setLoading(true);
+    Promise.all([window.loadStaff(), window.getStaffMonthly(month)])
+      .then(([s, d]) => { setStaff(s); setData(d); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [month]);
+
+  const RU_MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+  const EN_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const [yr, mo] = month.split('-').map(Number);
+  const monthLabel = window.__lang === 'en' ? `${EN_MONTHS[mo-1]} ${yr}` : `${RU_MONTHS[mo-1]} ${yr}`;
+  const daysInMonth = new Date(yr, mo, 0).getDate();
+
+  function prevMonth() {
+    const d = new Date(yr, mo - 2, 1);
+    setMonth(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+  }
+  function nextMonth() {
+    const d = new Date(yr, mo, 1);
+    setMonth(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+  }
+
+  function countStatus(name, statusId) {
+    const days = data[name] || {};
+    return Object.values(days).filter(d => d.status === statusId).length;
+  }
+
+  return (
+    <div style={{ padding: '8px 20px 32px' }}>
+      {/* Month navigation */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+        <button onClick={prevMonth} className="bk-press" style={{
+          border: 'none', cursor: 'pointer', background: '#EDE8E0', borderRadius: 12,
+          width: 38, height: 38, display: 'grid', placeItems: 'center', fontSize: 18, color: 'var(--ink)' }}>‹</button>
+        <div style={{ flex: 1, textAlign: 'center', fontWeight: 800, fontSize: 15, color: 'var(--ink)' }}>
+          {monthLabel}
+        </div>
+        <button onClick={nextMonth} className="bk-press" style={{
+          border: 'none', cursor: 'pointer', background: '#EDE8E0', borderRadius: 12,
+          width: 38, height: 38, display: 'grid', placeItems: 'center', fontSize: 18, color: 'var(--ink)' }}>›</button>
+      </div>
+
+      {loading && <div style={{ textAlign: 'center', padding: 40, color: 'var(--ink-faint)', fontSize: 13 }}>…</div>}
+
+      {!loading && staff.length === 0 && (
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--ink-faint)', fontSize: 14 }}>
+          {L('Нет сотрудников', 'No staff')}
+        </div>
+      )}
+
+      {!loading && staff.map(s => {
+        const worked  = countStatus(s.name, 'present') + countStatus(s.name, 'late') + countStatus(s.name, 'extra');
+        const sick    = countStatus(s.name, 'sick');
+        const dayOff  = countStatus(s.name, 'day-off');
+        const absent  = countStatus(s.name, 'absent');
+        const unpaid  = countStatus(s.name, 'unpaid');
+        const extra   = countStatus(s.name, 'extra');
+        const allDays = data[s.name] || {};
+
+        return (
+          <div key={s.name} style={{ background: 'var(--card)', borderRadius: 18, padding: '14px 16px',
+            marginBottom: 14, boxShadow: '0 2px 10px rgba(60,40,20,0.07)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+              <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#EDE8E0',
+                display: 'grid', placeItems: 'center', fontSize: 20, flexShrink: 0 }}>
+                {positionEmoji(s.position)}
+              </div>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--ink)' }}>{s.name}</div>
+                <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{s.position}</div>
+              </div>
+            </div>
+
+            {/* Calendar mini-grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, marginBottom: 12 }}>
+              {Array.from({ length: daysInMonth }, (_, i) => {
+                const d = String(i + 1).padStart(2, '0');
+                const key = `${month}-${d}`;
+                const rec = allDays[key];
+                const st = rec?.status;
+                return (
+                  <div key={d} style={{
+                    aspectRatio: '1', borderRadius: 6, fontSize: 9, fontWeight: 800,
+                    display: 'grid', placeItems: 'center',
+                    background: st ? (SSTAFF_COLOR[st] || '#EDE8E0') : '#F5F2EE',
+                    color: st ? (SSTAFF_INK[st] || '#5a4a30') : '#C8BEB0',
+                    title: st ? staffStatusLabel(st) : '' }}>
+                    {i + 1}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Summary chips */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+              <span style={{ background: '#D4F0DF', color: '#1f7a55', padding: '4px 11px', borderRadius: 999, fontSize: 12, fontWeight: 700 }}>
+                ✅ {worked} {L('дн', 'd')}
+              </span>
+              {sick > 0 && <span style={{ background: '#FBD9E1', color: '#a8456a', padding: '4px 11px', borderRadius: 999, fontSize: 12, fontWeight: 700 }}>
+                🤒 {sick}
+              </span>}
+              {dayOff > 0 && <span style={{ background: '#E8D5FB', color: '#5a2a86', padding: '4px 11px', borderRadius: 999, fontSize: 12, fontWeight: 700 }}>
+                🏖️ {dayOff}
+              </span>}
+              {absent > 0 && <span style={{ background: '#FFE0E0', color: '#a03030', padding: '4px 11px', borderRadius: 999, fontSize: 12, fontWeight: 700 }}>
+                ❌ {absent}
+              </span>}
+              {unpaid > 0 && <span style={{ background: '#E8E0D5', color: '#5a4a30', padding: '4px 11px', borderRadius: 999, fontSize: 12, fontWeight: 700 }}>
+                💸 {unpaid}
+              </span>}
+              {extra > 0 && <span style={{ background: '#CDE8FB', color: '#1f5f86', padding: '4px 11px', borderRadius: 999, fontSize: 12, fontWeight: 700 }}>
+                ⏰ +{extra}
+              </span>}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 const TITLES = {
   home: 'appName', children: 'children', attendance: 'markDay',
   payments: 'payments', 'payments-garden': 'payments', 'payments-clubs': 'payments',
   activities: 'activities', club: 'activities', summary: 'daySummary', notifications: 'notifications', compose: 'compose',
+  team: 'team', 'staff-daily': 'staffLog', 'staff-monthly': 'monthSummary',
 };
 
 // Attendance is marked fresh each day; persisted in localStorage so a reload
@@ -3556,12 +4014,13 @@ function persistAttendance(statuses) {
 function loadStoredRole() {
   try {
     const parsed = JSON.parse(localStorage.getItem('balu_role'));
-    return parsed && parsed.date === todayStr() ? parsed.role : null;
+    if (!parsed || parsed.date !== todayStr()) return null;
+    return { role: parsed.role, name: parsed.name || null };
   } catch { return null; }
 }
 
-function persistRole(role) {
-  try { localStorage.setItem('balu_role', JSON.stringify({ date: todayStr(), role })); } catch {}
+function persistRole(role, name = null) {
+  try { localStorage.setItem('balu_role', JSON.stringify({ date: todayStr(), role, name })); } catch {}
 }
 
 function LoginGate({ onLogin }) {
@@ -3574,9 +4033,9 @@ function LoginGate({ onLogin }) {
     if (!password.trim()) return;
     setLoading(true);
     setError(false);
-    const role = await window.login(password.trim());
+    const data = await window.login(password.trim());
     setLoading(false);
-    if (role) onLogin(role);
+    if (data) onLogin(data);
     else setError(true);
   }
 
@@ -3618,7 +4077,8 @@ function App() {
   const [statuses, setStatuses] = React.useState({});
   const [feed, setFeed] = React.useState([]);
   const [toast, setToast] = React.useState(null);
-  const [role, setRole] = React.useState(() => loadStoredRole());
+  const [role, setRole] = React.useState(() => loadStoredRole()?.role ?? null);
+  const [teacherName, setTeacherName] = React.useState(() => loadStoredRole()?.name ?? null);
 
   React.useEffect(() => {
     Promise.all([
@@ -3661,9 +4121,12 @@ function App() {
   // keep i18n + global lang in sync BEFORE children render
   window.__lang = lang;
   setI18nLang(lang);
-  window.__isStaff = role === 'staff';
+  window.__isStaff     = role === 'staff';
+  window.__isDirector  = role === 'director';
+  window.__isTeacher   = role === 'teacher';
+  window.__teacherName = teacherName;
 
-  if (!role) return <LoginGate onLogin={r => { persistRole(r); setRole(r); }} />;
+  if (!role) return <LoginGate onLogin={d => { persistRole(d.role, d.name); setRole(d.role); setTeacherName(d.name); }} />;
 
   const top = stack[stack.length - 1];
 
@@ -3671,7 +4134,7 @@ function App() {
   function back() { setDir('back'); setStack(s => s.length > 1 ? s.slice(0, -1) : s); }
   function home() { setDir('back'); setStack([{ name: 'home', params: {} }]); }
   function toggleLang() { const n = lang === 'ru' ? 'en' : 'ru'; setLang(n); localStorage.setItem('balu_lang', n); }
-  function logout() { localStorage.removeItem('balu_role'); setRole(null); }
+  function logout() { localStorage.removeItem('balu_role'); setRole(null); setTeacherName(null); }
 
   function showToast(msg) { setToast(msg); clearTimeout(window.__tt); window.__tt = setTimeout(() => setToast(null), 1900); }
 
@@ -3734,6 +4197,9 @@ function App() {
       case 'summary':       return <SummaryScreen statuses={statuses} go={go} />;
       case 'notifications': return <NotificationsScreen feed={feed} go={go} actions={actions} />;
       case 'compose':       return <ComposeScreen back={back} actions={actions} />;
+      case 'team':          return <TeamScreen go={go} />;
+      case 'staff-daily':   return <StaffDailyScreen params={p} />;
+      case 'staff-monthly': return <StaffMonthlyScreen />;
       default:              return null;
     }
   }
