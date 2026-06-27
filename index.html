@@ -2175,8 +2175,8 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
       price: kid.price || '',
       allergens,
       allergyNote,
-      paracetamol: kid.paracetamol === true ? 'yes' : '',
-      photoConsent: kid.photoConsent === true ? 'yes' : '',
+      paracetamol: kid.paracetamol || '',
+      photoConsent: kid.photoConsent || '',
       adaptation: !!kid.adaptation,
       mealsIncluded: kid.mealsHalal ? 'halal' : kid.mealsIncluded ? 'yes' : '',
       napTime: !!kid.napTime,
@@ -3093,9 +3093,6 @@ function PaymentsGardenScreen() {
   }
   function changeDays(kidId, n) {
     setDays(prev => ({ ...prev, [mo.id]: { ...prev[mo.id], [kidId]: n } }));
-  }
-  function changeDate(kidId, d) {
-    setDates(prev => ({ ...prev, [mo.id]: { ...prev[mo.id], [kidId]: d } }));
   }
   function handleSave() {
     setSaved(JSON.parse(JSON.stringify(paid)));
