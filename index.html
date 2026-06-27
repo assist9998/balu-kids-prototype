@@ -113,6 +113,8 @@
     activities:      { ru: 'Кружки',           en: 'Clubs' },
     children_sub:    { ru: 'Профили и группы', en: 'Profiles & groups' },
     attendance_sub:  { ru: 'Отметки за день',  en: 'Daily check-in' },
+    payments_sub:    { ru: 'Оплата садика',     en: 'Tuition payments' },
+    activities_sub:  { ru: 'Кружки и секции',  en: 'Clubs & activities' },
     summary_sub:     { ru: 'Статистика дня',   en: 'Today at a glance' },
     notifications_sub:{ ru: 'Лента и заметки',  en: 'Feed & notes' },
 
@@ -1625,7 +1627,7 @@ function HomeScreen({ go, statuses, feed, homeStyle }) {
           </div>
           <div style={{ textAlign: 'right', lineHeight: 1.2, flexShrink: 0 }}>
             <div style={{ fontSize: 11.5, color: 'var(--ink-faint)', fontWeight: 700 }}>{t('today')}</div>
-            <div style={{ fontSize: 14, color: 'var(--ink)', fontWeight: 800 }}>{L('16 июня', 'Jun 16')}</div>
+            <div style={{ fontSize: 14, color: 'var(--ink)', fontWeight: 800 }}>{(() => { const d = new Date(); return L(`${d.getDate()} ${['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'][d.getMonth()]}`, `${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]} ${d.getDate()}`); })()}</div>
           </div>
         </div>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 14,
@@ -1785,6 +1787,7 @@ function ChildrenScreen({ go, statuses }) {
 function GroupScreen({ params, go, statuses }) {
   const grp = DATA.GROUPS.find(g => g.id === params.groupId);
   const kids = DATA.CHILDREN.filter(k => k.group === params.groupId);
+  if (!grp) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--ink-faint)' }}>—</div>;
   return (
     <div style={{ padding: '4px 20px 28px' }}>
       <div style={{ background: grp.color, borderRadius: 20, padding: '18px 20px', marginBottom: 18, display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -1797,15 +1800,16 @@ function GroupScreen({ params, go, statuses }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {kids.map((kid, i) => {
           const PALETTE = ['#FBE7A8','#CDE8FB','#D4F0DF','#FBD9E1','#FBE0C0','#E8D5FB'];
+          const badges = careBadges(kid, { includeMeals: false });
           return (
             <Card key={kid.id} pad={12} onClick={() => go('child', { childId: kid.id })}
               style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2' }}>
               <Avatar emoji={kid.emoji} color={PALETTE[i % PALETTE.length]} size={46} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}</div>
-                {careBadges(kid, { includeMeals: false }).length > 0 && (
+                {badges.length > 0 && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 5 }}>
-                    {careBadges(kid, { includeMeals: false }).map((b, bi) => <ScoutBadge key={bi} compact {...b} />)}
+                    {badges.map((b, bi) => <ScoutBadge key={bi} compact {...b} />)}
                   </div>
                 )}
               </div>
@@ -1827,6 +1831,7 @@ function ChildScreen({ params, statuses, back }) {
   const [deleteConfirm, setDeleteConfirm] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
   const kid = DATA.CHILDREN.find(k => k.id === params.childId);
+  if (!kid) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--ink-faint)' }}>—</div>;
   const grp = DATA.GROUPS.find(g => g.id === kid.group);
   const st = statuses[kid.id];
   const PALETTE = ['#FBE7A8','#CDE8FB','#D4F0DF','#FBD9E1','#FBE0C0','#E8D5FB'];
@@ -1987,9 +1992,9 @@ function ChildScreen({ params, statuses, back }) {
 
       {/* attendance ring */}
       <Card pad={16} style={{ display: 'flex', alignItems: 'center', gap: 18, marginBottom: 16, background: '#FBF7F2' }}>
-        <Ring pct={kid.rate} size={92} stroke={11} color='#B07848'>
+        <Ring pct={kid.rate ?? 0} size={92} stroke={11} color='#B07848'>
           <div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink)', lineHeight: 1 }}>{kid.rate}%</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink)', lineHeight: 1 }}>{kid.rate ?? '—'}{kid.rate != null ? '%' : ''}</div>
           </div>
         </Ring>
         <div>
@@ -2473,15 +2478,16 @@ function AttendanceScreen({ statuses, actions, go }) {
           const st = local[kid.id];
           const PALETTE = ['#FBE7A8','#CDE8FB','#D4F0DF','#FBD9E1','#FBE0C0','#E8D5FB'];
           const kidIndex = DATA.CHILDREN.filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
+          const badges = careBadges(kid, { includeMeals: false });
           return (
             <Card key={kid.id} pad={12} onClick={() => go('child', { childId: kid.id })}
               style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2' }}>
               <Avatar emoji={kid.emoji} color={PALETTE[kidIndex % PALETTE.length]} size={44} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}</div>
-                {careBadges(kid, { includeMeals: false }).length > 0 && (
+                {badges.length > 0 && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 5 }}>
-                    {careBadges(kid, { includeMeals: false }).map((b, bi) => <ScoutBadge key={bi} compact {...b} />)}
+                    {badges.map((b, bi) => <ScoutBadge key={bi} compact {...b} />)}
                   </div>
                 )}
               </div>
@@ -3547,7 +3553,7 @@ const FONTS = {
 const TITLES = {
   home: 'appName', children: 'children', attendance: 'markDay',
   payments: 'payments', 'payments-garden': 'payments', 'payments-clubs': 'payments',
-  activities: 'activities', summary: 'daySummary', notifications: 'notifications', compose: 'compose',
+  activities: 'activities', club: 'activities', summary: 'daySummary', notifications: 'notifications', compose: 'compose',
 };
 
 // Attendance is marked fresh each day; persisted in localStorage so a reload
