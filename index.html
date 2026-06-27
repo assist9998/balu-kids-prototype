@@ -313,6 +313,35 @@ window.API_BASE = "https://rmxois1uv0a24xrbi2dfcfac.95.179.188.141.sslip.io";
     return res.json();
   };
 
+  window.loadFeed = async function () {
+    const res = await fetch(`${window.API_BASE}/feed`);
+    if (!res.ok) throw new Error(`GET /feed failed: ${res.status}`);
+    window.DATA.FEED = await res.json();
+  };
+
+  window.addFeedItem = async function (data) {
+    const res = await fetch(`${window.API_BASE}/feed`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error(`POST /feed failed: ${res.status}`);
+    return res.json();
+  };
+
+  window.deleteFeedItem = async function (id) {
+    const res = await fetch(`${window.API_BASE}/feed/${id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error(`DELETE /feed failed: ${res.status}`);
+  };
+
+  window.markFeedRead = async function (id) {
+    await fetch(`${window.API_BASE}/feed/${id}/read`, { method: 'PATCH' });
+  };
+
+  window.markAllFeedRead = async function () {
+    await fetch(`${window.API_BASE}/feed/read-all`, { method: 'PATCH' });
+  };
+
   window.setChildEmoji = async function (childId, emoji) {
     const res = await fetch(`${window.API_BASE}/children/${encodeURIComponent(childId)}/emoji`, {
       method: 'PUT',
@@ -2530,6 +2559,18 @@ function WeekChart() {
 // ════════════════════════════════════════════════════════════════
 //  NOTIFICATIONS — feed
 // ════════════════════════════════════════════════════════════════
+function fmtFeedTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const hm = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  if (d.toDateString() === now.toDateString()) return L(`Сегодня ${hm}`, `Today ${hm}`);
+  const yest = new Date(now); yest.setDate(now.getDate() - 1);
+  if (d.toDateString() === yest.toDateString()) return L(`Вчера ${hm}`, `Yesterday ${hm}`);
+  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)} ${hm}`;
+}
+
 const TYPE_TINT = { birthday: '#FBD9E1', alert: '#FBE7A8', message: '#CDE8FB', sent: '#D4F0DF', urgent: '#FBD9E1' };
 
 function LongPressCard({ onDelete, onTap, children, style }) {
@@ -2589,7 +2630,7 @@ function NotificationsScreen({ feed, go, actions }) {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 14.5, color: 'var(--ink)', fontWeight: 600, lineHeight: 1.4, textWrap: 'pretty' }}>{Lo(item)}</div>
               <div style={{ fontSize: 12, color: 'var(--ink-faint)', fontWeight: 600, marginTop: 4 }}>
-                {item.timeEn ? L(item.time, item.timeEn) : item.time}
+                {item.created_at ? fmtFeedTime(item.created_at) : (item.timeEn ? L(item.time, item.timeEn) : item.time)}
               </div>
             </div>
             {item.unread && <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#B07848', marginTop: 6, flexShrink: 0 }} />}
@@ -2639,12 +2680,18 @@ function ComposeScreen({ back, actions }) {
     finally { setLoading(false); }
   }
 
-  function send() {
-    if (!text.trim()) return;
-    const chosen = types[typeIdx];
-    actions.addPost({ ru: ruText || text, en: text, emoji: chosen.emoji, type });
-    actions.toast(t('noteSaved') + ' ✓');
-    back();
+  const [sending, setSending] = React.useState(false);
+  async function send() {
+    if (!text.trim() || sending) return;
+    setSending(true);
+    try {
+      const chosen = types[typeIdx];
+      await actions.addPost({ ru: ruText || text, en: text, emoji: chosen.emoji, type });
+      actions.toast(t('noteSaved') + ' ✓');
+      back();
+    } catch(e) {
+      setSending(false);
+    }
   }
 
   return (
@@ -2699,11 +2746,12 @@ function ComposeScreen({ back, actions }) {
       {text.trim() && (
         <div style={{ position: 'sticky', bottom: 0, marginTop: 4, padding: '14px 0 26px',
           background: 'linear-gradient(to top, var(--bg) 62%, transparent)' }}>
-          <button onClick={send} className="bk-press" style={{
-            width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-display)',
+          <button onClick={send} disabled={sending} className="bk-press" style={{
+            width: '100%', border: 'none', cursor: sending ? 'default' : 'pointer', fontFamily: 'var(--font-display)',
             background: '#B07848', color: '#fff', fontSize: 17, fontWeight: 800,
-            padding: 15, borderRadius: 18, boxShadow: '0 10px 24px -8px #B07848' }}>
-            {t('save')}
+            padding: 15, borderRadius: 18, boxShadow: '0 10px 24px -8px #B07848',
+            opacity: sending ? 0.7 : 1 }}>
+            {sending ? '…' : t('save')}
           </button>
         </div>
       )}
@@ -3310,12 +3358,15 @@ function App() {
   const [childrenReady, setChildrenReady] = React.useState(false);
   const [loadError, setLoadError] = React.useState(null);
   const [statuses, setStatuses] = React.useState({});
-  const [feed, setFeed] = React.useState(() => DATA.FEED.map(f => ({ ...f })));
+  const [feed, setFeed] = React.useState([]);
   const [toast, setToast] = React.useState(null);
   const [role, setRole] = React.useState(() => loadStoredRole());
 
   React.useEffect(() => {
-    window.loadChildren()
+    Promise.all([
+      window.loadChildren(),
+      window.loadFeed().then(() => setFeed(DATA.FEED.map(f => ({ ...f })))).catch(() => {}),
+    ])
       .then(() => window.loadAttendance(todayStr()).catch(() => loadStoredAttendance() || {}))
       .then(remote => {
         const m = {}; DATA.CHILDREN.forEach(k => m[k.id] = remote[k.id] || 'absent');
@@ -3369,13 +3420,24 @@ function App() {
     setStatus: (id, st) => setStatuses(m => ({ ...m, [id]: st })),
     markAllPresent: (ids) => setStatuses(m => { const n = { ...m }; ids.forEach(i => n[i] = 'present'); return n; }),
     saveStatuses: (map) => { setStatuses(() => ({ ...map })); window.saveAttendance(todayStr(), map).catch(() => {}); },
-    markAllRead:  () => setFeed(f => f.map(x => ({ ...x, unread: false }))),
-    markOneRead:  (id) => setFeed(f => f.map(x => x.id === id ? { ...x, unread: false } : x)),
-    deletePost:   (id) => setFeed(f => f.filter(x => x.id !== id)),
-    addPost: ({ ru, en, emoji = '📋', type = 'alert' }) => setFeed(f => [{
-      id: Date.now(), type, emoji,
-      ru, en, time: t('justNow'), timeEn: t('justNow'), unread: true,
-    }, ...f]),
+    markAllRead: async () => {
+      setFeed(f => f.map(x => ({ ...x, unread: false })));
+      await window.markAllFeedRead().catch(() => {});
+    },
+    markOneRead: async (id) => {
+      setFeed(f => f.map(x => x.id === id ? { ...x, unread: false } : x));
+      const item = feed.find(x => x.id === id);
+      if (!item?.auto) await window.markFeedRead(id).catch(() => {});
+    },
+    deletePost: async (id) => {
+      setFeed(f => f.filter(x => x.id !== id));
+      const item = feed.find(x => x.id === id);
+      if (!item?.auto) await window.deleteFeedItem(id).catch(() => {});
+    },
+    addPost: async ({ ru, en, emoji = '📋', type = 'alert' }) => {
+      const item = await window.addFeedItem({ ru, en, emoji, type });
+      setFeed(f => [item, ...f]);
+    },
     toast: showToast,
   };
 
