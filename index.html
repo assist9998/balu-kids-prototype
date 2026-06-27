@@ -2579,7 +2579,7 @@ function LongPressCard({ onDelete, onTap, children, style }) {
   function onTouchStart() { timer.current = setTimeout(() => setConfirm(true), 500); }
   function onTouchEnd()   { clearTimeout(timer.current); }
   return (
-    <div style={{ position: 'relative' }}
+    <div style={{ position: 'relative', userSelect: 'none', WebkitUserSelect: 'none' }}
       onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} onTouchMove={() => clearTimeout(timer.current)}>
       <div onClick={() => { if (!confirm) onTap(); }} style={style}>{children}</div>
       {confirm && (
