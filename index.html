@@ -2452,16 +2452,14 @@ function SummaryScreen({ statuses, go }) {
   const late    = kids.filter(k => statuses[k.id] === 'late').length;
   const absent  = kids.filter(k => statuses[k.id] === 'absent').length;
   const here    = present + late;
-  const rate = Math.round(here / kids.length * 100);
-  const napping = Math.round(here * 0.82);
+  const rate = kids.length ? Math.round(here / kids.length * 100) : 0;
 
-  const MONTHLY = { toddler: 400, middle: 450, big: 500, primary: 550 };
-  const DAILY   = { toddler: 35,  middle: 40,  big: 45,  primary: 50  };
-  const DAYS = 18;
-  const payPaid   = kids.filter((k, i) => i % 3 !== 2).length;
+  const today = todayStr();
+  const payPaid   = kids.filter(k => k.paidUntil && k.paidUntil >= today).length;
   const payUnpaid = kids.length - payPaid;
-  const totalCollected = kids.filter((k, i) => i % 3 !== 2)
-    .reduce((s, k) => s + (k.contract === 'tourist' ? DAILY[k.group] * DAYS : MONTHLY[k.group]), 0);
+  const totalCollected = kids
+    .filter(k => k.paidUntil && k.paidUntil >= today)
+    .reduce((s, k) => s + (parseFloat(String(k.price).replace(/[^0-9.]/g, '')) || 0), 0);
 
   return (
     <div style={{ padding: '4px 20px 30px', display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -2518,7 +2516,7 @@ function SummaryScreen({ statuses, go }) {
           {!window.__isStaff && (
             <div style={{ flex: 1.4, textAlign: 'center', borderRadius: 14, padding: '12px 8px',
               background: '#fff', boxShadow: '0 1px 4px rgba(60,40,20,0.07)' }}>
-              <div style={{ fontSize: 22, fontWeight: 800, color: '#B07848', lineHeight: 1, fontFamily: 'var(--font-display)' }}>${totalCollected}</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#B07848', lineHeight: 1, fontFamily: 'var(--font-display)' }}>{totalCollected > 0 ? totalCollected.toLocaleString() : '—'}</div>
               <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 700, marginTop: 4 }}>{L('Собрано', 'Collected')}</div>
             </div>
           )}
@@ -2540,18 +2538,55 @@ function MiniStat({ dot, n, label }) {
 }
 
 function WeekChart() {
-  const max = Math.max(...DATA.WEEK.map(d => d.v));
+  const LABELS = [
+    { ru: 'Пн', en: 'Mo' }, { ru: 'Вт', en: 'Tu' }, { ru: 'Ср', en: 'We' },
+    { ru: 'Чт', en: 'Th' }, { ru: 'Пт', en: 'Fr' },
+  ];
+  const [data, setData] = React.useState(LABELS.map(d => ({ ...d, v: null })));
+  const total = DATA.CHILDREN.length;
+
+  React.useEffect(() => {
+    if (!total) return;
+    const now = new Date();
+    const todayMid = new Date(now); todayMid.setHours(0, 0, 0, 0);
+    const dow = now.getDay() || 7;
+    const monday = new Date(now); monday.setDate(now.getDate() - (dow - 1));
+    const days = LABELS.map((lbl, i) => {
+      const d = new Date(monday); d.setDate(monday.getDate() + i);
+      const mid = new Date(d); mid.setHours(0, 0, 0, 0);
+      const iso = d.toISOString().slice(0, 10);
+      return { ...lbl, iso, future: mid > todayMid };
+    });
+    Promise.all(days.map(d => d.future
+      ? Promise.resolve({})
+      : fetch(`${window.API_BASE}/attendance/${d.iso}`).then(r => r.ok ? r.json() : {}).catch(() => ({}))
+    )).then(results => {
+      setData(days.map((d, i) => {
+        if (d.future) return { ru: d.ru, en: d.en, v: null };
+        const present = Object.values(results[i]).filter(v => v !== 'absent').length;
+        return { ru: d.ru, en: d.en, v: Math.round(present / total * 100) };
+      }));
+    });
+  }, [total]);
+
+  const vals = data.map(d => d.v ?? 0);
+  const max = Math.max(...vals, 1);
   return (
     <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10, height: 110, marginTop: 8 }}>
-      {DATA.WEEK.map((d, i) => (
-        <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, height: '100%', justifyContent: 'flex-end' }}>
-          <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--ink-soft)' }}>{d.v}</div>
-          <div style={{ width: '100%', maxWidth: 30, height: `${(d.v / 100) * 78}px`, borderRadius: 8,
-            background: d.v === max ? '#B07848' : '#EDE8E0',
-            transition: 'height 0.8s cubic-bezier(.22,1,.36,1)' }} />
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-faint)' }}>{Lo(d)}</div>
-        </div>
-      ))}
+      {data.map((d, i) => {
+        const isFuture = d.v === null;
+        const h = isFuture ? 4 : Math.max((d.v / max) * 78, 4);
+        return (
+          <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, height: '100%', justifyContent: 'flex-end' }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: isFuture ? 'transparent' : 'var(--ink-soft)' }}>{isFuture ? '' : d.v}</div>
+            <div style={{ width: '100%', maxWidth: 30, height: `${h}px`, borderRadius: 8,
+              background: !isFuture && d.v === max ? '#B07848' : '#EDE8E0',
+              opacity: isFuture ? 0.3 : 1,
+              transition: 'height 0.8s cubic-bezier(.22,1,.36,1)' }} />
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-faint)' }}>{Lo(d)}</div>
+          </div>
+        );
+      })}
     </div>
   );
 }
