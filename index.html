@@ -342,6 +342,64 @@ window.API_BASE = "https://rmxois1uv0a24xrbi2dfcfac.95.179.188.141.sslip.io";
     await fetch(`${window.API_BASE}/feed/read-all`, { method: 'PATCH' });
   };
 
+  window.loadClubs = async function () {
+    const res = await fetch(`${window.API_BASE}/clubs`);
+    if (!res.ok) throw new Error(`GET /clubs failed: ${res.status}`);
+    const raw = await res.json();
+    window.DATA.CLUBS = raw.map(c => ({
+      id: c.id,
+      ru: c.name_ru,
+      en: c.name_en,
+      emoji: c.emoji,
+      color: c.color,
+      ink: c.ink,
+      days: { ru: c.days_ru, en: c.days_en },
+      time: c.time,
+      price: c.price,
+      kids: c.kids,
+    }));
+  };
+
+  window.addClubMember = async function (clubId, childId) {
+    const res = await fetch(`${window.API_BASE}/clubs/${clubId}/members/${encodeURIComponent(childId)}`, { method: 'POST' });
+    if (!res.ok) throw new Error(`POST /clubs member failed: ${res.status}`);
+  };
+
+  window.removeClubMember = async function (clubId, childId) {
+    const res = await fetch(`${window.API_BASE}/clubs/${clubId}/members/${encodeURIComponent(childId)}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error(`DELETE /clubs member failed: ${res.status}`);
+  };
+
+  window.loadClubAttendance = async function (clubId, date) {
+    const res = await fetch(`${window.API_BASE}/club-attendance/${clubId}/${encodeURIComponent(date)}`);
+    if (!res.ok) throw new Error(`GET /club-attendance failed: ${res.status}`);
+    return res.json();
+  };
+
+  window.saveClubAttendance = async function (clubId, date, statuses) {
+    const res = await fetch(`${window.API_BASE}/club-attendance/${clubId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date, statuses }),
+    });
+    if (!res.ok) throw new Error(`POST /club-attendance failed: ${res.status}`);
+  };
+
+  window.loadClubPayments = async function (month, clubId) {
+    const res = await fetch(`${window.API_BASE}/club-payments/${encodeURIComponent(month)}/${clubId}`);
+    if (!res.ok) throw new Error(`GET /club-payments failed: ${res.status}`);
+    return res.json();
+  };
+
+  window.saveClubPayments = async function (month, clubId, paid) {
+    const res = await fetch(`${window.API_BASE}/club-payments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ month, club_id: clubId, paid }),
+    });
+    if (!res.ok) throw new Error(`POST /club-payments failed: ${res.status}`);
+  };
+
   window.setChildEmoji = async function (childId, emoji) {
     const res = await fetch(`${window.API_BASE}/children/${encodeURIComponent(childId)}/emoji`, {
       method: 'PUT',
@@ -1337,6 +1395,9 @@ function ScoutBadgeRow({ kid, grp, status, onEdit, onDelete }) {
   petals.push(...careBadges(kid));
   if (kid.napTime) petals.push({ emoji: '😴', label: 'Nap time', tone: 'info' });
   if (kid.afterSchool) petals.push({ emoji: '🏫', label: 'After school', tone: 'amenity' });
+  DATA.CLUBS.filter(c => c.kids.includes(kid.id)).forEach(c =>
+    petals.push({ emoji: c.emoji, label: Lo(c), bg: c.color, ink: c.ink })
+  );
   const all = group ? [group, ...petals] : petals;
 
   const actionStyle = {
@@ -2798,6 +2859,7 @@ const PAY_PALETTE   = ['#FBE7A8','#CDE8FB','#D4F0DF','#FBD9E1','#FBE0C0','#E8D5F
 const PAY_CLUB_PRICE = { chess: 60, swimming: 80 };
 
 function fmtMoney(n) {
+  if (n == null) return '—';
   if (!n) return '0';
   return n % 1000 === 0 ? `${n / 1000}k` : String(n);
 }
@@ -3131,7 +3193,7 @@ function PaymentsGardenScreen() {
 }
 
 function PaymentsClubsScreen() {
-  const [clubId,    setClubId]   = React.useState(() => DATA.CLUBS[0].id);
+  const [clubId,    setClubId]   = React.useState(() => DATA.CLUBS[0]?.id ?? null);
   const [payFilter, setPayFilter] = React.useState('all');
   const curCalMonthIdx = React.useMemo(() => {
     const m = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'][new Date().getMonth()];
@@ -3140,37 +3202,54 @@ function PaymentsClubsScreen() {
   }, []);
   const maxMonthIdx = Math.min(curCalMonthIdx + 1, GARDEN_MONTHS.length - 1);
   const [monthIdx,  setMonthIdx] = React.useState(curCalMonthIdx);
+  const [paid,      setPaid]     = React.useState({});
+  const [saved,     setSaved]    = React.useState({});
+  const [saving,    setSaving]   = React.useState(false);
   const touchStart = React.useRef(null);
 
-  const initPaid = () => {
-    const m = {};
-    GARDEN_MONTHS.forEach((mo, mi) => {
-      m[mo.id] = {};
-      DATA.CLUBS.forEach(c => c.kids.forEach((id, i) => { m[mo.id][`${c.id}_${id}`] = mi === 0 && i % 2 === 0; }));
-    });
-    return m;
-  };
-  const [paid,  setPaid]  = React.useState(initPaid);
-  const [saved, setSaved] = React.useState(initPaid);
-
   const mo         = GARDEN_MONTHS[monthIdx];
-  const curPaid    = paid[mo.id];
   const activeClub = DATA.CLUBS.find(c => c.id === clubId);
-  const cKey       = kid => `${clubId}_${kid.id}`;
-  const allKids    = DATA.CHILDREN.filter(k => activeClub.kids.includes(k.id));
-  const countPaid   = allKids.filter(k =>  curPaid[cKey(k)]).length;
-  const countUnpaid = allKids.filter(k => !curPaid[cKey(k)]).length;
-  const total       = countPaid * PAY_CLUB_PRICE[clubId];
-  const kids        = allKids.filter(k => payFilter === 'paid' ? curPaid[cKey(k)] : payFilter === 'unpaid' ? !curPaid[cKey(k)] : true);
-  const hasChanges  = GARDEN_MONTHS.some(m => Object.keys(paid[m.id]).some(k => (paid[m.id][k]||false) !== (saved[m.id][k]||false)));
+  const allKids    = activeClub ? DATA.CHILDREN.filter(k => activeClub.kids.includes(k.id)) : [];
+  const curPaid    = paid[`${mo.id}_${clubId}`] || {};
+  const curSaved   = saved[`${mo.id}_${clubId}`] || {};
+  const countPaid   = allKids.filter(k =>  curPaid[k.id]).length;
+  const countUnpaid = allKids.filter(k => !curPaid[k.id]).length;
+  const price       = activeClub?.price ?? null;
+  const total       = price != null ? countPaid * price : null;
+  const kids        = allKids.filter(k => payFilter === 'paid' ? curPaid[k.id] : payFilter === 'unpaid' ? !curPaid[k.id] : true);
+  const hasChanges  = JSON.stringify(curPaid) !== JSON.stringify(curSaved);
+
+  React.useEffect(() => {
+    if (!clubId || !mo) return;
+    window.loadClubPayments(mo.id, clubId).then(remote => {
+      const key = `${mo.id}_${clubId}`;
+      setPaid(prev => ({ ...prev, [key]: remote }));
+      setSaved(prev => ({ ...prev, [key]: { ...remote } }));
+    }).catch(() => {});
+  }, [mo?.id, clubId]);
 
   function toggle(kid) {
-    const k = cKey(kid);
-    setPaid(prev => ({ ...prev, [mo.id]: { ...prev[mo.id], [k]: !prev[mo.id][k] } }));
+    const key = `${mo.id}_${clubId}`;
+    setPaid(prev => ({ ...prev, [key]: { ...(prev[key] || {}), [kid.id]: !(prev[key] || {})[kid.id] } }));
   }
-  function handleSave() { setSaved(JSON.parse(JSON.stringify(paid))); }
+
+  async function handleSave() {
+    if (!clubId) return;
+    setSaving(true);
+    const key = `${mo.id}_${clubId}`;
+    await window.saveClubPayments(mo.id, clubId, curPaid).catch(() => {});
+    setSaved(prev => ({ ...prev, [key]: { ...curPaid } }));
+    setSaving(false);
+  }
+
   function prevMonth() { if (monthIdx > 0) { setMonthIdx(i => i - 1); setPayFilter('all'); } }
   function nextMonth() { if (monthIdx < maxMonthIdx) { setMonthIdx(i => i + 1); setPayFilter('all'); } }
+
+  if (!activeClub) return (
+    <div style={{ padding: 20, color: 'var(--ink-faint)', fontSize: 14, textAlign: 'center' }}>
+      {L('Нет кружков', 'No clubs')}
+    </div>
+  );
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
@@ -3182,7 +3261,7 @@ function PaymentsClubsScreen() {
             background: clubId === c.id ? '#B07848' : '#FBF7F2',
             color: clubId === c.id ? '#fff' : 'var(--ink-soft)',
             boxShadow: clubId === c.id ? '0 6px 14px -6px #B07848' : 'none' }}>
-            {Lo(c)}
+            {c.emoji} {Lo(c)}
           </button>
         ))}
       </div>
@@ -3211,10 +3290,15 @@ function PaymentsClubsScreen() {
       </div>
       <PayStats cp={countPaid} cu={countUnpaid} total={total} filter={payFilter} onFilter={setPayFilter} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 9, padding: '0 20px' }}>
+        {allKids.length === 0 && (
+          <div style={{ textAlign: 'center', color: 'var(--ink-faint)', padding: 24, fontSize: 14 }}>
+            {L('Нет участников', 'No members')}
+          </div>
+        )}
         {kids.map(kid => (
-          <KidPayRow key={kid.id} kid={kid} isPaid={curPaid[cKey(kid)]}
+          <KidPayRow key={kid.id} kid={kid} isPaid={!!curPaid[kid.id]}
             onToggle={() => toggle(kid)}
-            amount={PAY_CLUB_PRICE[clubId]} />
+            amount={price} />
         ))}
       </div>
       <SaveBar hasChanges={hasChanges} onSave={handleSave} />
@@ -3248,12 +3332,65 @@ function ActivitiesScreen({ go }) {
 }
 
 function ClubScreen({ params }) {
-  const club = DATA.CLUBS.find(c => c.id === params.clubId);
-  const kids = DATA.CHILDREN.filter(k => club.kids.includes(k.id));
   const PALETTE = ['#FBE7A8','#CDE8FB','#D4F0DF','#FBD9E1','#FBE0C0','#E8D5FB'];
+  const [club, setClub] = React.useState(() => DATA.CLUBS.find(c => c.id === params.clubId));
+  const [tab, setTab] = React.useState('members');
+  const [addOpen, setAddOpen] = React.useState(false);
+  const [removing, setRemoving] = React.useState(null);
+  const [attDate, setAttDate] = React.useState(todayStr());
+  const [attData, setAttData] = React.useState({});
+  const [attSaving, setAttSaving] = React.useState(false);
+
+  const kids = DATA.CHILDREN.filter(k => club.kids.includes(k.id));
+  const notInClub = DATA.CHILDREN.filter(k => !club.kids.includes(k.id));
+
+  React.useEffect(() => {
+    if (tab !== 'attendance') return;
+    window.loadClubAttendance(club.id, attDate).then(setAttData).catch(() => setAttData({}));
+  }, [tab, attDate, club.id]);
+
+  async function reloadClub() {
+    await window.loadClubs().catch(() => {});
+    setClub(DATA.CLUBS.find(c => c.id === params.clubId));
+  }
+
+  async function handleAdd(childId) {
+    await window.addClubMember(club.id, childId);
+    await reloadClub();
+    setAddOpen(false);
+  }
+
+  async function handleRemove(childId) {
+    setRemoving(childId);
+    await window.removeClubMember(club.id, childId).catch(() => {});
+    await reloadClub();
+    setRemoving(null);
+  }
+
+  async function toggleAtt(childId) {
+    const cur = attData[childId] || 'absent';
+    const next = cur === 'present' ? 'absent' : 'present';
+    const updated = { ...attData, [childId]: next };
+    setAttData(updated);
+    setAttSaving(true);
+    await window.saveClubAttendance(club.id, attDate, updated).catch(() => {});
+    setAttSaving(false);
+  }
+
+  const tabBtn = (id, label) => (
+    <button key={id} onClick={() => setTab(id)} style={{
+      flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+      padding: '9px 4px', borderRadius: 999, fontSize: 13, fontWeight: 800,
+      background: tab === id ? club.ink : '#FBF7F2',
+      color: tab === id ? '#fff' : 'var(--ink-soft)',
+      boxShadow: tab === id ? `0 4px 12px -4px ${club.ink}88` : 'none',
+    }}>{label}</button>
+  );
+
   return (
     <div style={{ padding: '4px 20px 28px' }}>
-      <div style={{ background: club.color, borderRadius: 20, padding: '18px 20px', marginBottom: 18, display: 'flex', alignItems: 'center', gap: 16 }}>
+      {/* Header */}
+      <div style={{ background: club.color, borderRadius: 20, padding: '18px 20px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 16 }}>
         <div style={{ fontSize: 48, lineHeight: 1 }}>{club.emoji}</div>
         <div>
           <div style={{ fontSize: 22, fontWeight: 800, color: club.ink, fontFamily: 'var(--font-display)' }}>{Lo(club)}</div>
@@ -3262,21 +3399,117 @@ function ClubScreen({ params }) {
           </div>
         </div>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {kids.map((kid, i) => {
-          const grp = DATA.GROUPS.find(g => g.id === kid.group);
-          const kidIndex = DATA.CHILDREN.filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
-          return (
-            <Card key={kid.id} pad={12} style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2' }}>
-              <Avatar emoji={kid.emoji} color={PALETTE[kidIndex % PALETTE.length]} size={44} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}</div>
-                <span style={{ background: grp.color, color: grp.ink, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999 }}>{grp.emoji} {Lo(grp)}</span>
-              </div>
-            </Card>
-          );
-        })}
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+        {tabBtn('members', L('Участники', 'Members'))}
+        {tabBtn('attendance', L('Посещаемость', 'Attendance'))}
       </div>
+
+      {tab === 'members' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {kids.map(kid => {
+            const grp = DATA.GROUPS.find(g => g.id === kid.group);
+            const kidIndex = DATA.CHILDREN.filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
+            return (
+              <Card key={kid.id} pad={12} style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2' }}>
+                <Avatar emoji={kid.emoji} color={PALETTE[kidIndex % PALETTE.length]} size={44} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}</div>
+                  {grp && <span style={{ background: grp.color, color: grp.ink, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999 }}>{grp.emoji} {Lo(grp)}</span>}
+                </div>
+                <button onClick={() => handleRemove(kid.id)} disabled={removing === kid.id} className="bk-press" style={{
+                  border: 'none', background: '#FBE8E8', color: '#C04040', borderRadius: 10,
+                  padding: '6px 10px', fontSize: 15, cursor: 'pointer', opacity: removing === kid.id ? 0.5 : 1,
+                }}>✕</button>
+              </Card>
+            );
+          })}
+          <button onClick={() => setAddOpen(true)} className="bk-press" style={{
+            border: '2px dashed rgba(107,92,74,0.25)', background: 'transparent',
+            borderRadius: 16, padding: 14, fontSize: 14, fontWeight: 700,
+            color: 'var(--ink-soft)', cursor: 'pointer', fontFamily: 'inherit',
+          }}>+ {L('Добавить ребёнка', 'Add child')}</button>
+        </div>
+      )}
+
+      {tab === 'attendance' && (
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+            <input type="date" value={attDate} onChange={e => setAttDate(e.target.value)}
+              style={{ flex: 1, padding: '10px 14px', borderRadius: 12, border: '1.5px solid rgba(107,92,74,0.2)',
+                fontSize: 14, fontFamily: 'inherit', background: '#FBF7F2', color: 'var(--ink)', outline: 'none' }} />
+            {attSaving && <span style={{ fontSize: 12, color: 'var(--ink-faint)' }}>...</span>}
+          </div>
+          {kids.length === 0 && (
+            <div style={{ textAlign: 'center', color: 'var(--ink-faint)', padding: 24, fontSize: 14 }}>
+              {L('Нет участников', 'No members')}
+            </div>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+            {kids.map(kid => {
+              const grp = DATA.GROUPS.find(g => g.id === kid.group);
+              const kidIndex = DATA.CHILDREN.filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
+              const status = attData[kid.id] || 'absent';
+              return (
+                <Card key={kid.id} pad={12} style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2' }}>
+                  <Avatar emoji={kid.emoji} color={PALETTE[kidIndex % PALETTE.length]} size={44} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}</div>
+                    {grp && <span style={{ background: grp.color, color: grp.ink, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999 }}>{grp.emoji} {Lo(grp)}</span>}
+                  </div>
+                  <button onClick={() => toggleAtt(kid.id)} className="bk-press" style={{
+                    border: 'none', borderRadius: 10, padding: '6px 14px',
+                    fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                    background: status === 'present' ? '#D4F0DF' : '#E7E1D9',
+                    color: status === 'present' ? '#1F6B4A' : '#6B5C4A',
+                  }}>{status === 'present' ? L('Пришёл', 'Present') : L('Нет', 'Absent')}</button>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Add member sheet */}
+      {addOpen && (
+        <div onClick={() => setAddOpen(false)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 200,
+          display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--bg)', borderRadius: '22px 22px 0 0', padding: '20px 20px 36px',
+            maxHeight: '70vh', display: 'flex', flexDirection: 'column',
+          }}>
+            <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)', marginBottom: 14 }}>
+              {L('Добавить в кружок', 'Add to club')}
+            </div>
+            <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 9 }}>
+              {notInClub.length === 0 && (
+                <div style={{ textAlign: 'center', color: 'var(--ink-faint)', padding: 24, fontSize: 14 }}>
+                  {L('Все дети уже записаны', 'All children already enrolled')}
+                </div>
+              )}
+              {notInClub.map(kid => {
+                const grp = DATA.GROUPS.find(g => g.id === kid.group);
+                const kidIndex = DATA.CHILDREN.filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
+                return (
+                  <Card key={kid.id} pad={12} onClick={() => handleAdd(kid.id)} style={{
+                    display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2', cursor: 'pointer',
+                  }}>
+                    <Avatar emoji={kid.emoji} color={PALETTE[kidIndex % PALETTE.length]} size={44} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}</div>
+                      {grp && <span style={{ background: grp.color, color: grp.ink, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999 }}>{grp.emoji} {Lo(grp)}</span>}
+                    </div>
+                    <span style={{ fontSize: 20, color: club.ink }}>+</span>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -3400,6 +3633,7 @@ function App() {
   React.useEffect(() => {
     Promise.all([
       window.loadChildren(),
+      window.loadClubs().catch(() => {}),
       window.loadFeed().then(() => setFeed(DATA.FEED.map(f => ({ ...f })))).catch(() => {}),
     ])
       .then(() => window.loadAttendance(todayStr()).catch(() => loadStoredAttendance() || {}))
