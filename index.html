@@ -1993,14 +1993,25 @@ const ALLERGENS = [
   { id: 'fish',       en: 'Fish',       ru: 'Рыба' },
   { id: 'shellfish',  en: 'Shellfish',  ru: 'Морепродукты' },
   { id: 'strawberry', en: 'Strawberry', ru: 'Клубника' },
+  { id: 'citrus',     en: 'Citrus',     ru: 'Цитрусы' },
+  { id: 'chocolate',  en: 'Chocolate',  ru: 'Шоколад' },
+  { id: 'pork',       en: 'Pork',       ru: 'Свинина' },
 ];
+
+const _ALLERGEN_ALIASES = {
+  citrus:    ['citrus', 'grapefruit', 'orange', 'lemon', 'цитрус'],
+  chocolate: ['chocolate', 'cocoa', 'шоколад', 'какао'],
+  pork:      ['pork', 'pig', 'свинин'],
+  shellfish: ['shellfish', 'seafood', 'морепродукт'],
+  strawberry:['strawberry', 'berry', 'клубник', 'ягод'],
+};
 
 function parseAllergens(str) {
   const s = str || '';
-  const found = ALLERGENS.filter(a =>
-    new RegExp('\\b' + a.en + '\\b', 'i').test(s) ||
-    new RegExp('\\b' + a.ru + '\\b', 'i').test(s)
-  ).map(a => a.id);
+  const found = ALLERGENS.filter(a => {
+    const aliases = _ALLERGEN_ALIASES[a.id] || [a.en.toLowerCase(), a.ru.toLowerCase()];
+    return aliases.some(kw => new RegExp('\\b' + kw, 'i').test(s));
+  }).map(a => a.id);
   let note = s;
   for (const a of ALLERGENS.filter(x => found.includes(x.id))) {
     note = note.replace(new RegExp(',?\\s*' + a.en + '\\s*,?', 'gi'), ',');
