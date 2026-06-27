@@ -1350,20 +1350,20 @@ function ScoutBadge({ emoji, text, dot, label, tone, bg, ink, compact }) {
 
 function allergyEmoji(text) {
   const s = text.toLowerCase();
-  if (s.includes('grapefruit')) return '🍇';
-  if (s.includes('citrus') || s.includes('orange') || s.includes('lemon')) return '🍊';
-  if (s.includes('shellfish') || s.includes('seafood') || s.includes('морепродукт')) return '🦐';
+  if (s.includes('grapefruit')) return '🍇🚫';
+  if (s.includes('citrus') || s.includes('orange') || s.includes('lemon')) return '🍊🚫';
+  if (s.includes('shellfish') || s.includes('seafood') || s.includes('морепродукт')) return '🦐🚫';
   if (s.includes('pork') || s.includes('pig')) return '🐖🚫';
-  if (s.includes('gluten') || s.includes('wheat')) return '🌾';
-  if (s.includes('milk') || s.includes('dairy') || s.includes('lactose')) return '🥛';
-  if (s.includes('peanut') || s.includes('nut')) return '🥜';
-  if (s.includes('egg')) return '🥚';
-  if (s.includes('fish')) return '🐟';
-  if (s.includes('soy')) return '🌱';
-  if (s.includes('chocolate') || s.includes('cocoa')) return '🍫';
-  if (s.includes('strawberry') || s.includes('berry')) return '🍓';
-  if (s.includes('dust')) return '🌫️';
-  if (s.includes('pollen')) return '🌼';
+  if (s.includes('gluten') || s.includes('wheat')) return '🌾🚫';
+  if (s.includes('milk') || s.includes('dairy') || s.includes('lactose')) return '🥛🚫';
+  if (s.includes('peanut') || s.includes('nut')) return '🥜🚫';
+  if (s.includes('egg')) return '🥚🚫';
+  if (s.includes('fish')) return '🐟🚫';
+  if (s.includes('soy')) return '🌱🚫';
+  if (s.includes('chocolate') || s.includes('cocoa')) return '🍫🚫';
+  if (s.includes('strawberry') || s.includes('berry')) return '🍓🚫';
+  if (s.includes('dust')) return '🌫️🚫';
+  if (s.includes('pollen')) return '🌼🚫';
   return '⚠️';
 }
 
@@ -2090,17 +2090,17 @@ const _FINP = {
 };
 
 const ALLERGENS = [
-  { id: 'nuts',       en: 'Nuts',       ru: 'Орехи',        emoji: '🥜' },
-  { id: 'dairy',      en: 'Dairy',      ru: 'Молоко',       emoji: '🥛' },
-  { id: 'eggs',       en: 'Eggs',       ru: 'Яйца',         emoji: '🥚' },
-  { id: 'gluten',     en: 'Gluten',     ru: 'Глютен',       emoji: '🌾' },
-  { id: 'soy',        en: 'Soy',        ru: 'Соя',          emoji: '🌱' },
-  { id: 'fish',       en: 'Fish',       ru: 'Рыба',         emoji: '🐟' },
-  { id: 'shellfish',  en: 'Shellfish',  ru: 'Морепродукты', emoji: '🦐' },
-  { id: 'strawberry', en: 'Strawberry', ru: 'Клубника',     emoji: '🍓' },
-  { id: 'citrus',     en: 'Citrus',     ru: 'Цитрусы',      emoji: '🍊' },
-  { id: 'grapefruit', en: 'Grapefruit', ru: 'Грейпфрут',   emoji: '🍇' },
-  { id: 'chocolate',  en: 'Chocolate',  ru: 'Шоколад',      emoji: '🍫' },
+  { id: 'nuts',       en: 'Nuts',       ru: 'Орехи',        emoji: '🥜🚫' },
+  { id: 'dairy',      en: 'Dairy',      ru: 'Молоко',       emoji: '🥛🚫' },
+  { id: 'eggs',       en: 'Eggs',       ru: 'Яйца',         emoji: '🥚🚫' },
+  { id: 'gluten',     en: 'Gluten',     ru: 'Глютен',       emoji: '🌾🚫' },
+  { id: 'soy',        en: 'Soy',        ru: 'Соя',          emoji: '🌱🚫' },
+  { id: 'fish',       en: 'Fish',       ru: 'Рыба',         emoji: '🐟🚫' },
+  { id: 'shellfish',  en: 'Shellfish',  ru: 'Морепродукты', emoji: '🦐🚫' },
+  { id: 'strawberry', en: 'Strawberry', ru: 'Клубника',     emoji: '🍓🚫' },
+  { id: 'citrus',     en: 'Citrus',     ru: 'Цитрусы',      emoji: '🍊🚫' },
+  { id: 'grapefruit', en: 'Grapefruit', ru: 'Грейпфрут',   emoji: '🍇🚫' },
+  { id: 'chocolate',  en: 'Chocolate',  ru: 'Шоколад',      emoji: '🍫🚫' },
 ];
 
 const _ALLERGEN_ALIASES = {
