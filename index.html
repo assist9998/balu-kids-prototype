@@ -2109,7 +2109,7 @@ const ALLERGENS = [
 ];
 
 const _ALLERGEN_ALIASES = {
-  citrus:    ['citrus', 'grapefruit', 'orange', 'lemon', 'цитрус'],
+  citrus:    ['citrus', 'orange', 'lemon', 'цитрус'],
   chocolate: ['chocolate', 'cocoa', 'шоколад', 'какао'],
   shellfish: ['shellfish', 'seafood', 'морепродукт'],
   strawberry:['strawberry', 'berry', 'клубник', 'ягод'],
@@ -2865,8 +2865,7 @@ function ComposeScreen({ back, actions }) {
   );
 }
 
-const PAY_PALETTE   = ['#FBE7A8','#CDE8FB','#D4F0DF','#FBD9E1','#FBE0C0','#E8D5FB'];
-const PAY_CLUB_PRICE = { chess: 60, swimming: 80 };
+const PAY_PALETTE = ['#FBE7A8','#CDE8FB','#D4F0DF','#FBD9E1','#FBE0C0','#E8D5FB'];
 
 function fmtMoney(n) {
   if (n == null) return '—';
@@ -3051,7 +3050,6 @@ function PaymentsGardenScreen() {
   const [days,      setDays]      = React.useState(initEmpty);
   const [savedDays, setSavedDays] = React.useState(initEmpty);
   const [loadedMonths, setLoadedMonths] = React.useState({});
-  const [secDays,  setSecDays]  = React.useState(() => { const m = {}; GARDEN_MONTHS.forEach(mo => { m[mo.id] = new Date().getDate(); }); return m; });
 
   const mo = GARDEN_MONTHS[monthIdx];
 
@@ -3166,23 +3164,6 @@ function PaymentsGardenScreen() {
             fontSize: 20, color: '#B07848', fontWeight: 800, lineHeight: 1 }}>›</button>
         </div>
       </div>
-      {isTour && (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '0 20px 14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, width: '100%',
-            background: '#FBF7F2', borderRadius: 999, padding: '9px 18px',
-            boxShadow: '0 1px 3px rgba(60,40,20,0.07)', userSelect: 'none' }}>
-            <button onClick={() => setSecDays(p => ({ ...p, [mo.id]: Math.max(1, p[mo.id] - 1) }))}
-              style={{ border: 'none', background: 'none', padding: 0, cursor: secDays[mo.id] > 1 ? 'pointer' : 'default',
-                opacity: secDays[mo.id] > 1 ? 1 : 0.2, fontSize: 20, color: '#B07848', fontWeight: 800, lineHeight: 1 }}>‹</button>
-            <span style={{ flex: 1, textAlign: 'center', fontSize: 15, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>
-              {secDays[mo.id]}
-            </span>
-            <button onClick={() => setSecDays(p => ({ ...p, [mo.id]: Math.min(31, p[mo.id] + 1) }))}
-              style={{ border: 'none', background: 'none', padding: 0, cursor: secDays[mo.id] < 31 ? 'pointer' : 'default',
-                opacity: secDays[mo.id] < 31 ? 1 : 0.2, fontSize: 20, color: '#B07848', fontWeight: 800, lineHeight: 1 }}>›</button>
-          </div>
-        </div>
-      )}
       <PayStats cp={countPaid} cu={countUnpaid} total={total} filter={payFilter} onFilter={setPayFilter} />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 9, padding: '0 20px' }}>
@@ -3348,15 +3329,15 @@ function ClubScreen({ params }) {
   const [attData, setAttData] = React.useState({});
   const [attSaving, setAttSaving] = React.useState(false);
 
+  React.useEffect(() => {
+    if (!club || tab !== 'attendance') return;
+    window.loadClubAttendance(club.id, attDate).then(setAttData).catch(() => setAttData({}));
+  }, [tab, attDate, club?.id]);
+
   if (!club) return <div style={{ padding: 20, color: 'var(--ink-faint)', fontSize: 14, textAlign: 'center' }}>—</div>;
 
   const kids = DATA.CHILDREN.filter(k => club.kids.includes(k.id));
   const notInClub = DATA.CHILDREN.filter(k => !club.kids.includes(k.id));
-
-  React.useEffect(() => {
-    if (tab !== 'attendance') return;
-    window.loadClubAttendance(club.id, attDate).then(setAttData).catch(() => setAttData({}));
-  }, [tab, attDate, club.id]);
 
   async function reloadClub() {
     await window.loadClubs().catch(() => {});
