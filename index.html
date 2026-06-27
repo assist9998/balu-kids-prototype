@@ -3341,6 +3341,8 @@ function ClubScreen({ params }) {
   const [attData, setAttData] = React.useState({});
   const [attSaving, setAttSaving] = React.useState(false);
 
+  if (!club) return <div style={{ padding: 20, color: 'var(--ink-faint)', fontSize: 14, textAlign: 'center' }}>—</div>;
+
   const kids = DATA.CHILDREN.filter(k => club.kids.includes(k.id));
   const notInClub = DATA.CHILDREN.filter(k => !club.kids.includes(k.id));
 
