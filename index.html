@@ -1350,7 +1350,7 @@ function ScoutBadge({ emoji, text, dot, label, tone, bg, ink, compact }) {
 
 function allergyEmoji(text) {
   const s = text.toLowerCase();
-  if (s.includes('grapefruit')) return '🍇🚫';
+  if (s.includes('grapefruit')) return '🍊🚫';
   if (s.includes('citrus') || s.includes('orange') || s.includes('lemon')) return '🍊🚫';
   if (s.includes('shellfish') || s.includes('seafood') || s.includes('морепродукт')) return '🦐🚫';
   if (s.includes('pork') || s.includes('pig')) return '🐖🚫';
@@ -2099,7 +2099,7 @@ const ALLERGENS = [
   { id: 'shellfish',  en: 'Shellfish',  ru: 'Морепродукты', emoji: '🦐🚫' },
   { id: 'strawberry', en: 'Strawberry', ru: 'Клубника',     emoji: '🍓🚫' },
   { id: 'citrus',     en: 'Citrus',     ru: 'Цитрусы',      emoji: '🍊🚫' },
-  { id: 'grapefruit', en: 'Grapefruit', ru: 'Грейпфрут',   emoji: '🍇🚫' },
+  { id: 'grapefruit', en: 'Grapefruit', ru: 'Грейпфрут',   emoji: '🍊🚫' },
   { id: 'chocolate',  en: 'Chocolate',  ru: 'Шоколад',      emoji: '🍫🚫' },
 ];
 
