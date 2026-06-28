@@ -339,6 +339,29 @@ window.API_BASE = "https://rmxois1uv0a24xrbi2dfcfac.95.179.188.141.sslip.io";
     return res.json();
   };
 
+  window.addStaff = async function (data) {
+    const res = await fetch(`${window.API_BASE}/staff`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error(`POST /staff failed: ${res.status}`);
+  };
+
+  window.updateStaff = async function (oldName, data) {
+    const res = await fetch(`${window.API_BASE}/staff/${encodeURIComponent(oldName)}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error(`PUT /staff failed: ${res.status}`);
+  };
+
+  window.deleteStaff = async function (name) {
+    const res = await fetch(`${window.API_BASE}/staff/${encodeURIComponent(name)}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error(`DELETE /staff failed: ${res.status}`);
+  };
+
   window.updateChild = async function (childId, data) {
     const res = await fetch(`${window.API_BASE}/children/${encodeURIComponent(childId)}`, {
       method: 'PUT',
@@ -3636,14 +3659,153 @@ function positionEmoji(pos) {
   return '👩‍🏫';
 }
 
+// ── StaffFormSheet ────────────────────────────────────────────────────────────
+
+function StaffFormSheet({ member, onClose, onSaved }) {
+  const isEdit = !!member;
+  const [form, setForm] = React.useState(() => ({
+    name:        member?.name        || '',
+    position:    member?.position    || '',
+    contractEnd: member?.contractEnd || '',
+    phone:       member?.phone       || '',
+    password:    '',  // never prefill password
+  }));
+  const [saving,        setSaving]        = React.useState(false);
+  const [deleting,      setDeleting]      = React.useState(false);
+  const [deleteConfirm, setDeleteConfirm] = React.useState(false);
+  const [error,         setError]         = React.useState(null);
+
+  function set(field) { return e => setForm(f => ({ ...f, [field]: e.target.value })); }
+
+  async function handleSave() {
+    if (!form.name.trim()) { setError(L('Введите имя', 'Enter name')); return; }
+    setSaving(true); setError(null);
+    try {
+      if (isEdit) {
+        await window.updateStaff(member.name, { ...form, name: form.name.trim() });
+      } else {
+        await window.addStaff({ ...form, name: form.name.trim() });
+      }
+      onSaved();
+    } catch(e) { setError(e.message); setSaving(false); }
+  }
+
+  async function handleDelete() {
+    setDeleting(true);
+    try {
+      await window.deleteStaff(member.name);
+      onSaved();
+    } catch(e) { alert(e.message); setDeleting(false); setDeleteConfirm(false); }
+  }
+
+  const INP = { width: '100%', boxSizing: 'border-box', border: '1.5px solid #DDD8CF', borderRadius: 12,
+    padding: '11px 14px', fontFamily: 'inherit', fontSize: 14, background: '#FBF7F2',
+    color: 'var(--ink)', outline: 'none' };
+  const LBL = { fontSize: 11, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase',
+    color: 'var(--ink-soft)', marginBottom: 5, display: 'block' };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'flex-end',
+      background: 'rgba(0,0,0,0.4)' }} onClick={onClose}>
+      <div style={{ width: '100%', background: 'var(--bg)', borderRadius: '24px 24px 0 0',
+        maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}
+        onClick={e => e.stopPropagation()}>
+
+        {/* Handle + title */}
+        <div style={{ flexShrink: 0, padding: '12px 20px 12px', borderBottom: '1px solid rgba(60,40,20,0.07)' }}>
+          <div style={{ width: 40, height: 4, background: 'rgba(60,40,20,0.15)', borderRadius: 2, margin: '0 auto 12px' }} />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>
+              {isEdit ? L('Редактировать', 'Edit staff') : L('Новый сотрудник', 'Add staff')}
+            </div>
+            <button onClick={onClose} style={{ border: 'none', background: 'none', fontSize: 24,
+              cursor: 'pointer', color: 'var(--ink-faint)', padding: 4 }}>×</button>
+          </div>
+        </div>
+
+        {/* Fields */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px 8px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <label style={LBL}>{L('Имя', 'Name')}</label>
+              <input style={INP} value={form.name} onChange={set('name')} placeholder="Анна Иванова" />
+            </div>
+            <div>
+              <label style={LBL}>{L('Должность', 'Position')}</label>
+              <input style={INP} value={form.position} onChange={set('position')} placeholder={L('Воспитатель', 'Teacher')} />
+            </div>
+            <div>
+              <label style={LBL}>{L('Договор до', 'Contract until')}</label>
+              <input style={INP} value={form.contractEnd} onChange={set('contractEnd')} placeholder="31.12.2026" />
+            </div>
+            <div>
+              <label style={LBL}>{L('Телефон', 'Phone')}</label>
+              <input style={INP} type="tel" value={form.phone} onChange={set('phone')} placeholder="+7 999 000 00 00" />
+            </div>
+            <div>
+              <label style={LBL}>{L('Пароль для входа', 'Login password')}</label>
+              <input style={INP} type="password" value={form.password} onChange={set('password')}
+                placeholder={isEdit ? L('Оставьте пустым — не изменится', 'Leave blank to keep current') : ''} />
+            </div>
+          </div>
+
+          {error && <div style={{ marginTop: 12, fontSize: 13, color: 'var(--no)', fontWeight: 600 }}>{error}</div>}
+
+          {/* Save */}
+          <button onClick={handleSave} disabled={saving} className="bk-press" style={{
+            width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-display)',
+            background: '#B07848', color: '#fff', fontSize: 15, fontWeight: 800,
+            padding: 14, borderRadius: 16, marginTop: 20, opacity: saving ? 0.7 : 1 }}>
+            {saving ? '…' : L('Сохранить', 'Save')}
+          </button>
+
+          {/* Delete */}
+          {isEdit && !deleteConfirm && (
+            <button onClick={() => setDeleteConfirm(true)} className="bk-press" style={{
+              width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+              background: 'none', color: '#E05555', fontSize: 14, fontWeight: 700,
+              padding: '14px 0 4px' }}>
+              🗑️ {L('Удалить сотрудника', 'Delete staff member')}
+            </button>
+          )}
+          {isEdit && deleteConfirm && (
+            <div style={{ marginTop: 12, background: '#FFF0F0', borderRadius: 14, padding: 16 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#a03030', marginBottom: 12 }}>
+                {L(`Удалить ${member.name}?`, `Delete ${member.name}?`)}
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button onClick={() => setDeleteConfirm(false)} className="bk-press" style={{
+                  flex: 1, border: 'none', cursor: 'pointer', background: '#EDE8E0',
+                  borderRadius: 12, padding: 11, fontFamily: 'inherit', fontSize: 14, fontWeight: 800 }}>
+                  {L('Отмена', 'Cancel')}
+                </button>
+                <button onClick={handleDelete} disabled={deleting} className="bk-press" style={{
+                  flex: 1, border: 'none', cursor: 'pointer', background: '#E05555',
+                  borderRadius: 12, padding: 11, fontFamily: 'inherit', fontSize: 14, fontWeight: 800, color: '#fff' }}>
+                  {deleting ? '…' : L('Удалить', 'Delete')}
+                </button>
+              </div>
+            </div>
+          )}
+          <div style={{ height: 24 }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── TeamScreen ────────────────────────────────────────────────────────────────
 
 function TeamScreen({ go }) {
-  const [staff, setStaff] = React.useState(null);
+  const [staff,     setStaff]     = React.useState(null);
+  const [formOpen,  setFormOpen]  = React.useState(false);
+  const [editMember, setEditMember] = React.useState(null);
 
-  React.useEffect(() => {
+  function reload() {
     window.loadStaff().then(setStaff).catch(() => setStaff([]));
-  }, []);
+  }
+
+  React.useEffect(reload, []);
 
   const today = todayStr();
 
@@ -3669,21 +3831,19 @@ function TeamScreen({ go }) {
         <div style={{ textAlign: 'center', padding: 40, color: 'var(--ink-faint)', fontSize: 13 }}>…</div>
       )}
       {staff !== null && staff.length === 0 && (
-        <div style={{ textAlign: 'center', padding: 40, color: 'var(--ink-faint)', fontSize: 14 }}>
-          {L('Нет сотрудников. Добавьте их в лист «Staff» таблицы.', 'No staff found. Add them to the Staff sheet.')}
+        <div style={{ textAlign: 'center', padding: 32, color: 'var(--ink-faint)', fontSize: 14 }}>
+          {L('Нет сотрудников', 'No staff yet')}
         </div>
       )}
+
       {(staff || []).map(s => {
         const days = contractDaysLeft(s.contractEnd);
-        const isExpired   = days !== null && days < 0;
-        const isExpiring  = days !== null && days >= 0 && days <= 30;
+        const isExpired  = days !== null && days < 0;
+        const isExpiring = days !== null && days >= 0 && days <= 30;
         return (
-          <button key={s.name} onClick={() => go('staff-daily', { name: s.name, date: today })}
-            className="bk-press" style={{
-            width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-            background: 'var(--card)', borderRadius: 18, padding: '14px 16px',
+          <div key={s.name} style={{ background: 'var(--card)', borderRadius: 18, padding: '14px 16px',
             marginBottom: 12, display: 'flex', alignItems: 'center', gap: 14,
-            boxShadow: '0 2px 10px rgba(60,40,20,0.07)', textAlign: 'left' }}>
+            boxShadow: '0 2px 10px rgba(60,40,20,0.07)' }}>
             <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#EDE8E0',
               display: 'grid', placeItems: 'center', fontSize: 24, flexShrink: 0 }}>
               {positionEmoji(s.position)}
@@ -3703,15 +3863,35 @@ function TeamScreen({ go }) {
                 </div>
               )}
             </div>
-            {s.phone ? (
+            {s.phone && (
               <a href={`tel:${s.phone}`} onClick={e => e.stopPropagation()}
                 style={{ width: 36, height: 36, borderRadius: '50%', background: '#D4F0DF',
                   display: 'grid', placeItems: 'center', fontSize: 16, flexShrink: 0,
                   textDecoration: 'none' }}>📞</a>
-            ) : null}
-          </button>
+            )}
+            <button onClick={() => { setEditMember(s); setFormOpen(true); }} className="bk-press" style={{
+              width: 36, height: 36, borderRadius: '50%', background: '#EDE8E0',
+              border: 'none', cursor: 'pointer', display: 'grid', placeItems: 'center',
+              fontSize: 15, flexShrink: 0 }}>✏️</button>
+          </div>
         );
       })}
+
+      {/* Add button */}
+      <button onClick={() => { setEditMember(null); setFormOpen(true); }} className="bk-press" style={{
+        width: '100%', border: '2px dashed #C8BEB0', cursor: 'pointer', fontFamily: 'inherit',
+        background: 'none', color: 'var(--ink-soft)', fontSize: 14, fontWeight: 700,
+        padding: '13px 0', borderRadius: 18, marginTop: 4 }}>
+        + {L('Добавить сотрудника', 'Add staff member')}
+      </button>
+
+      {formOpen && (
+        <StaffFormSheet
+          member={editMember}
+          onClose={() => setFormOpen(false)}
+          onSaved={() => { setFormOpen(false); reload(); }}
+        />
+      )}
     </div>
   );
 }
