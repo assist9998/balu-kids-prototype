@@ -1681,7 +1681,7 @@ function HomeScreen({ go, statuses, feed, homeStyle }) {
       badge: `${rate}%` },
     { key: 'notifications', emoji: '⭐', color: '#FBD9E1', colorLight: '#FDF0F3', colorDark: '#C9ADBA', ink: '#a8456a', go: 'notifications',
       badge: unread ? `${unread} ${t('unread')}` : null, dot: unread > 0, count: unread },
-    ...(window.__isDirector ? [
+    ...((window.__isDirector || window.__isTeacher) ? [
       { key: 'team', emoji: '👩‍🏫', color: '#E8E0D5', colorLight: '#F2EDE8', colorDark: '#C0B5A8', ink: '#5a4a30', go: 'team',
         badge: null },
     ] : []),
@@ -2663,7 +2663,7 @@ function SummaryScreen({ statuses, go }) {
               <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 700, marginTop: 4 }}>{s.label}</div>
             </div>
           ))}
-          {!window.__isStaff && (
+          {!(window.__isStaff || window.__isTeacher) && (
             <div style={{ flex: 1.4, textAlign: 'center', borderRadius: 14, padding: '12px 8px',
               background: '#fff', boxShadow: '0 1px 4px rgba(60,40,20,0.07)' }}>
               <div style={{ fontSize: 22, fontWeight: 800, color: '#B07848', lineHeight: 1, fontFamily: 'var(--font-display)' }}>{totalCollected > 0 ? totalCollected.toLocaleString() : '—'}</div>
@@ -2971,7 +2971,7 @@ function PayStats({ cp, cu, total, filter, onFilter }) {
     <div style={{ display: 'flex', gap: 10, padding: '0 20px 16px' }}>
       {statBox('paid',   cp, L('Оплатили', 'Paid'),      'var(--ok)')}
       {statBox('unpaid', cu, L('Не оплатили', 'Unpaid'), 'var(--no)')}
-      {!window.__isStaff && (
+      {!(window.__isStaff || window.__isTeacher) && (
         <div style={{ flex: 1.4, background: '#FBF7F2', borderRadius: 18, padding: '12px 8px', textAlign: 'center' }}>
           <div style={{ fontSize: 22, fontWeight: 600, color: '#B07848', lineHeight: 1 }}>{fmtMoney(total)}</div>
           <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 600, marginTop: 4 }}>{L('Собрано', 'Collected')}</div>
@@ -3011,7 +3011,7 @@ function KidPayRow({ kid, isPaid, onToggle, amount, tourDays, onDaysChange, tour
           {kid.dayType && <span style={{ background: '#E7E1D9', color: '#6B5C4A', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, marginLeft: 6 }}>{kid.dayType}</span>}
         </div>
         <div style={{ textAlign: 'right' }} onClick={tourDays !== undefined ? e => { e.stopPropagation(); onToggle(); } : undefined}>
-          {isPaid ? paidBadge : unpaidBadge(window.__isStaff
+          {isPaid ? paidBadge : unpaidBadge((window.__isStaff || window.__isTeacher)
             ? (tourDays !== undefined ? `${tourDays} ${L('дн.','days')}` : L('Не оплачено', 'Unpaid'))
             : (tourDays !== undefined ? `${fmtMoney(amount)} · ${tourDays} ${L('дн.','days')}` : fmtMoney(amount)))}
         </div>
@@ -3035,7 +3035,7 @@ function KidPayRow({ kid, isPaid, onToggle, amount, tourDays, onDaysChange, tour
                 textAlign: 'center', fontFamily: 'var(--font-display)' }}>{tourDays}</span>
               <button style={bigBtn} onClick={() => onDaysChange(tourDays + 1)}>+</button>
             </div>
-            {!window.__isStaff && (
+            {!(window.__isStaff || window.__isTeacher) && (
               <div style={{ textAlign: 'center', fontSize: 16, fontWeight: 700, color: 'var(--ink-soft)', marginBottom: 24 }}>
                 {fmtMoney(amount)}
               </div>
@@ -3668,7 +3668,8 @@ function StaffFormSheet({ member, onClose, onSaved }) {
     position:    member?.position    || '',
     contractEnd: member?.contractEnd || '',
     phone:       member?.phone       || '',
-    password:    '',  // never prefill password
+    rate:        member?.rate        || '',
+    password:    '',  // never prefill — blank = keep current on edit
   }));
   const [saving,        setSaving]        = React.useState(false);
   const [deleting,      setDeleting]      = React.useState(false);
@@ -3681,10 +3682,12 @@ function StaffFormSheet({ member, onClose, onSaved }) {
     if (!form.name.trim()) { setError(L('Введите имя', 'Enter name')); return; }
     setSaving(true); setError(null);
     try {
+      const payload = { ...form, name: form.name.trim() };
+      if (isEdit && !form.password.trim()) delete payload.password;
       if (isEdit) {
-        await window.updateStaff(member.name, { ...form, name: form.name.trim() });
+        await window.updateStaff(member.name, payload);
       } else {
-        await window.addStaff({ ...form, name: form.name.trim() });
+        await window.addStaff(payload);
       }
       onSaved();
     } catch(e) { setError(e.message); setSaving(false); }
@@ -3741,6 +3744,11 @@ function StaffFormSheet({ member, onClose, onSaved }) {
             <div>
               <label style={LBL}>{L('Телефон', 'Phone')}</label>
               <input style={INP} type="tel" value={form.phone} onChange={set('phone')} placeholder="+7 999 000 00 00" />
+            </div>
+            <div>
+              <label style={LBL}>{L('Ставка в день', 'Daily rate')}</label>
+              <input style={INP} type="number" inputMode="numeric" value={form.rate} onChange={set('rate')}
+                placeholder="0" />
             </div>
             <div>
               <label style={LBL}>{L('Пароль для входа', 'Login password')}</label>
@@ -3908,7 +3916,14 @@ function StaffDailyScreen({ params }) {
 
   React.useEffect(() => {
     Promise.all([window.loadStaff(), window.getStaffAttendance(date)])
-      .then(([s, rec]) => { setStaff(s); setRecords(rec); })
+      .then(([s, rec]) => {
+        // Teacher only sees themselves
+        const filtered = window.__isTeacher && window.__teacherName
+          ? s.filter(x => x.name === window.__teacherName)
+          : s;
+        setStaff(filtered);
+        setRecords(rec);
+      })
       .catch(() => {});
   }, [date]);
 
@@ -3926,6 +3941,9 @@ function StaffDailyScreen({ params }) {
   }
   function setTime(name, time) {
     setRecords(r => ({ ...r, [name]: { ...(r[name] || {}), arrival_time: time } }));
+  }
+  function setNote(name, note) {
+    setRecords(r => ({ ...r, [name]: { ...(r[name] || {}), note } }));
   }
 
   async function save() {
@@ -4015,6 +4033,15 @@ function StaffDailyScreen({ params }) {
                     fontFamily: 'inherit', fontSize: 13, background: '#FBF7F2', color: 'var(--ink)', outline: 'none' }} />
               </div>
             )}
+            {/* Note */}
+            <textarea value={rec.note || ''} onChange={e => setNote(s.name, e.target.value)}
+              placeholder={L('Заметка…', 'Note…')} rows={1}
+              style={{ marginTop: 10, width: '100%', boxSizing: 'border-box', resize: 'none',
+                border: '1.5px solid #DDD8CF', borderRadius: 10, padding: '7px 12px',
+                fontFamily: 'inherit', fontSize: 12.5, background: '#FBF7F2',
+                color: 'var(--ink)', outline: 'none', lineHeight: 1.4,
+                overflow: 'hidden', minHeight: 34 }}
+              onInput={e => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }} />
           </div>
         );
       })}
@@ -4102,6 +4129,8 @@ function StaffMonthlyScreen() {
         const unpaid  = countStatus(s.name, 'unpaid');
         const extra   = countStatus(s.name, 'extra');
         const allDays = data[s.name] || {};
+        const rate    = parseFloat(s.rate) || 0;
+        const salary  = rate > 0 ? worked * rate : null;
 
         return (
           <div key={s.name} style={{ background: 'var(--card)', borderRadius: 18, padding: '14px 16px',
@@ -4111,10 +4140,20 @@ function StaffMonthlyScreen() {
                 display: 'grid', placeItems: 'center', fontSize: 20, flexShrink: 0 }}>
                 {positionEmoji(s.position)}
               </div>
-              <div>
+              <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--ink)' }}>{s.name}</div>
                 <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{s.position}</div>
               </div>
+              {salary !== null && (
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: 17, fontWeight: 800, color: '#1f7a55' }}>
+                    {salary.toLocaleString()}
+                  </div>
+                  <div style={{ fontSize: 10.5, color: 'var(--ink-faint)', fontWeight: 600 }}>
+                    {rate.toLocaleString()} × {worked}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Calendar mini-grid */}
@@ -4124,14 +4163,16 @@ function StaffMonthlyScreen() {
                 const key = `${month}-${d}`;
                 const rec = allDays[key];
                 const st = rec?.status;
+                const time = st === 'late' && rec?.arrival_time ? rec.arrival_time : null;
                 return (
                   <div key={d} style={{
-                    aspectRatio: '1', borderRadius: 6, fontSize: 9, fontWeight: 800,
-                    display: 'grid', placeItems: 'center',
+                    borderRadius: 6, fontSize: 9, fontWeight: 800,
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    padding: '3px 1px',
                     background: st ? (SSTAFF_COLOR[st] || '#EDE8E0') : '#F5F2EE',
-                    color: st ? (SSTAFF_INK[st] || '#5a4a30') : '#C8BEB0',
-                    title: st ? staffStatusLabel(st) : '' }}>
-                    {i + 1}
+                    color: st ? (SSTAFF_INK[st] || '#5a4a30') : '#C8BEB0' }}>
+                    <span>{i + 1}</span>
+                    {time && <span style={{ fontSize: 7, lineHeight: 1.2, opacity: 0.85 }}>{time.slice(0,5)}</span>}
                   </div>
                 );
               })}
