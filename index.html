@@ -3934,19 +3934,22 @@ const MONTHS_EN = ['January','February','March','April','May','June','July','Aug
 
 function StaffScheduleScreen() {
   const today = new Date();
-  const [year,   setYear]   = React.useState(today.getFullYear());
-  const [month,  setMonth]  = React.useState(today.getMonth() + 1);
-  const [staff,  setStaff]  = React.useState([]);
-  const [data,   setData]   = React.useState({});
-  const [picker, setPicker] = React.useState(null);
+  const [year,    setYear]    = React.useState(today.getFullYear());
+  const [month,   setMonth]   = React.useState(today.getMonth() + 1);
+  const [staff,   setStaff]   = React.useState([]);
+  const [data,    setData]    = React.useState({});
+  const [loading, setLoading] = React.useState(true);
+  const [picker,  setPicker]  = React.useState(null);
 
   const monthKey = `${year}-${String(month).padStart(2,'0')}`;
 
   React.useEffect(() => {
+    setLoading(true);
     setData({});
     Promise.all([window.loadStaff(), window.getStaffMonthly(monthKey)])
       .then(([s, d]) => { setStaff(s); setData(d); })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, [year, month]);
 
   const daysInMonth = new Date(year, month, 0).getDate();
@@ -4009,13 +4012,16 @@ function StaffScheduleScreen() {
           background: '#EDE8E0', borderRadius: 10, fontSize: 18, fontWeight: 700, color: 'var(--ink)' }}>›</button>
       </div>
 
-      {staff.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '32px 20px', color: 'var(--ink-faint)', fontSize: 13 }}>
-          {Object.keys(data).length === 0 ? '…' : L('Нет сотрудников', 'No staff')}
+      {loading && (
+        <div style={{ textAlign: 'center', padding: '32px 20px', color: 'var(--ink-faint)', fontSize: 13 }}>…</div>
+      )}
+      {!loading && staff.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '32px 20px', color: 'var(--ink-soft)', fontSize: 14, fontWeight: 700 }}>
+          {L('Сначала добавьте сотрудников в разделе «Команда»', 'Add staff members in the Team section first')}
         </div>
       )}
 
-      {staff.length > 0 && (
+      {!loading && staff.length > 0 && (
         <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }}>
           <div style={{ display: 'inline-block', paddingLeft: 12, paddingRight: 16,
             minWidth: NAME_W + daysInMonth * (CELL_W + 2) + 24 }}>
