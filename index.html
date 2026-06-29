@@ -1698,10 +1698,11 @@ function HomeScreen({ go, statuses, feed, homeStyle }) {
       badge: `${rate}%` },
     { key: 'notifications', emoji: '⭐', color: '#FBD9E1', colorLight: '#FDF0F3', colorDark: '#C9ADBA', ink: '#a8456a', go: 'notifications',
       badge: unread ? `${unread} ${t('unread')}` : null, dot: unread > 0, count: unread },
-    ...((window.__isDirector || window.__isTeacher) ? [
-      { key: 'team', emoji: '👩‍🏫', color: '#E8E0D5', colorLight: '#F2EDE8', colorDark: '#C0B5A8', ink: '#5a4a30', go: 'team',
-        badge: null },
-    ] : []),
+    // HIDDEN: staff module (uncomment when presenting KP)
+    // ...((window.__isDirector || window.__isTeacher) ? [
+    //   { key: 'team', emoji: '👩‍🏫', color: '#E8E0D5', colorLight: '#F2EDE8', colorDark: '#C0B5A8', ink: '#5a4a30', go: 'team',
+    //     badge: null },
+    // ] : []),
   ];
 
   const hour = new Date().getHours();
