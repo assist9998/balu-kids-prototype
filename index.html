@@ -195,6 +195,7 @@
     arrivalTime:       { ru: 'Время прихода',   en: 'Arrival time' },
     staffLog:          { ru: 'Журнал',          en: 'Log' },
     staffMonthly:      { ru: 'Месяц',           en: 'Monthly' },
+    staffSchedule:     { ru: 'Расписание',      en: 'Schedule' },
     position:          { ru: 'Должность',       en: 'Position' },
     phone:             { ru: 'Телефон',         en: 'Phone' },
     noStaff:           { ru: 'Сотрудников нет', en: 'No staff' },
@@ -360,6 +361,22 @@ window.API_BASE = "https://rmxois1uv0a24xrbi2dfcfac.95.179.188.141.sslip.io";
       method: 'DELETE',
     });
     if (!res.ok) throw new Error(`DELETE /staff failed: ${res.status}`);
+  };
+
+  window.setStaffDay = async function (date, staffName, data) {
+    const res = await fetch(
+      `${window.API_BASE}/staff-attendance/${encodeURIComponent(date)}/${encodeURIComponent(staffName)}`,
+      { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }
+    );
+    if (!res.ok) throw new Error(`PUT /staff-attendance failed: ${res.status}`);
+  };
+
+  window.clearStaffDay = async function (date, staffName) {
+    const res = await fetch(
+      `${window.API_BASE}/staff-attendance/${encodeURIComponent(date)}/${encodeURIComponent(staffName)}`,
+      { method: 'DELETE' }
+    );
+    if (!res.ok) throw new Error(`DELETE /staff-attendance failed: ${res.status}`);
   };
 
   window.updateChild = async function (childId, data) {
@@ -3820,17 +3837,23 @@ function TeamScreen({ go }) {
   return (
     <div style={{ padding: '8px 20px 32px' }}>
       {/* Quick action buttons */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
         <button onClick={() => go('staff-daily', { date: today })} className="bk-press" style={{
-          flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-          background: '#CDE8FB', color: '#1f5f86', fontSize: 13, fontWeight: 800,
-          padding: '11px 14px', borderRadius: 14 }}>
+          flex: 1, minWidth: 120, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+          background: '#CDE8FB', color: '#1f5f86', fontSize: 12.5, fontWeight: 800,
+          padding: '11px 10px', borderRadius: 14 }}>
           📋 {L('Журнал сегодня', "Today's log")}
         </button>
+        <button onClick={() => go('staff-schedule')} className="bk-press" style={{
+          flex: 1, minWidth: 100, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+          background: '#D4F0DF', color: '#1f7a55', fontSize: 12.5, fontWeight: 800,
+          padding: '11px 10px', borderRadius: 14 }}>
+          📅 {L('Расписание', 'Schedule')}
+        </button>
         <button onClick={() => go('staff-monthly')} className="bk-press" style={{
-          flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-          background: '#E8E0D5', color: '#5a4a30', fontSize: 13, fontWeight: 800,
-          padding: '11px 14px', borderRadius: 14 }}>
+          flex: 1, minWidth: 100, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+          background: '#E8E0D5', color: '#5a4a30', fontSize: 12.5, fontWeight: 800,
+          padding: '11px 10px', borderRadius: 14 }}>
           📊 {L('Итог за месяц', 'Monthly')}
         </button>
       </div>
@@ -3900,6 +3923,259 @@ function TeamScreen({ go }) {
           onSaved={() => { setFormOpen(false); reload(); }}
         />
       )}
+    </div>
+  );
+}
+
+// ── StaffScheduleScreen ───────────────────────────────────────────────────────
+
+const MONTHS_RU = ['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
+const MONTHS_EN = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function StaffScheduleScreen() {
+  const today = new Date();
+  const [year,   setYear]   = React.useState(today.getFullYear());
+  const [month,  setMonth]  = React.useState(today.getMonth() + 1);
+  const [staff,  setStaff]  = React.useState([]);
+  const [data,   setData]   = React.useState({});
+  const [picker, setPicker] = React.useState(null);
+
+  const monthKey = `${year}-${String(month).padStart(2,'0')}`;
+
+  React.useEffect(() => {
+    setData({});
+    Promise.all([window.loadStaff(), window.getStaffMonthly(monthKey)])
+      .then(([s, d]) => { setStaff(s); setData(d); })
+      .catch(() => {});
+  }, [year, month]);
+
+  const daysInMonth = new Date(year, month, 0).getDate();
+
+  function prevMonth() {
+    if (month === 1) { setYear(y => y - 1); setMonth(12); }
+    else setMonth(m => m - 1);
+  }
+  function nextMonth() {
+    if (month === 12) { setYear(y => y + 1); setMonth(1); }
+    else setMonth(m => m + 1);
+  }
+
+  function getCell(name, day) {
+    const date = `${monthKey}-${String(day).padStart(2,'0')}`;
+    return data[name]?.[date] || null;
+  }
+
+  function openPicker(name, day) {
+    const date = `${monthKey}-${String(day).padStart(2,'0')}`;
+    const rec = data[name]?.[date];
+    setPicker({ name, date, day, status: rec?.status || null, arrival_time: rec?.arrival_time || '' });
+  }
+
+  async function handlePick(status, arrival_time) {
+    const { name, date } = picker;
+    if (!status) {
+      await window.clearStaffDay(date, name).catch(() => {});
+      setData(prev => {
+        const n = { ...prev, [name]: { ...(prev[name] || {}) } };
+        delete n[name][date];
+        return n;
+      });
+    } else {
+      await window.setStaffDay(date, name, { status, arrival_time: arrival_time || '' }).catch(() => {});
+      setData(prev => ({
+        ...prev,
+        [name]: { ...(prev[name] || {}), [date]: { status, arrival_time: arrival_time || '' } }
+      }));
+    }
+    setPicker(null);
+  }
+
+  const NAME_W = 100;
+  const CELL_W = 34;
+  const CELL_H = 32;
+
+  return (
+    <div style={{ paddingBottom: 32 }}>
+      {/* Month nav */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, padding: '2px 20px 16px' }}>
+        <button onClick={prevMonth} className="bk-press" style={{
+          width: 36, height: 36, border: 'none', cursor: 'pointer',
+          background: '#EDE8E0', borderRadius: 10, fontSize: 18, fontWeight: 700, color: 'var(--ink)' }}>‹</button>
+        <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--ink)', minWidth: 140, textAlign: 'center' }}>
+          {LANG === 'ru' ? MONTHS_RU[month-1] : MONTHS_EN[month-1]} {year}
+        </span>
+        <button onClick={nextMonth} className="bk-press" style={{
+          width: 36, height: 36, border: 'none', cursor: 'pointer',
+          background: '#EDE8E0', borderRadius: 10, fontSize: 18, fontWeight: 700, color: 'var(--ink)' }}>›</button>
+      </div>
+
+      {staff.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '32px 20px', color: 'var(--ink-faint)', fontSize: 13 }}>
+          {Object.keys(data).length === 0 ? '…' : L('Нет сотрудников', 'No staff')}
+        </div>
+      )}
+
+      {staff.length > 0 && (
+        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }}>
+          <div style={{ display: 'inline-block', paddingLeft: 12, paddingRight: 16,
+            minWidth: NAME_W + daysInMonth * (CELL_W + 2) + 24 }}>
+
+            {/* Day-number header */}
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
+              <div style={{ width: NAME_W, flexShrink: 0 }} />
+              {Array.from({length: daysInMonth}, (_, i) => i + 1).map(d => {
+                const dow = new Date(year, month-1, d).getDay();
+                const isWknd = dow === 0 || dow === 6;
+                return (
+                  <div key={d} style={{ width: CELL_W, flexShrink: 0, marginRight: 2,
+                    textAlign: 'center', fontSize: 10, fontWeight: 700,
+                    color: isWknd ? '#b03030' : 'var(--ink-faint)' }}>
+                    {d}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Staff rows */}
+            {staff.map(s => {
+              const parts = s.name.split(' ');
+              const firstName = parts[0];
+              const rest = parts.slice(1).join(' ');
+              return (
+                <div key={s.name} style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
+                  <div style={{ width: NAME_W, flexShrink: 0, paddingRight: 6, overflow: 'hidden' }}>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink)',
+                      display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {firstName}
+                      {rest && <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--ink-soft)', marginLeft: 3 }}>{rest}</span>}
+                    </span>
+                  </div>
+                  {Array.from({length: daysInMonth}, (_, i) => i + 1).map(d => {
+                    const rec = getCell(s.name, d);
+                    const st  = rec?.status || null;
+                    const ss  = st ? STAFF_STATUSES.find(x => x.id === st) : null;
+                    const dow = new Date(year, month-1, d).getDay();
+                    const isWknd = dow === 0 || dow === 6;
+                    const bg = st ? SSTAFF_COLOR[st] : (isWknd ? '#EDE8E0' : '#F5F3EE');
+                    return (
+                      <button key={d} onClick={() => openPicker(s.name, d)} className="bk-press"
+                        style={{ width: CELL_W, height: CELL_H, flexShrink: 0, marginRight: 2,
+                          border: 'none', cursor: 'pointer', borderRadius: 7,
+                          background: bg, fontSize: 13, fontFamily: 'inherit',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {ss?.emoji || ''}
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Legend */}
+      <div style={{ padding: '14px 14px 0', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {STAFF_STATUSES.map(ss => (
+          <span key={ss.id} style={{ fontSize: 11, fontWeight: 600,
+            background: SSTAFF_COLOR[ss.id], color: SSTAFF_INK[ss.id],
+            padding: '3px 8px', borderRadius: 999 }}>
+            {ss.emoji} {LANG === 'ru' ? ss.ru : ss.en}
+          </span>
+        ))}
+      </div>
+
+      {picker && (
+        <ScheduleCellPicker picker={picker} onClose={() => setPicker(null)} onPick={handlePick} />
+      )}
+    </div>
+  );
+}
+
+function ScheduleCellPicker({ picker, onClose, onPick }) {
+  const [status,  setStatus]  = React.useState(picker.status);
+  const [time,    setTime]    = React.useState(picker.arrival_time || '');
+  const [saving,  setSaving]  = React.useState(false);
+
+  const [, , dayStr] = picker.date.split('-');
+  const dowNames = LANG === 'ru'
+    ? ['вс','пн','вт','ср','чт','пт','сб']
+    : ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const dow = new Date(picker.date).getDay();
+
+  async function confirm() {
+    setSaving(true);
+    await onPick(status, status === 'late' ? time : '');
+  }
+  async function clear() {
+    setSaving(true);
+    await onPick(null, '');
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'flex-end' }}>
+      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.32)' }} />
+      <div style={{ position: 'relative', width: '100%', background: '#fff',
+        borderRadius: '20px 20px 0 0', padding: '18px 20px calc(24px + env(safe-area-inset-bottom))',
+        boxShadow: '0 -4px 24px rgba(0,0,0,0.13)' }}>
+
+        <div style={{ textAlign: 'center', marginBottom: 16 }}>
+          <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--ink)' }}>{picker.name.split(' ')[0]}</div>
+          <div style={{ fontSize: 12.5, color: 'var(--ink-soft)', marginTop: 2 }}>
+            {parseInt(dayStr, 10)} {dowNames[dow]}
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14 }}>
+          {STAFF_STATUSES.map(ss => {
+            const sel = status === ss.id;
+            return (
+              <button key={ss.id} onClick={() => setStatus(ss.id)} className="bk-press"
+                style={{ border: sel ? `2px solid ${SSTAFF_INK[ss.id]}` : '2px solid transparent',
+                  cursor: 'pointer', fontFamily: 'inherit',
+                  background: sel ? SSTAFF_COLOR[ss.id] : '#F5F3EE',
+                  borderRadius: 12, padding: '8px 4px',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                <span style={{ fontSize: 20 }}>{ss.emoji}</span>
+                <span style={{ fontSize: 9.5, fontWeight: 700, lineHeight: 1.2, textAlign: 'center',
+                  color: sel ? SSTAFF_INK[ss.id] : 'var(--ink-soft)' }}>
+                  {LANG === 'ru' ? ss.ru : ss.en}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {status === 'late' && (
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-soft)', display: 'block', marginBottom: 5 }}>
+              {L('Время прихода', 'Arrival time')}
+            </label>
+            <input type="time" value={time} onChange={e => setTime(e.target.value)}
+              style={{ width: '100%', border: '2px solid #EDE8E0', borderRadius: 12,
+                padding: '8px 12px', fontSize: 15, fontFamily: 'inherit', outline: 'none',
+                boxSizing: 'border-box' }} />
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 10 }}>
+          {picker.status && (
+            <button onClick={clear} disabled={saving} className="bk-press"
+              style={{ border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                background: '#FFE0E0', color: '#a03030', fontSize: 13, fontWeight: 700,
+                padding: '11px 16px', borderRadius: 14 }}>
+              {L('Убрать', 'Clear')}
+            </button>
+          )}
+          <button onClick={confirm} disabled={saving || !status} className="bk-press"
+            style={{ flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+              background: status ? (SSTAFF_COLOR[status] || '#D4F0DF') : '#EDE8E0',
+              color: status ? (SSTAFF_INK[status] || '#1f7a55') : 'var(--ink-faint)',
+              fontSize: 14, fontWeight: 800, padding: '11px 0', borderRadius: 14 }}>
+            {saving ? '…' : L('Сохранить', 'Save')}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -4210,7 +4486,7 @@ const TITLES = {
   home: 'appName', children: 'children', attendance: 'markDay',
   payments: 'payments', 'payments-garden': 'payments', 'payments-clubs': 'payments',
   activities: 'activities', club: 'activities', summary: 'daySummary', notifications: 'notifications', compose: 'compose',
-  team: 'team', 'staff-daily': 'staffLog', 'staff-monthly': 'monthSummary',
+  team: 'team', 'staff-daily': 'staffLog', 'staff-monthly': 'monthSummary', 'staff-schedule': 'staffSchedule',
 };
 
 // Attendance is marked fresh each day; persisted in localStorage so a reload
@@ -4418,9 +4694,10 @@ function App() {
       case 'summary':       return <SummaryScreen statuses={statuses} go={go} />;
       case 'notifications': return <NotificationsScreen feed={feed} go={go} actions={actions} />;
       case 'compose':       return <ComposeScreen back={back} actions={actions} />;
-      case 'team':          return <TeamScreen go={go} />;
-      case 'staff-daily':   return <StaffDailyScreen params={p} />;
-      case 'staff-monthly': return <StaffMonthlyScreen />;
+      case 'team':           return <TeamScreen go={go} />;
+      case 'staff-schedule': return <StaffScheduleScreen />;
+      case 'staff-daily':    return <StaffDailyScreen params={p} />;
+      case 'staff-monthly':  return <StaffMonthlyScreen />;
       default:              return null;
     }
   }
