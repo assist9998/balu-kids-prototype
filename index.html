@@ -2253,7 +2253,7 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
   const [form, setForm] = React.useState(() => {
     if (!kid) return {
       firstName: '', lastName: '', group: 'big', contractType: 'longterm',
-      birthday: '', startDate: '', dayType: '', price: '', deposit: '', clubPaymentType: '', paidUntil: '',
+      birthday: '', startDate: '', dayType: '', price: '', deposit: '', paidUntil: '',
       allergens: [], allergyNote: '',
       paracetamol: '', photoConsent: '', adaptation: false,
       mealsIncluded: '', napTime: false, afterSchool: false,
@@ -2271,7 +2271,6 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
       dayType: kid.dayType || '',
       price: kid.price || '',
       deposit: kid.deposit || '',
-      clubPaymentType: kid.clubPaymentType || '',
       paidUntil: kid.paidUntil || '',
       allergens,
       allergyNote,
@@ -2413,11 +2412,6 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
                 </FRow>
               </div>
             </div>
-            <FRow label={L('Оплата кружков', 'Club payment')}>
-              <input style={_FINP} value={form.clubPaymentType}
-                onChange={e => set('clubPaymentType')(e.target.value)}
-                placeholder={L('Ежемесячно / За занятие…', 'Monthly / Per class…')} />
-            </FRow>
             <FRow label={L('Оплачено до', 'Paid until')}>
               <input style={{ ..._FINP, maxWidth: 160 }} value={form.paidUntil}
                 onChange={e => set('paidUntil')(e.target.value)} placeholder="2025-08-31" />
