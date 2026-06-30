@@ -2253,7 +2253,7 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
   const [form, setForm] = React.useState(() => {
     if (!kid) return {
       firstName: '', lastName: '', group: 'big', contractType: 'longterm',
-      birthday: '', startDate: '', dayType: '', price: '',
+      birthday: '', startDate: '', dayType: '', price: '', deposit: '', clubPaymentType: '', paidUntil: '',
       allergens: [], allergyNote: '',
       paracetamol: '', photoConsent: '', adaptation: false,
       mealsIncluded: '', napTime: false, afterSchool: false,
@@ -2270,6 +2270,9 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
       startDate: kid.startDate || '',
       dayType: kid.dayType || '',
       price: kid.price || '',
+      deposit: kid.deposit || '',
+      clubPaymentType: kid.clubPaymentType || '',
+      paidUntil: kid.paidUntil || '',
       allergens,
       allergyNote,
       paracetamol: kid.paracetamol || '',
@@ -2396,9 +2399,28 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
                 { id: 'Half day',  label: L('Полдня', 'Half day') },
               ]} />
             </FRow>
-            <FRow label={L('Цена', 'Price')}>
-              <input style={{ ..._FINP, maxWidth: 160 }} type="number" value={form.price}
-                onChange={e => set('price')(e.target.value)} placeholder="0" />
+            <div style={{ display: 'flex', gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <FRow label={L('Цена', 'Price')}>
+                  <input style={_FINP} type="number" value={form.price}
+                    onChange={e => set('price')(e.target.value)} placeholder="0" />
+                </FRow>
+              </div>
+              <div style={{ flex: 1 }}>
+                <FRow label={L('Депозит', 'Deposit')}>
+                  <input style={_FINP} type="number" value={form.deposit}
+                    onChange={e => set('deposit')(e.target.value)} placeholder="0" />
+                </FRow>
+              </div>
+            </div>
+            <FRow label={L('Оплата кружков', 'Club payment')}>
+              <input style={_FINP} value={form.clubPaymentType}
+                onChange={e => set('clubPaymentType')(e.target.value)}
+                placeholder={L('Ежемесячно / За занятие…', 'Monthly / Per class…')} />
+            </FRow>
+            <FRow label={L('Оплачено до', 'Paid until')}>
+              <input style={{ ..._FINP, maxWidth: 160 }} value={form.paidUntil}
+                onChange={e => set('paidUntil')(e.target.value)} placeholder="2025-08-31" />
             </FRow>
           </div>
 
