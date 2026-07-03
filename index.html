@@ -1485,7 +1485,7 @@ function ScoutBadgeRow({ kid, grp, status, onEdit, onDelete }) {
   if (status) petals.push(status === 'present'
     ? { dot: 'var(--ok)', label: t('present'), tone: 'ok' }
     : { dot: 'var(--ink-faint)', label: t('absent'), tone: 'neutral' });
-  if (kid.paidUntil && kid.paidUntil < todayStr()) petals.push({ emoji: '⚠️', label: 'Overdue', tone: 'warn' });
+  if (kid.paidUntil && normDate(kid.paidUntil) < todayStr()) petals.push({ emoji: '⚠️', label: 'Overdue', tone: 'warn' });
   if (kid.contract === 'tourist') petals.push({ emoji: '🧳', label: kid.dayType ? `Tourist · ${kid.dayType}` : 'Tourist', tone: 'info' });
   if (kid.contract && kid.contract !== 'tourist') petals.push({ emoji: '🏠', label: kid.dayType ? `Long term · ${kid.dayType}` : 'Long term', tone: 'ok' });
   petals.push(...careBadges(kid));
@@ -2414,7 +2414,7 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
             </div>
             <FRow label={L('Оплачено до', 'Paid until')}>
               <input style={{ ..._FINP, maxWidth: 160 }} value={form.paidUntil}
-                onChange={e => set('paidUntil')(e.target.value)} placeholder="2025-08-31" />
+                onChange={e => set('paidUntil')(e.target.value)} placeholder="2026.07.10" />
             </FRow>
           </div>
 
@@ -2639,10 +2639,10 @@ function SummaryScreen({ statuses, go }) {
   const rate = kids.length ? Math.round(here / kids.length * 100) : 0;
 
   const today = todayStr();
-  const payPaid   = kids.filter(k => k.paidUntil && k.paidUntil >= today).length;
+  const payPaid   = kids.filter(k => k.paidUntil && normDate(k.paidUntil) >= today).length;
   const payUnpaid = kids.length - payPaid;
   const totalCollected = kids
-    .filter(k => k.paidUntil && k.paidUntil >= today)
+    .filter(k => k.paidUntil && normDate(k.paidUntil) >= today)
     .reduce((s, k) => s + (parseFloat(String(k.price).replace(/[^0-9.]/g, '')) || 0), 0);
 
   return (
@@ -4518,6 +4518,8 @@ function todayStr() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
+// normalize stored date to YYYY-MM-DD for comparison (supports both dots and dashes)
+function normDate(s) { return (s || '').replace(/\./g, '-'); }
 
 function loadStoredAttendance() {
   try {
@@ -4622,11 +4624,11 @@ function App() {
   React.useEffect(() => {
     if (!childrenReady) return;
     const today = todayStr();
-    const overdue = DATA.CHILDREN.filter(k => k.paidUntil && k.paidUntil < today);
+    const overdue = DATA.CHILDREN.filter(k => k.paidUntil && normDate(k.paidUntil) < today);
     setFeed(f => {
       const manual = f.filter(x => !x.auto);
       const autoItems = overdue.map(k => {
-        const parts = k.paidUntil.split('-');
+        const parts = normDate(k.paidUntil).split('-');
         const since = `${parts[2]}.${parts[1]}`;
         return {
           id: `overdue-${k.id}`, auto: true, type: 'urgent', emoji: '⚠️',
