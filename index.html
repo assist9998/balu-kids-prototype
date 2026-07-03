@@ -2414,7 +2414,7 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
             </div>
             <FRow label={L('Оплачено до', 'Paid until')}>
               <input style={{ ..._FINP, maxWidth: 160 }} value={form.paidUntil}
-                onChange={e => set('paidUntil')(e.target.value)} placeholder="2026.07.10" />
+                onChange={e => set('paidUntil')(e.target.value)} placeholder="10.07.2026" />
             </FRow>
           </div>
 
@@ -4518,8 +4518,15 @@ function todayStr() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
-// normalize stored date to YYYY-MM-DD for comparison (supports both dots and dashes)
-function normDate(s) { return (s || '').replace(/\./g, '-'); }
+// normalize stored date to YYYY-MM-DD for comparison
+// handles DD.MM.YYYY (Russian), YYYY.MM.DD and YYYY-MM-DD
+function normDate(s) {
+  s = (s || '').trim();
+  if (!s) return s;
+  const m = s.match(/^(\d{2})[.\-](\d{2})[.\-](\d{4})$/);
+  if (m) return `${m[3]}-${m[2]}-${m[1]}`;   // DD.MM.YYYY → YYYY-MM-DD
+  return s.replace(/\./g, '-');               // YYYY.MM.DD → YYYY-MM-DD
+}
 
 function loadStoredAttendance() {
   try {
