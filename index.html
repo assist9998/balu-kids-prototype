@@ -3239,7 +3239,7 @@ function PaymentsGardenScreen() {
     if (loadedMonths[mo.id]) return;
     window.loadPayments(mo.id).then(remote => {
       const p = {}, d = {};
-      DATA.CHILDREN.forEach(k => {
+      activeKids().forEach(k => {
         p[k.id] = !!(remote[k.id] && remote[k.id].paid);
         d[k.id] = (remote[k.id] && remote[k.id].days) || 1;
       });
@@ -3379,7 +3379,7 @@ function PaymentsClubsScreen() {
 
   const mo         = GARDEN_MONTHS[monthIdx];
   const activeClub = DATA.CLUBS.find(c => c.id === clubId);
-  const allKids    = activeClub ? DATA.CHILDREN.filter(k => activeClub.kids.includes(k.id)) : [];
+  const allKids    = activeClub ? activeKids().filter(k => activeClub.kids.includes(k.id)) : [];
   const curPaid    = paid[`${mo.id}_${clubId}`] || {};
   const curSaved   = saved[`${mo.id}_${clubId}`] || {};
   const countPaid   = allKids.filter(k =>  curPaid[k.id]).length;
@@ -3518,8 +3518,8 @@ function ClubScreen({ params }) {
 
   if (!club) return <div style={{ padding: 20, color: 'var(--ink-faint)', fontSize: 14, textAlign: 'center' }}>—</div>;
 
-  const kids = DATA.CHILDREN.filter(k => club.kids.includes(k.id));
-  const notInClub = DATA.CHILDREN.filter(k => !club.kids.includes(k.id));
+  const kids = activeKids().filter(k => club.kids.includes(k.id));
+  const notInClub = activeKids().filter(k => !club.kids.includes(k.id));
 
   async function reloadClub() {
     await window.loadClubs().catch(() => {});
@@ -4686,7 +4686,7 @@ function App() {
     ])
       .then(() => window.loadAttendance(todayStr()).catch(() => loadStoredAttendance() || {}))
       .then(remote => {
-        const m = {}; DATA.CHILDREN.forEach(k => m[k.id] = remote[k.id] || 'absent');
+        const m = {}; activeKids().forEach(k => m[k.id] = remote[k.id] || 'absent');
         setStatuses(m);
         setChildrenReady(true);
       })
@@ -4700,7 +4700,7 @@ function App() {
   React.useEffect(() => {
     if (!childrenReady) return;
     const today = todayStr();
-    const overdue = DATA.CHILDREN.filter(k => k.paidUntil && normDate(k.paidUntil) < today);
+    const overdue = activeKids().filter(k => k.paidUntil && normDate(k.paidUntil) < today);
     setFeed(f => {
       const manual = f.filter(x => !x.auto);
       const autoItems = overdue.map(k => {
