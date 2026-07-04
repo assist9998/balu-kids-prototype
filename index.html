@@ -2910,6 +2910,7 @@ function SummaryScreen({ statuses, go }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 4 }}>
           {DATA.GROUPS.map(g => {
             const gk = kids.filter(k => k.group === g.id);
+            if (!gk.length) return null;
             const gh = gk.filter(k => statuses[k.id] !== 'absent').length;
             return <BarRow key={g.id} label={Lo(g)} value={Math.round(gh / gk.length * 100)} color={g.ink}
               right={`${gh}/${gk.length}`} />;
