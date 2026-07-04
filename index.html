@@ -1972,10 +1972,10 @@ function ChildScreen({ params, statuses, back }) {
           <div style={{ background: 'var(--bg)', borderRadius: 24, padding: 24, width: '100%', maxWidth: 320 }}
             onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)', marginBottom: 8 }}>
-              {L(`Удалить ${kid.id.split(' ')[0]}?`, `Delete ${kid.id.split(' ')[0]}?`)}
+              {L(`Архивировать ${kid.id.split(' ')[0]}?`, `Archive ${kid.id.split(' ')[0]}?`)}
             </div>
             <div style={{ fontSize: 14, color: 'var(--ink-soft)', lineHeight: 1.45, marginBottom: 22 }}>
-              {L('Ребёнок будет удалён из таблицы. Это действие нельзя отменить.', 'The child will be removed from the spreadsheet. This cannot be undone.')}
+              {L('Ребёнок пропадёт из журнала и платежей. Можно восстановить через архив.', 'The child will be hidden from journal and payments. Can be restored from archive.')}
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={() => setDeleteConfirm(false)} className="bk-press" style={{
@@ -1987,7 +1987,7 @@ function ChildScreen({ params, statuses, back }) {
               <button onClick={async () => {
                 setDeleting(true);
                 try {
-                  await window.deleteChild(kid.id);
+                  await window.updateChild(kid.id, { status: 'inactive' });
                   await window.loadChildren();
                   back();
                 } catch(e) {
@@ -1997,10 +1997,10 @@ function ChildScreen({ params, statuses, back }) {
                 }
               }} disabled={deleting} className="bk-press" style={{
                 flex: 1, border: 'none', cursor: deleting ? 'default' : 'pointer',
-                background: '#E05555', borderRadius: 14, padding: 13,
+                background: '#8B6A4A', borderRadius: 14, padding: 13,
                 fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 800,
                 color: '#fff', opacity: deleting ? 0.7 : 1 }}>
-                {deleting ? '…' : L('Удалить', 'Delete')}
+                {deleting ? '…' : L('Архивировать', 'Archive')}
               </button>
             </div>
           </div>
@@ -2123,10 +2123,10 @@ function ChildScreen({ params, statuses, back }) {
           {L('Изменить', 'Edit')}
         </button>
         <button onClick={() => setDeleteConfirm(true)} className="bk-press" style={{
-          flex: 1, border: 'none', cursor: 'pointer', background: '#FBE8E8',
+          flex: 1, border: 'none', cursor: 'pointer', background: '#F0EAE2',
           borderRadius: 16, padding: 14, fontFamily: 'var(--font-display)',
-          fontSize: 15, fontWeight: 800, color: '#C04040' }}>
-          {L('Удалить', 'Delete')}
+          fontSize: 15, fontWeight: 800, color: '#8B6A4A' }}>
+          {L('Архивировать', 'Archive')}
         </button>
       </div>
     </div>
