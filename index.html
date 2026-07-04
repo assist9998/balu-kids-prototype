@@ -2671,9 +2671,7 @@ function MiniCalendar({ selected, onSelect, onClose }) {
   );
 }
 
-function AttendanceScreen({ statuses, actions, go }) {
-  const [selDate,   setSelDate]   = React.useState(todayStr);
-  const [calOpen,   setCalOpen]   = React.useState(false);
+function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen, setCalOpen }) {
   const [filter,    setFilter]    = React.useState('all');
   const [loading,   setLoading]   = React.useState(false);
   const [allMarked, setAllMarked] = React.useState(false);
@@ -2740,32 +2738,9 @@ function AttendanceScreen({ statuses, actions, go }) {
   const chips = [{ id: 'all', label: t('all'), emoji: '🗂️' }, ...DATA.GROUPS.map(g => ({ id: g.id, label: Lo(g), emoji: g.emoji }))];
 
   const selDateObj = new Date(selDate + 'T12:00:00');
-  const MR = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
-  const ME = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const dateLbl = isToday
-    ? L('Сегодня', 'Today')
-    : `${selDateObj.getDate()} ${L(MR[selDateObj.getMonth()], ME[selDateObj.getMonth()])} ${selDateObj.getFullYear()}`;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
-
-      {/* date bar */}
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', padding:'2px 20px 10px' }}>
-        <button onClick={() => setCalOpen(true)} className="bk-press" style={{
-          display:'flex', alignItems:'center', gap:6, border:'none', cursor:'pointer',
-          background: isToday ? '#F0E4D4' : '#E8E0D5', borderRadius:999,
-          padding:'7px 16px', fontFamily:'var(--font-display)', fontSize:14, fontWeight:800,
-          color: isToday ? '#B07848' : 'var(--ink)' }}>
-          📅 {dateLbl}
-        </button>
-        {!isToday && (
-          <button onClick={() => setSelDate(todayStr())} className="bk-press" style={{
-            marginLeft:8, border:'none', cursor:'pointer', background:'transparent',
-            fontSize:12, fontWeight:700, color:'var(--ink-soft)', padding:'6px 10px', borderRadius:999 }}>
-            {L('← Сегодня', '← Today')}
-          </button>
-        )}
-      </div>
 
       {loading ? (
         <div style={{ textAlign:'center', padding:40, color:'var(--ink-faint)', fontSize:15 }}>…</div>
@@ -4845,6 +4820,8 @@ function App() {
   const [loadError, setLoadError] = React.useState(null);
   const [statuses, setStatuses] = React.useState({});
   const [feed, setFeed] = React.useState([]);
+  const [attSelDate, setAttSelDate] = React.useState(todayStr);
+  const [attCalOpen, setAttCalOpen] = React.useState(false);
   const [toast, setToast] = React.useState(null);
   const [role, setRole] = React.useState(() => loadStoredRole()?.role ?? null);
   const [teacherName, setTeacherName] = React.useState(() => loadStoredRole()?.name ?? null);
@@ -4957,7 +4934,8 @@ function App() {
       case 'children':      return <ChildrenScreen go={go} statuses={statuses} />;
       case 'group':         return <GroupScreen params={p} go={go} statuses={statuses} />;
       case 'child':         return <ChildScreen params={p} statuses={statuses} back={back} />;
-      case 'attendance':    return <AttendanceScreen statuses={statuses} actions={actions} go={go} />;
+      case 'attendance':    return <AttendanceScreen statuses={statuses} actions={actions} go={go}
+        selDate={attSelDate} setSelDate={setAttSelDate} calOpen={attCalOpen} setCalOpen={setAttCalOpen} />;
       case 'payments':         return <PaymentsScreen go={go} />;
       case 'payments-garden':  return <PaymentsGardenScreen />;
       case 'payments-clubs':   return <PaymentsClubsScreen />;
@@ -4999,6 +4977,32 @@ function App() {
               </>
             )}
           </div>
+          {/* center: attendance date pill */}
+          {top.name === 'attendance' && (() => {
+            const isTdy = attSelDate === todayStr();
+            const d = new Date(attSelDate + 'T12:00:00');
+            const MR = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+            const ME = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            const lbl = isTdy ? L('Сегодня','Today') : `${d.getDate()} ${L(MR[d.getMonth()],ME[d.getMonth()])} ${d.getFullYear()}`;
+            return (
+              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                {!isTdy && (
+                  <button onClick={() => setAttSelDate(todayStr())} className="bk-press" style={{
+                    border:'none', cursor:'pointer', background:'transparent', padding:'5px 8px',
+                    fontSize:13, fontWeight:700, color:'var(--ink-soft)', borderRadius:999 }}>
+                    ←
+                  </button>
+                )}
+                <button onClick={() => setAttCalOpen(true)} className="bk-press" style={{
+                  display:'flex', alignItems:'center', gap:5, border:'none', cursor:'pointer',
+                  background: isTdy ? '#F0E4D4' : '#E8D8C4', borderRadius:999,
+                  padding:'5px 12px', fontFamily:'var(--font-display)', fontSize:13, fontWeight:800,
+                  color: isTdy ? '#B07848' : '#7A4828', whiteSpace:'nowrap' }}>
+                  📅 {lbl}
+                </button>
+              </div>
+            );
+          })()}
           {/* right: logout + lang toggle */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button onClick={logout} className="bk-press" title={L('Выйти', 'Log out')} style={{
