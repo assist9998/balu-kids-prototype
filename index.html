@@ -1464,13 +1464,19 @@ function allergyEmoji(text) {
 
 function careBadges(kid, { includeMeals = true } = {}) {
   const badges = [];
-  if (kid.allergyEn) kid.allergyEn.split(/[,./]+/).map(a => a.trim()).filter(Boolean)
-    .forEach(a => {
-      if (a.toLowerCase().includes('halal')) { badges.push({ text: 'HALAL', label: 'Meals', tone: 'halal' }); return; }
-      const withNo = a.toLowerCase().startsWith('no ') ? a : `No ${a}`;
-      const label = withNo.charAt(0).toUpperCase() + withNo.slice(1);
-      badges.push({ emoji: allergyEmoji(a), label, tone: 'warn' });
-    });
+  if (kid.allergyEn) {
+    const seenEmoji = new Set();
+    kid.allergyEn.split(/[,./]+/).map(a => a.trim()).filter(Boolean)
+      .forEach(a => {
+        if (a.toLowerCase().includes('halal')) { badges.push({ text: 'HALAL', label: 'Meals', tone: 'halal' }); return; }
+        const emoji = allergyEmoji(a);
+        if (seenEmoji.has(emoji)) return;
+        seenEmoji.add(emoji);
+        const withNo = a.toLowerCase().startsWith('no ') ? a : `No ${a}`;
+        const label = withNo.charAt(0).toUpperCase() + withNo.slice(1);
+        badges.push({ emoji, label, tone: 'warn' });
+      });
+  }
   if (kid.paracetamol === 'no') badges.push({ emoji: '💊🚫', label: 'No paracetamol', tone: 'warn' });
   if (kid.photoConsent === 'no') badges.push({ emoji: '📸🚫', label: 'No photos', tone: 'warn' });
   if (kid.adaptation) badges.push({ emoji: '🌱', label: 'Adaptation', tone: 'special' });
