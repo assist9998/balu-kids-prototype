@@ -4983,7 +4983,7 @@ function App() {
               </>
             )}
           </div>
-          {/* center: attendance date pill */}
+          {/* center: attendance date pill — absolutely centered */}
           {top.name === 'attendance' && (() => {
             const isTdy = attSelDate === todayStr();
             const d = new Date(attSelDate + 'T12:00:00');
@@ -4991,18 +4991,12 @@ function App() {
             const ME = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
             const lbl = isTdy ? L('Сегодня','Today') : `${d.getDate()} ${L(MR[d.getMonth()],ME[d.getMonth()])} ${d.getFullYear()}`;
             return (
-              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                {!isTdy && (
-                  <button onClick={() => setAttSelDate(todayStr())} className="bk-press" style={{
-                    border:'none', cursor:'pointer', background:'transparent', padding:'5px 8px',
-                    fontSize:13, fontWeight:700, color:'var(--ink-soft)', borderRadius:999 }}>
-                    ←
-                  </button>
-                )}
+              <div style={{ position:'absolute', left:'50%', transform:'translateX(-50%)',
+                bottom: 10, display:'flex', alignItems:'center' }}>
                 <button onClick={() => setAttCalOpen(true)} className="bk-press" style={{
                   display:'flex', alignItems:'center', gap:5, border:'none', cursor:'pointer',
                   background: isTdy ? '#F0E4D4' : '#E8D8C4', borderRadius:999,
-                  padding:'5px 12px', fontFamily:'var(--font-display)', fontSize:13, fontWeight:800,
+                  padding:'5px 14px', fontFamily:'var(--font-display)', fontSize:13, fontWeight:800,
                   color: isTdy ? '#B07848' : '#7A4828', whiteSpace:'nowrap' }}>
                   📅 {lbl}
                 </button>
