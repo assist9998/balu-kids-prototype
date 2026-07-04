@@ -2250,6 +2250,7 @@ function FMultiPills({ value, options, onChange }) {
 
 function ChildFormSheet({ kid, onClose, onSaved }) {
   const isEdit = !!kid;
+  // NOTE: returns Fragment to allow archive picker overlay as sibling
 
   const [form, setForm] = React.useState(() => {
     if (!kid) return {
@@ -2345,6 +2346,7 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
     color: 'var(--ink-soft)', padding: '20px 0 8px' };
 
   return (
+    <React.Fragment>
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'flex-end',
       background: 'rgba(0,0,0,0.4)' }} onClick={onClose}>
       <div style={{ width: '100%', background: 'var(--bg)', borderRadius: '24px 24px 0 0',
@@ -2564,6 +2566,7 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
         </div>
       </div>
     )}
+    </React.Fragment>
   );
 }
 
