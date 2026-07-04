@@ -266,6 +266,7 @@ window.API_BASE = "https://rmxois1uv0a24xrbi2dfcfac.95.179.188.141.sslip.io";
   ];
 
   window.DATA = { GROUPS, CHILDREN, CLUBS, WEEK, FEED };
+  window.activeKids = () => (window.DATA.CHILDREN || []).filter(k => k.active !== false);
 
   window.loadChildren = async function () {
     const res = await fetch(`${window.API_BASE}/children`);
@@ -1680,7 +1681,7 @@ Object.assign(window, { clsx, Avatar, StatusDot, StatusChip, Ring, BarRow, Card,
 //  HOME
 // ════════════════════════════════════════════════════════════════
 function HomeScreen({ go, statuses, feed, homeStyle }) {
-  const kids = DATA.CHILDREN;
+  const kids = activeKids();
   const present = kids.filter(k => statuses[k.id] !== 'absent').length;
   const rate = Math.round((kids.filter(k => statuses[k.id] === 'present').length) / kids.length * 100);
   const unread = feed.filter(f => f.unread).length;
@@ -1836,7 +1837,7 @@ function ChildrenScreen({ go, statuses }) {
     <div style={{ padding: '4px 20px 28px' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {DATA.GROUPS.map(grp => {
-          const inGroup = DATA.CHILDREN.filter(k => k.group === grp.id);
+          const inGroup = activeKids().filter(k => k.group === grp.id);
           const present = inGroup.filter(k => statuses[k.id] !== 'absent').length;
           return (
             <Card key={grp.id} pad={14} onClick={() => go('group', { groupId: grp.id })}
@@ -1883,7 +1884,7 @@ function ChildrenScreen({ go, statuses }) {
 // ════════════════════════════════════════════════════════════════
 function GroupScreen({ params, go, statuses }) {
   const grp = DATA.GROUPS.find(g => g.id === params.groupId);
-  const kids = DATA.CHILDREN.filter(k => k.group === params.groupId);
+  const kids = activeKids().filter(k => k.group === params.groupId);
   if (!grp) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--ink-faint)' }}>—</div>;
   return (
     <div style={{ padding: '4px 20px 28px' }}>
@@ -2258,6 +2259,7 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
       paracetamol: '', photoConsent: '', adaptation: false,
       mealsIncluded: '', napTime: false, afterSchool: false,
       parent1Name: '', parent1Phone: '', parent2Name: '', parent2Phone: '', address: '',
+      status: 'active',
     };
     const parts = (kid.id || '').split(' ');
     const { allergens, allergyNote } = parseAllergens(kid.allergyEn || '');
@@ -2285,6 +2287,7 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
       parent2Name: kid.parent2Name || '',
       parent2Phone: kid.parent2Phone || '',
       address: kid.address || '',
+      status: kid.active === false ? 'inactive' : 'active',
     };
   });
 
@@ -2488,6 +2491,12 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
               {error}
             </div>
           )}
+          <FRow label={L('Статус', 'Status')}>
+            <FPills value={form.status} onChange={set('status')} options={[
+              { id: 'active',   label: L('Активный', 'Active') },
+              { id: 'inactive', label: L('Архив', 'Inactive') },
+            ]} />
+          </FRow>
           <button onClick={handleSave} disabled={saving} className="bk-press" style={{
             width: '100%', border: 'none', cursor: saving ? 'default' : 'pointer',
             fontFamily: 'var(--font-display)', background: '#B07848', color: '#fff',
@@ -2523,24 +2532,24 @@ Object.assign(window, { HomeScreen, ChildrenScreen, GroupScreen, ChildScreen, Ch
 const CYCLE = { present: 'absent', absent: 'present', late: 'present' };
 
 function AttendanceScreen({ statuses, actions, go }) {
-  const initLocal = () => { const m = {}; DATA.CHILDREN.forEach(k => { m[k.id] = statuses[k.id] || 'absent'; }); return m; };
+  const initLocal = () => { const m = {}; activeKids().forEach(k => { m[k.id] = statuses[k.id] || 'absent'; }); return m; };
   const [local,      setLocal]      = React.useState(initLocal);
   const [savedLocal, setSavedLocal] = React.useState(initLocal);
   const [allMarked,  setAllMarked]  = React.useState(false);
   const snapRef = React.useRef(null);
   const [filter, setFilter] = React.useState('all');
 
-  const kids = DATA.CHILDREN.filter(k => filter === 'all' || k.group === filter);
+  const kids = activeKids().filter(k => filter === 'all' || k.group === filter);
   const counts = {
-    present: DATA.CHILDREN.filter(k => local[k.id] === 'present').length,
-    absent:  DATA.CHILDREN.filter(k => local[k.id] !== 'present').length,
+    present: activeKids().filter(k => local[k.id] === 'present').length,
+    absent:  activeKids().filter(k => local[k.id] !== 'present').length,
   };
-  const hasChanges = DATA.CHILDREN.some(k => local[k.id] !== savedLocal[k.id]);
+  const hasChanges = activeKids().some(k => local[k.id] !== savedLocal[k.id]);
 
   function toggleMarkAll() {
     if (!allMarked) {
       snapRef.current = { ...local };
-      const all = {}; DATA.CHILDREN.forEach(k => { all[k.id] = 'present'; });
+      const all = {}; activeKids().forEach(k => { all[k.id] = 'present'; });
       setLocal(all); setAllMarked(true);
     } else {
       setLocal(snapRef.current || initLocal()); setAllMarked(false);
@@ -2631,7 +2640,7 @@ function CountStat({ n, label, tone }) {
 //  SUMMARY
 // ════════════════════════════════════════════════════════════════
 function SummaryScreen({ statuses, go }) {
-  const kids = DATA.CHILDREN;
+  const kids = activeKids();
   const present = kids.filter(k => statuses[k.id] === 'present').length;
   const late    = kids.filter(k => statuses[k.id] === 'late').length;
   const absent  = kids.filter(k => statuses[k.id] === 'absent').length;
@@ -2727,7 +2736,7 @@ function WeekChart() {
     { ru: 'Чт', en: 'Th' }, { ru: 'Пт', en: 'Fr' },
   ];
   const [data, setData] = React.useState(LABELS.map(d => ({ ...d, v: null })));
-  const total = DATA.CHILDREN.length;
+  const total = activeKids().length;
 
   React.useEffect(() => {
     if (!total) return;
@@ -3111,7 +3120,7 @@ function PaymentsScreen({ go }) {
     <div style={{ padding: '8px 20px 30px', display: 'flex', flexDirection: 'column', gap: 14 }}>
       {[
         { route: 'payments-garden', emoji: '🏫', ru: 'Садик',  en: 'Childcare', color: '#FBE0C0',
-          sub: { ru: `${DATA.CHILDREN.filter(k=>k.contract!=='tourist').length} детей`, en: `${DATA.CHILDREN.filter(k=>k.contract!=='tourist').length} kids` } },
+          sub: { ru: `${activeKids().filter(k=>k.contract!=='tourist').length} детей`, en: `${activeKids().filter(k=>k.contract!=='tourist').length} kids` } },
         { route: 'payments-clubs',  emoji: '🎨', ru: 'Кружки', en: 'Clubs',     color: '#E8D5FB',
           sub: { ru: `${DATA.CLUBS.length} кружка`, en: `${DATA.CLUBS.length} clubs` } },
       ].map(s => (
@@ -3186,7 +3195,7 @@ function PaymentsGardenScreen() {
   const curDays  = days[mo.id];
   const isTour   = tariff === 'tourist';
 
-  const allKids = DATA.CHILDREN
+  const allKids = activeKids()
     .filter(k => isTour ? k.contract === 'tourist' : k.contract !== 'tourist')
     .filter(k => group === 'all' || k.group === group);
   const getAmount   = kid => isTour ? (curDays[kid.id] || 1) * Number(kid.price || 0) : Number(kid.price || 0);
@@ -3194,7 +3203,7 @@ function PaymentsGardenScreen() {
   const countUnpaid = allKids.filter(k => !curPaid[k.id]).length;
   const total       = allKids.filter(k =>  curPaid[k.id]).reduce((s, k) => s + getAmount(k), 0);
   const kids        = allKids.filter(k => payFilter === 'paid' ? curPaid[k.id] : payFilter === 'unpaid' ? !curPaid[k.id] : true);
-  const hasChanges  = GARDEN_MONTHS.some(m => DATA.CHILDREN.some(k =>
+  const hasChanges  = GARDEN_MONTHS.some(m => activeKids().some(k =>
     (paid[m.id][k.id]||false) !== (saved[m.id][k.id]||false) ||
     (days[m.id][k.id]||1) !== (savedDays[m.id][k.id]||1)
   ));
@@ -3210,7 +3219,7 @@ function PaymentsGardenScreen() {
     setSavedDays(JSON.parse(JSON.stringify(days)));
     const curPaidNow = paid[mo.id] || {};
     const curDaysNow = days[mo.id] || {};
-    const rows = DATA.CHILDREN.map(k => {
+    const rows = activeKids().map(k => {
       const kIsTour = k.contract === 'tourist';
       return {
         kid_id: k.id,
