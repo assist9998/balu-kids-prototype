@@ -1552,6 +1552,7 @@ function EmojiPickerSheet({ kid, onClose }) {
   const allEmojis = AVATAR_BASES.flatMap(base => AVATAR_TONES.map(tone => base + tone));
 
   return (
+    <Portal>
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'flex-end',
       background: 'rgba(0,0,0,0.35)' }} onClick={onClose}>
       <div style={{ width: '100%', background: 'var(--bg)', borderRadius: '24px 24px 0 0',
@@ -1584,6 +1585,7 @@ function EmojiPickerSheet({ kid, onClose }) {
         )}
       </div>
     </div>
+    </Portal>
   );
 }
 
@@ -1972,6 +1974,7 @@ function ChildScreen({ params, statuses, back }) {
       )}
 
       {deleteConfirm && (
+        <Portal>
         <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.5)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
           onClick={() => setDeleteConfirm(false)}>
@@ -2011,6 +2014,7 @@ function ChildScreen({ params, statuses, back }) {
             </div>
           </div>
         </div>
+        </Portal>
       )}
 
       {/* child info + contacts + address — hero plate, same style as home greeting card */}
@@ -2352,7 +2356,7 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
     color: 'var(--ink-soft)', padding: '20px 0 8px' };
 
   return (
-    <React.Fragment>
+    <Portal>
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'flex-end',
       background: 'rgba(0,0,0,0.4)' }} onClick={onClose}>
       <div style={{ width: '100%', background: 'var(--bg)', borderRadius: '24px 24px 0 0',
@@ -2572,7 +2576,7 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
         </div>
       </div>
     )}
-    </React.Fragment>
+    </Portal>
   );
 }
 
@@ -2596,6 +2600,16 @@ Object.assign(window, { HomeScreen, ChildrenScreen, GroupScreen, ChildScreen, Ch
 //  ATTENDANCE — tap to cycle present → late → absent
 // ════════════════════════════════════════════════════════════════
 const CYCLE = { present: 'absent', absent: 'present', late: 'present' };
+
+function Portal({ children }) {
+  const el = React.useMemo(() => {
+    const div = document.createElement('div');
+    document.body.appendChild(div);
+    return div;
+  }, []);
+  React.useEffect(() => () => { if (document.body.contains(el)) document.body.removeChild(el); }, [el]);
+  return ReactDOM.createPortal(children, el);
+}
 
 function MiniCalendar({ selected, onSelect, onClose }) {
   const today = todayStr();
@@ -2827,7 +2841,7 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
         </>
       )}
 
-      {calOpen && <MiniCalendar selected={selDate} onSelect={setSelDate} onClose={() => setCalOpen(false)} />}
+      {calOpen && <Portal><MiniCalendar selected={selDate} onSelect={setSelDate} onClose={() => setCalOpen(false)} /></Portal>}
     </div>
   );
 }
@@ -3280,6 +3294,7 @@ function KidPayRow({ kid, isPaid, onToggle, amount, tourDays, onDaysChange, tour
       </Card>
 
       {showDays && (
+        <Portal>
         <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'flex-end',
           background: 'rgba(0,0,0,0.35)' }} onClick={() => setShowDays(false)}>
           <div style={{ width: '100%', background: 'var(--bg)', borderRadius: '24px 24px 0 0',
@@ -3310,6 +3325,7 @@ function KidPayRow({ kid, isPaid, onToggle, amount, tourDays, onDaysChange, tour
             </button>
           </div>
         </div>
+        </Portal>
       )}
     </>
   );
@@ -3804,6 +3820,7 @@ function ClubScreen({ params }) {
 
       {/* Add member sheet */}
       {addOpen && (
+        <Portal>
         <div onClick={() => setAddOpen(false)} style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 200,
           display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
@@ -3840,6 +3857,7 @@ function ClubScreen({ params }) {
             </div>
           </div>
         </div>
+        </Portal>
       )}
     </div>
   );
@@ -3970,6 +3988,7 @@ function StaffFormSheet({ member, onClose, onSaved }) {
     color: 'var(--ink-soft)', marginBottom: 5, display: 'block' };
 
   return (
+    <Portal>
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'flex-end',
       background: 'rgba(0,0,0,0.4)' }} onClick={onClose}>
       <div style={{ width: '100%', background: 'var(--bg)', borderRadius: '24px 24px 0 0',
@@ -4061,6 +4080,7 @@ function StaffFormSheet({ member, onClose, onSaved }) {
         </div>
       </div>
     </div>
+    </Portal>
   );
 }
 
@@ -4364,6 +4384,7 @@ function ScheduleCellPicker({ picker, onClose, onPick }) {
   }
 
   return (
+    <Portal>
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'flex-end' }}>
       <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.32)' }} />
       <div style={{ position: 'relative', width: '100%', background: '#fff',
@@ -4428,6 +4449,7 @@ function ScheduleCellPicker({ picker, onClose, onPick }) {
         </div>
       </div>
     </div>
+    </Portal>
   );
 }
 
