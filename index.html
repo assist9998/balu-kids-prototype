@@ -1933,7 +1933,7 @@ function ChildScreen({ params, statuses, back }) {
   const grp = DATA.GROUPS.find(g => g.id === kid.group);
   const st = statuses[kid.id];
   const PALETTE = ['#FBE7A8','#CDE8FB','#D4F0DF','#FBD9E1','#FBE0C0','#E8D5FB'];
-  const kidIndex = DATA.CHILDREN.filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
+  const kidIndex = activeKids().filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
   const kidColor = PALETTE[kidIndex % PALETTE.length];
   const kinderInfo = [
     ...(kid.afterSchool ? [{ label: t('afterSchool'), value: t('yes') }] : []),
@@ -2721,10 +2721,20 @@ function AttendanceScreen({ statuses, actions, go }) {
     }
   }
   function setStatus(id, st) { setLocal(m => ({ ...m, [id]: st })); setAllMarked(false); }
+  const [saveErr, setSaveErr] = React.useState(null);
   async function handleSave() {
-    if (isToday) actions.saveStatuses(local);
-    else await window.saveAttendance(selDate, local).catch(() => {});
-    setSavedLocal({ ...local });
+    setSaveErr(null);
+    if (isToday) {
+      actions.saveStatuses(local);
+      setSavedLocal({ ...local });
+    } else {
+      try {
+        await window.saveAttendance(selDate, local);
+        setSavedLocal({ ...local });
+      } catch (e) {
+        setSaveErr(L('Ошибка сохранения', 'Save failed'));
+      }
+    }
   }
 
   const chips = [{ id: 'all', label: t('all'), emoji: '🗂️' }, ...DATA.GROUPS.map(g => ({ id: g.id, label: Lo(g), emoji: g.emoji }))];
@@ -2797,7 +2807,7 @@ function AttendanceScreen({ statuses, actions, go }) {
           {kids.map(kid => {
             const st = local[kid.id];
             const PALETTE = ['#FBE7A8','#CDE8FB','#D4F0DF','#FBD9E1','#FBE0C0','#E8D5FB'];
-            const kidIndex = DATA.CHILDREN.filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
+            const kidIndex = activeKids().filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
             const badges = careBadges(kid, { includeMeals: false });
             return (
               <Card key={kid.id} pad={12} onClick={() => go('child', { childId: kid.id })}
@@ -2819,6 +2829,7 @@ function AttendanceScreen({ statuses, actions, go }) {
           })}
         </div>
 
+        {saveErr && <div style={{ textAlign:'center', color:'var(--no)', fontSize:13, fontWeight:600, padding:'6px 0' }}>{saveErr}</div>}
         <SaveBar hasChanges={hasChanges} onSave={handleSave} />
         </>
       )}
@@ -3250,7 +3261,7 @@ function fmtTourDate(iso) {
 function KidPayRow({ kid, isPaid, onToggle, amount, tourDays, onDaysChange, tourDate, onDateChange }) {
   const [showDays, setShowDays] = React.useState(false);
   const grp = DATA.GROUPS.find(g => g.id === kid.group);
-  const kidIndex = DATA.CHILDREN.filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
+  const kidIndex = activeKids().filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
   const paidBadge = <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
     background: '#E6F7EE', color: '#1f7a55' }}>{L('Оплачено', 'Paid')}</span>;
   const unpaidBadge = (label) => <span style={{ fontSize: 13, fontWeight: 700, padding: '4px 10px', borderRadius: 999,
@@ -3737,7 +3748,7 @@ function ClubScreen({ params }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {kids.map(kid => {
             const grp = DATA.GROUPS.find(g => g.id === kid.group);
-            const kidIndex = DATA.CHILDREN.filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
+            const kidIndex = activeKids().filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
             return (
               <Card key={kid.id} pad={12} style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2' }}>
                 <Avatar emoji={kid.emoji} color={PALETTE[kidIndex % PALETTE.length]} size={44} />
@@ -3776,7 +3787,7 @@ function ClubScreen({ params }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
             {kids.map(kid => {
               const grp = DATA.GROUPS.find(g => g.id === kid.group);
-              const kidIndex = DATA.CHILDREN.filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
+              const kidIndex = activeKids().filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
               const status = attData[kid.id] || 'absent';
               return (
                 <Card key={kid.id} pad={12} style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2' }}>
@@ -3819,7 +3830,7 @@ function ClubScreen({ params }) {
               )}
               {notInClub.map(kid => {
                 const grp = DATA.GROUPS.find(g => g.id === kid.group);
-                const kidIndex = DATA.CHILDREN.filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
+                const kidIndex = activeKids().filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
                 return (
                   <Card key={kid.id} pad={12} onClick={() => handleAdd(kid.id)} style={{
                     display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2', cursor: 'pointer',
