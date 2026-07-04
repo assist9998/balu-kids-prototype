@@ -2619,6 +2619,19 @@ function AttendanceScreen({ statuses, actions, go }) {
   function handleSave() { actions.saveStatuses(local); setSavedLocal({ ...local }); }
   const chips = [{ id: 'all', label: t('all'), emoji: '🗂️' }, ...DATA.GROUPS.map(g => ({ id: g.id, label: Lo(g), emoji: g.emoji }))];
 
+  if (isWeekend()) return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      minHeight: '60vh', gap: 12, padding: 32, textAlign: 'center' }}>
+      <div style={{ fontSize: 48 }}>🌅</div>
+      <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>
+        {L('Выходной день', 'Weekend')}
+      </div>
+      <div style={{ fontSize: 14, color: 'var(--ink-soft)' }}>
+        {L('Журнал посещаемости доступен только в будние дни', 'Attendance journal is only available on weekdays')}
+      </div>
+    </div>
+  );
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
       {/* group filter */}
@@ -2714,21 +2727,34 @@ function SummaryScreen({ statuses, go }) {
     .filter(k => k.paidUntil && normDate(k.paidUntil) >= today)
     .reduce((s, k) => s + (parseFloat(String(k.price).replace(/[^0-9.]/g, '')) || 0), 0);
 
+  const weekend = isWeekend();
+
   return (
     <div style={{ padding: '4px 20px 30px', display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* hero ring */}
       <Card pad={20} style={{ display: 'flex', alignItems: 'center', gap: 20, background: '#FBF7F2' }}>
-        <Ring pct={rate} size={120} stroke={13} color='#B07848'>
-          <div>
-            <div style={{ fontSize: 30, fontWeight: 800, color: 'var(--ink)', lineHeight: 1, fontFamily: 'var(--font-display)' }}>{rate}%</div>
-            <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink-faint)', marginTop: 2 }}>{t('rate')}</div>
+        {weekend ? (
+          <div style={{ flex: 1, textAlign: 'center', padding: '8px 0' }}>
+            <div style={{ fontSize: 32 }}>🌅</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)', marginTop: 8 }}>
+              {L('Выходной день', 'Weekend')}
+            </div>
           </div>
-        </Ring>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <MiniStat dot="var(--ok)"   n={present} label={t('present')} />
-          <MiniStat dot="var(--warn)" n={late}    label={t('late')} />
-          <MiniStat dot="var(--no)"   n={absent}  label={t('absent')} />
-        </div>
+        ) : (
+          <>
+          <Ring pct={rate} size={120} stroke={13} color='#B07848'>
+            <div>
+              <div style={{ fontSize: 30, fontWeight: 800, color: 'var(--ink)', lineHeight: 1, fontFamily: 'var(--font-display)' }}>{rate}%</div>
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink-faint)', marginTop: 2 }}>{t('rate')}</div>
+            </div>
+          </Ring>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <MiniStat dot="var(--ok)"   n={present} label={t('present')} />
+            <MiniStat dot="var(--warn)" n={late}    label={t('late')} />
+            <MiniStat dot="var(--no)"   n={absent}  label={t('absent')} />
+          </div>
+          </>
+        )}
       </Card>
 
       {/* by group */}
@@ -4586,6 +4612,11 @@ const TITLES = {
 function todayStr() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function isWeekend(date) {
+  const d = date || new Date();
+  const day = d.getDay(); // 0=Sun, 6=Sat
+  return day === 0 || day === 6;
 }
 // normalize stored date to YYYY-MM-DD for comparison
 // handles DD.MM.YYYY (Russian), YYYY.MM.DD and YYYY-MM-DD
