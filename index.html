@@ -2658,7 +2658,7 @@ function MiniCalendar({ selected, onSelect, onClose }) {
             const isFuture= dateStr > today;
             const isSel   = dateStr === selected;
             const isTdy   = dateStr === today;
-            const disabled= isFuture;
+            const disabled= isWknd || isFuture;
             return (
               <button key={d} disabled={disabled}
                 onClick={() => { if (!disabled) { onSelect(dateStr); onClose(); } }}
@@ -2744,11 +2744,23 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
   const chips = [{ id: 'all', label: t('all'), emoji: '🗂️' }, ...DATA.GROUPS.map(g => ({ id: g.id, label: Lo(g), emoji: g.emoji }))];
 
   const selDateObj = new Date(selDate + 'T12:00:00');
+  const selIsWeekend = isWeekend(selDateObj);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
 
-      {loading ? (
+      {selIsWeekend ? (
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+          minHeight:'60vh', gap:12, padding:32, textAlign:'center' }}>
+          <div style={{ fontSize:48 }}>🌅</div>
+          <div style={{ fontSize:20, fontWeight:800, color:'var(--ink)', fontFamily:'var(--font-display)' }}>
+            {L('Выходной день', 'Weekend')}
+          </div>
+          <div style={{ fontSize:14, color:'var(--ink-soft)' }}>
+            {L('Журнал посещаемости доступен только в будние дни', 'Attendance journal is only available on weekdays')}
+          </div>
+        </div>
+      ) : loading ? (
         <div style={{ textAlign:'center', padding:40, color:'var(--ink-faint)', fontSize:15 }}>…</div>
       ) : (
         <>
@@ -2848,7 +2860,7 @@ function SummaryScreen({ statuses, go }) {
     .filter(k => k.paidUntil && normDate(k.paidUntil) >= today)
     .reduce((s, k) => s + (parseFloat(String(k.price).replace(/[^0-9.]/g, '')) || 0), 0);
 
-  const weekend = false;
+  const weekend = isWeekend();
 
   return (
     <div style={{ padding: '4px 20px 30px', display: 'flex', flexDirection: 'column', gap: 16 }}>
