@@ -2293,6 +2293,24 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
 
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState(null);
+  const [archiveOpen, setArchiveOpen] = React.useState(false);
+  const [restoring, setRestoring] = React.useState(false);
+
+  const archivedKids = (DATA.CHILDREN || []).filter(k => k.active === false);
+
+  async function handleRestore(kid) {
+    setRestoring(true);
+    try {
+      await window.updateChild(kid.id, { status: 'active' });
+      await window.loadChildren();
+      setArchiveOpen(false);
+      onSaved(kid.id);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setRestoring(false);
+    }
+  }
 
   function set(field) { return val => setForm(f => ({ ...f, [field]: val })); }
 
@@ -2341,6 +2359,13 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
             <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>
               {isEdit ? L('Редактировать', 'Edit child') : L('Новый ребёнок', 'Add child')}
             </div>
+            {!isEdit && archivedKids.length > 0 && (
+              <button onClick={() => setArchiveOpen(true)} className="bk-press" style={{
+                border: 'none', background: '#F0EAE2', color: '#8B6A4A',
+                fontSize: 12, fontWeight: 700, padding: '6px 12px', borderRadius: 20, cursor: 'pointer' }}>
+                {L('Архив', 'Archive')} ({archivedKids.length})
+              </button>
+            )}
             <button onClick={onClose} style={{ border: 'none', background: 'none', fontSize: 24,
               cursor: 'pointer', color: 'var(--ink-faint)', lineHeight: 1, padding: 4 }}>×</button>
           </div>
@@ -2507,6 +2532,38 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
         </div>
       </div>
     </div>
+
+    {archiveOpen && (
+      <div style={{ position: 'fixed', inset: 0, zIndex: 210, display: 'flex', alignItems: 'flex-end',
+        background: 'rgba(0,0,0,0.45)' }} onClick={() => setArchiveOpen(false)}>
+        <div style={{ width: '100%', background: 'var(--bg)', borderRadius: '24px 24px 0 0',
+          maxHeight: '70vh', display: 'flex', flexDirection: 'column' }}
+          onClick={e => e.stopPropagation()}>
+          <div style={{ flexShrink: 0, padding: '12px 20px 14px', borderBottom: '1px solid rgba(60,40,20,0.07)' }}>
+            <div style={{ width: 40, height: 4, background: 'rgba(60,40,20,0.15)', borderRadius: 2, margin: '0 auto 12px' }} />
+            <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>
+              {L('Восстановить из архива', 'Restore from archive')}
+            </div>
+          </div>
+          <div style={{ overflowY: 'auto', padding: '8px 16px 24px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {archivedKids.map(k => (
+              <button key={k.id} disabled={restoring} onClick={() => handleRestore(k)} className="bk-press"
+                style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%',
+                  background: '#F7F3EE', border: 'none', borderRadius: 16, padding: '12px 16px',
+                  cursor: restoring ? 'default' : 'pointer', textAlign: 'left' }}>
+                <span style={{ fontSize: 26 }}>{k.emoji}</span>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)' }}>{k.id}</div>
+                  <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 500 }}>
+                    {k.group} · {k.contract}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    )}
   );
 }
 
