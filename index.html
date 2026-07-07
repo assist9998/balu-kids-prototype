@@ -2335,7 +2335,27 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
         const res = await window.addChild(payload);
         newId = res.id;
       }
-      await window.loadChildren();
+      if (isEdit && newId === kid.id) {
+        // same id — patch the fields we just saved instead of refetching everything
+        Object.assign(kid, {
+          group: payload.group, contract: payload.contractType,
+          dob: payload.birthday, startDate: payload.startDate,
+          dayType: payload.dayType, price: payload.price,
+          deposit: payload.deposit, paidUntil: payload.paidUntil,
+          allergyEn: payload.allergies,
+          paracetamol: payload.paracetamol, photoConsent: payload.photoConsent,
+          adaptation: payload.adaptation,
+          mealsIncluded: payload.mealsIncluded === 'yes' || payload.mealsIncluded === 'halal',
+          mealsHalal: payload.mealsIncluded === 'halal',
+          napTime: payload.napTime, afterSchool: payload.afterSchool,
+          parent1Name: payload.parent1Name, parent1Phone: payload.parent1Phone,
+          parent2Name: payload.parent2Name, parent2Phone: payload.parent2Phone,
+          address: payload.address, active: payload.status !== 'inactive',
+        });
+      } else {
+        // new child, or renamed — id changed server-side, need the real record
+        await window.loadChildren();
+      }
       onSaved(newId);
     } catch(e) {
       setError(e.message);
@@ -3677,7 +3697,6 @@ function ClubScreen({ params }) {
   const [club, setClub] = React.useState(() => DATA.CLUBS.find(c => c.id === params.clubId));
   const [tab, setTab] = React.useState('members');
   const [addOpen, setAddOpen] = React.useState(false);
-  const [removing, setRemoving] = React.useState(null);
   const [attDate, setAttDate] = React.useState(todayStr());
   const [attData, setAttData] = React.useState({});
   const [attSaving, setAttSaving] = React.useState(false);
@@ -3692,22 +3711,31 @@ function ClubScreen({ params }) {
   const kids = activeKids().filter(k => club.kids.includes(k.id));
   const notInClub = activeKids().filter(k => !club.kids.includes(k.id));
 
-  async function reloadClub() {
-    await window.loadClubs().catch(() => {});
-    setClub(DATA.CLUBS.find(c => c.id === params.clubId));
-  }
-
-  async function handleAdd(childId) {
-    await window.addClubMember(club.id, childId);
-    await reloadClub();
+  function handleAdd(childId) {
+    const kids = [...club.kids, childId];
+    const dataClub = DATA.CLUBS.find(c => c.id === club.id);
+    if (dataClub) dataClub.kids = kids;
+    setClub({ ...club, kids });
     setAddOpen(false);
+    window.addClubMember(club.id, childId).catch(e => {
+      const reverted = kids.filter(id => id !== childId);
+      if (dataClub) dataClub.kids = reverted;
+      setClub(c => ({ ...c, kids: reverted }));
+      alert(L('Не удалось добавить: ', 'Failed to add: ') + e.message);
+    });
   }
 
-  async function handleRemove(childId) {
-    setRemoving(childId);
-    await window.removeClubMember(club.id, childId).catch(() => {});
-    await reloadClub();
-    setRemoving(null);
+  function handleRemove(childId) {
+    const kids = club.kids.filter(id => id !== childId);
+    const dataClub = DATA.CLUBS.find(c => c.id === club.id);
+    if (dataClub) dataClub.kids = kids;
+    setClub({ ...club, kids });
+    window.removeClubMember(club.id, childId).catch(e => {
+      const reverted = [...kids, childId];
+      if (dataClub) dataClub.kids = reverted;
+      setClub(c => ({ ...c, kids: reverted }));
+      alert(L('Не удалось убрать: ', 'Failed to remove: ') + e.message);
+    });
   }
 
   async function toggleAtt(childId) {
@@ -3761,9 +3789,9 @@ function ClubScreen({ params }) {
                   <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}</div>
                   {grp && <span style={{ background: grp.color, color: grp.ink, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999 }}>{grp.emoji} {Lo(grp)}</span>}
                 </div>
-                <button onClick={() => handleRemove(kid.id)} disabled={removing === kid.id} className="bk-press" style={{
+                <button onClick={() => handleRemove(kid.id)} className="bk-press" style={{
                   border: 'none', background: '#FBE8E8', color: '#C04040', borderRadius: 10,
-                  padding: '6px 10px', fontSize: 15, cursor: 'pointer', opacity: removing === kid.id ? 0.5 : 1,
+                  padding: '6px 10px', fontSize: 15, cursor: 'pointer',
                 }}>✕</button>
               </Card>
             );
