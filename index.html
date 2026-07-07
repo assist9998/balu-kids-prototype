@@ -1935,7 +1935,6 @@ function ChildScreen({ params, statuses, back }) {
   const [pickerOpen, setPickerOpen] = React.useState(false);
   const [editOpen, setEditOpen] = React.useState(false);
   const [deleteConfirm, setDeleteConfirm] = React.useState(false);
-  const [deleting, setDeleting] = React.useState(false);
   const kid = DATA.CHILDREN.find(k => k.id === params.childId);
   if (!kid) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--ink-faint)' }}>—</div>;
   const grp = DATA.GROUPS.find(g => g.id === kid.group);
@@ -1993,23 +1992,20 @@ function ChildScreen({ params, statuses, back }) {
                 fontSize: 15, fontWeight: 800, color: 'var(--ink-soft)' }}>
                 {L('Отмена', 'Cancel')}
               </button>
-              <button onClick={async () => {
-                setDeleting(true);
-                try {
-                  await window.updateChild(kid.id, { status: 'inactive' });
-                  await window.loadChildren();
-                  back();
-                } catch(e) {
-                  setDeleting(false);
-                  setDeleteConfirm(false);
-                  alert(e.message);
-                }
-              }} disabled={deleting} className="bk-press" style={{
-                flex: 1, border: 'none', cursor: deleting ? 'default' : 'pointer',
+              <button onClick={() => {
+                setDeleteConfirm(false);
+                kid.active = false; // optimistic — flip it locally and leave immediately
+                back();
+                window.updateChild(kid.id, { status: 'inactive' }).catch(e => {
+                  kid.active = true; // request failed — undo the optimistic flip
+                  alert(L('Не удалось архивировать: ', 'Failed to archive: ') + e.message);
+                });
+              }} className="bk-press" style={{
+                flex: 1, border: 'none', cursor: 'pointer',
                 background: '#8B6A4A', borderRadius: 14, padding: 13,
                 fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 800,
-                color: '#fff', opacity: deleting ? 0.7 : 1 }}>
-                {deleting ? '…' : L('Архивировать', 'Archive')}
+                color: '#fff' }}>
+                {L('Архивировать', 'Archive')}
               </button>
             </div>
           </div>
@@ -2305,22 +2301,17 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState(null);
   const [archiveOpen, setArchiveOpen] = React.useState(false);
-  const [restoring, setRestoring] = React.useState(false);
 
   const archivedKids = (DATA.CHILDREN || []).filter(k => k.active === false);
 
-  async function handleRestore(kid) {
-    setRestoring(true);
-    try {
-      await window.updateChild(kid.id, { status: 'active' });
-      await window.loadChildren();
-      setArchiveOpen(false);
-      onSaved(kid.id);
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setRestoring(false);
-    }
+  function handleRestore(kid) {
+    kid.active = true; // optimistic — flip it locally and leave immediately
+    setArchiveOpen(false);
+    onSaved(kid.id);
+    window.updateChild(kid.id, { status: 'active' }).catch(e => {
+      kid.active = false; // request failed — undo the optimistic flip
+      alert(L('Не удалось восстановить: ', 'Failed to restore: ') + String(e));
+    });
   }
 
   function set(field) { return val => setForm(f => ({ ...f, [field]: val })); }
@@ -2559,10 +2550,10 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
           </div>
           <div style={{ overflowY: 'auto', padding: '8px 16px 24px', display: 'flex', flexDirection: 'column', gap: 8 }}>
             {archivedKids.map(k => (
-              <button key={k.id} disabled={restoring} onClick={() => handleRestore(k)} className="bk-press"
+              <button key={k.id} onClick={() => handleRestore(k)} className="bk-press"
                 style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%',
                   background: '#F7F3EE', border: 'none', borderRadius: 16, padding: '12px 16px',
-                  cursor: restoring ? 'default' : 'pointer', textAlign: 'left' }}>
+                  cursor: 'pointer', textAlign: 'left' }}>
                 <span style={{ fontSize: 26 }}>{k.emoji}</span>
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)' }}>{k.id}</div>
