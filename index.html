@@ -3469,20 +3469,24 @@ function PaymentsGardenScreen() {
     setDays(prev => ({ ...prev, [mo.id]: { ...prev[mo.id], [kidId]: n } }));
   }
   function handleSave() {
+    const prevPaid = saved[mo.id] || {};
+    const prevDays = savedDays[mo.id] || {};
     setSaved(JSON.parse(JSON.stringify(paid)));
     setSavedDays(JSON.parse(JSON.stringify(days)));
     const curPaidNow = paid[mo.id] || {};
     const curDaysNow = days[mo.id] || {};
-    const rows = activeKids().map(k => {
-      const kIsTour = k.contract === 'tourist';
-      return {
-        kid_id: k.id,
-        paid: !!curPaidNow[k.id],
-        days: curDaysNow[k.id] || 1,
-        amount: kIsTour ? (curDaysNow[k.id] || 1) * Number(k.price || 0) : Number(k.price || 0),
-      };
-    });
-    window.savePayments(mo.id, rows).catch(() => {});
+    const rows = activeKids()
+      .filter(k => !!curPaidNow[k.id] !== !!prevPaid[k.id] || (curDaysNow[k.id] || 1) !== (prevDays[k.id] || 1))
+      .map(k => {
+        const kIsTour = k.contract === 'tourist';
+        return {
+          kid_id: k.id,
+          paid: !!curPaidNow[k.id],
+          days: curDaysNow[k.id] || 1,
+          amount: kIsTour ? (curDaysNow[k.id] || 1) * Number(k.price || 0) : Number(k.price || 0),
+        };
+      });
+    if (rows.length > 0) window.savePayments(mo.id, rows).catch(() => {});
   }
   function prevMonth() { if (monthIdx > 0) { setMonthIdx(i => i - 1); setPayFilter('all'); } }
   function nextMonth() { if (monthIdx < maxMonthIdx) { setMonthIdx(i => i + 1); setPayFilter('all'); } }
@@ -3601,7 +3605,13 @@ function PaymentsClubsScreen() {
     if (!clubId) return;
     setSaving(true);
     const key = `${mo.id}_${clubId}`;
-    await window.saveClubPayments(mo.id, clubId, curPaid).catch(() => {});
+    const changed = {};
+    allKids.forEach(k => {
+      if (!!curPaid[k.id] !== !!curSaved[k.id]) changed[k.id] = !!curPaid[k.id];
+    });
+    if (Object.keys(changed).length > 0) {
+      await window.saveClubPayments(mo.id, clubId, changed).catch(() => {});
+    }
     setSaved(prev => ({ ...prev, [key]: { ...curPaid } }));
     setSaving(false);
   }
