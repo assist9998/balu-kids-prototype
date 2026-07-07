@@ -2742,16 +2742,20 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
   const [saveErr, setSaveErr] = React.useState(null);
   async function handleSave() {
     setSaveErr(null);
-    if (isToday) {
-      actions.saveStatuses(local);
-      setSavedLocal({ ...local });
-    } else {
-      try {
-        await window.saveAttendance(selDate, local);
-        setSavedLocal({ ...local });
-      } catch (e) {
-        setSaveErr(L('Ошибка сохранения', 'Save failed'));
+    const changed = {};
+    activeKids().forEach(k => {
+      if (local[k.id] !== savedLocal[k.id]) changed[k.id] = local[k.id];
+    });
+    if (Object.keys(changed).length === 0) return;
+    try {
+      if (isToday) {
+        await actions.saveStatuses(local, changed);
+      } else {
+        await window.saveAttendance(selDate, changed);
       }
+      setSavedLocal({ ...local });
+    } catch (e) {
+      setSaveErr(L('Ошибка сохранения', 'Save failed'));
     }
   }
 
@@ -4928,7 +4932,7 @@ function App() {
   const actions = {
     setStatus: (id, st) => setStatuses(m => ({ ...m, [id]: st })),
     markAllPresent: (ids) => setStatuses(m => { const n = { ...m }; ids.forEach(i => n[i] = 'present'); return n; }),
-    saveStatuses: (map) => { setStatuses(() => ({ ...map })); window.saveAttendance(todayStr(), map).catch(() => {}); },
+    saveStatuses: (map, changed) => { setStatuses(() => ({ ...map })); return window.saveAttendance(todayStr(), changed || map); },
     markAllRead: async () => {
       setFeed(f => f.map(x => ({ ...x, unread: false })));
       await window.markAllFeedRead().catch(() => {});
