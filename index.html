@@ -302,6 +302,7 @@ window.API_BASE = "https://rmxois1uv0a24xrbi2dfcfac.95.179.188.141.sslip.io";
       body: JSON.stringify({ month, rows }),
     });
     if (!res.ok) throw new Error(`POST /payments failed: ${res.status}`);
+    return res.json();
   };
 
   window.login = async function (password) {
@@ -2322,6 +2323,13 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
   async function handleSave() {
     const fn = form.firstName.trim(), ln = form.lastName.trim();
     if (!fn && !ln) { setError(L('Введите имя', 'Enter name')); return; }
+    const candidateId = [fn, ln].filter(Boolean).join(' ');
+    const collides = (DATA.CHILDREN || []).some(c => c.id === candidateId && c !== kid);
+    if (collides) {
+      setError(L('Такой ребёнок уже есть — добавьте фамилию или другой отличительный признак',
+                  'A child with this name already exists — add a last name or something to tell them apart'));
+      return;
+    }
     setSaving(true); setError(null);
     try {
       const allergyStr = [
@@ -2485,6 +2493,9 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
             <FHRow label={L('После школы', 'After school')}>
               <FToggle value={form.afterSchool} onChange={set('afterSchool')} />
             </FHRow>
+            <FHRow label={L('Адаптация', 'Adaptation')}>
+              <FToggle value={form.adaptation} onChange={set('adaptation')} />
+            </FHRow>
           </div>
 
           <div style={SEC}>{L('Здоровье', 'Health')}</div>
@@ -2509,9 +2520,6 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
                 { id: 'yes', label: L('Да', 'Yes') }, { id: 'no', label: L('Нет', 'No') },
               ]} />
             </FRow>
-            <FHRow label={L('Адаптация', 'Adaptation')}>
-              <FToggle value={form.adaptation} onChange={set('adaptation')} />
-            </FHRow>
           </div>
 
           <div style={SEC}>{L('Родители', 'Parents')}</div>
@@ -3486,7 +3494,13 @@ function PaymentsGardenScreen() {
           amount: kIsTour ? (curDaysNow[k.id] || 1) * Number(k.price || 0) : Number(k.price || 0),
         };
       });
-    if (rows.length > 0) window.savePayments(mo.id, rows).catch(() => {});
+    if (rows.length > 0) {
+      window.savePayments(mo.id, rows).then(res => {
+        const dates = (res && res.paidUntil) || {};
+        const parts = Object.entries(dates).map(([name, d]) => `${name.split(' ')[0]} — до ${d}`);
+        if (parts.length > 0) window.showToast(parts.join(', '));
+      }).catch(() => {});
+    }
   }
   function prevMonth() { if (monthIdx > 0) { setMonthIdx(i => i - 1); setPayFilter('all'); } }
   function nextMonth() { if (monthIdx < maxMonthIdx) { setMonthIdx(i => i + 1); setPayFilter('all'); } }
@@ -4960,6 +4974,7 @@ function App() {
   function logout() { localStorage.removeItem('balu_role'); setRole(null); setTeacherName(null); }
 
   function showToast(msg) { setToast(msg); clearTimeout(window.__tt); window.__tt = setTimeout(() => setToast(null), 1900); }
+  window.showToast = showToast; // reachable from screens that don't get `actions` as a prop (e.g. PaymentsGardenScreen)
 
   const actions = {
     setStatus: (id, st) => setStatuses(m => ({ ...m, [id]: st })),
