@@ -2633,7 +2633,7 @@ function Portal({ children }) {
   return ReactDOM.createPortal(children, el);
 }
 
-function MiniCalendar({ selected, onSelect, onClose }) {
+function MiniCalendar({ selected, onSelect, onClose, disableWeekends = true, disableFuture = true }) {
   const today = todayStr();
   const init = new Date((selected || today) + 'T12:00:00');
   const [viewYear,  setViewYear]  = React.useState(init.getFullYear());
@@ -2644,8 +2644,8 @@ function MiniCalendar({ selected, onSelect, onClose }) {
   const DH = [L('Пн','Mo'),L('Вт','Tu'),L('Ср','We'),L('Чт','Th'),L('Пт','Fr'),L('Сб','Sa'),L('Вс','Su')];
 
   const todayDate  = new Date(today + 'T12:00:00');
-  const isAtLatest = viewYear > todayDate.getFullYear() ||
-    (viewYear === todayDate.getFullYear() && viewMonth >= todayDate.getMonth());
+  const isAtLatest = disableFuture && (viewYear > todayDate.getFullYear() ||
+    (viewYear === todayDate.getFullYear() && viewMonth >= todayDate.getMonth()));
 
   function prevMonth() {
     if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
@@ -2694,15 +2694,15 @@ function MiniCalendar({ selected, onSelect, onClose }) {
             const isFuture= dateStr > today;
             const isSel   = dateStr === selected;
             const isTdy   = dateStr === today;
-            const disabled= isWknd || isFuture;
+            const disabled= (disableWeekends && isWknd) || (disableFuture && isFuture);
             return (
               <button key={d} disabled={disabled}
                 onClick={() => { if (!disabled) { onSelect(dateStr); onClose(); } }}
                 style={{ border:'none', borderRadius:10, padding:'9px 2px', fontSize:14,
                   fontWeight: isSel||isTdy ? 800 : 500, cursor: disabled ? 'default' : 'pointer',
                   background: isSel ? '#B07848' : isTdy ? '#F0E4D4' : 'transparent',
-                  color: isSel ? '#fff' : isWknd ? '#D4B8B0' : isFuture ? 'var(--ink-faint)' : 'var(--ink)',
-                  opacity: isFuture ? 0.35 : 1 }}>
+                  color: isSel ? '#fff' : (disableWeekends && isWknd) ? '#D4B8B0' : (disableFuture && isFuture) ? 'var(--ink-faint)' : 'var(--ink)',
+                  opacity: (disableFuture && isFuture) ? 0.35 : 1 }}>
                 {d}
               </button>
             );
@@ -2760,7 +2760,17 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
       setLocal(snapRef.current || makeLocal(statuses)); setAllMarked(false);
     }
   }
-  function setStatus(id, st) { setLocal(m => ({ ...m, [id]: st })); setAllMarked(false); }
+  function setStatus(id, st) {
+    if (st === 'present' && local[id] !== 'present') {
+      const kid = activeKids().find(k => k.id === id);
+      const covered = kid && kid.paidUntil && normDate(kid.paidUntil) >= selDate;
+      if (kid && !covered) {
+        actions.toast(L('Не оплачено — обратитесь к бухгалтеру/директору', 'Not paid — contact the accountant/director'));
+      }
+    }
+    setLocal(m => ({ ...m, [id]: st }));
+    setAllMarked(false);
+  }
   const [saveErr, setSaveErr] = React.useState(null);
   async function handleSave() {
     setSaveErr(null);
@@ -2842,6 +2852,9 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
             const PALETTE = ['#FBE7A8','#CDE8FB','#D4F0DF','#FBD9E1','#FBE0C0','#E8D5FB'];
             const kidIndex = activeKids().filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
             const badges = careBadges(kid, { includeMeals: false });
+            if (!(kid.paidUntil && normDate(kid.paidUntil) >= selDate)) {
+              badges.push({ emoji: '💰', label: 'Unpaid', tone: 'warn' });
+            }
             return (
               <Card key={kid.id} pad={12} onClick={() => go('child', { childId: kid.id })}
                 style={{ display:'flex', alignItems:'center', gap:13, background:'#FBF7F2' }}>
@@ -3292,7 +3305,7 @@ function fmtTourDate(iso) {
   return L(`${d.getDate()} ${mRu[d.getMonth()]}`, `${mEn[d.getMonth()]} ${d.getDate()}`);
 }
 
-function KidPayRow({ kid, isPaid, onToggle, amount, tourDays, onDaysChange, tourDate, onDateChange }) {
+function KidPayRow({ kid, isPaid, onToggle, amount, tourDays, onDaysChange, tourDate, onDateChange, dateCheck }) {
   const [showDays, setShowDays] = React.useState(false);
   const grp = DATA.GROUPS.find(g => g.id === kid.group);
   const kidIndex = activeKids().filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
@@ -3312,6 +3325,14 @@ function KidPayRow({ kid, isPaid, onToggle, amount, tourDays, onDaysChange, tour
           <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}</div>
           <span style={{ background: grp.color, color: grp.ink, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999 }}>{grp.emoji} {Lo(grp)}</span>
           {kid.dayType && <span style={{ background: '#E7E1D9', color: '#6B5C4A', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, marginLeft: 6 }}>{kid.dayType}</span>}
+          {dateCheck && (
+            <div style={{ fontSize: 11, fontWeight: 700, marginTop: 4,
+              color: dateCheck.ok ? '#1f7a55' : '#c0392b' }}>
+              {dateCheck.ok
+                ? `✅ ${L('оплачено на', 'covered')} ${dateCheck.date.split('-').reverse().join('.')}`
+                : `⚠️ ${L('не оплачено на', 'not covered')} ${dateCheck.date.split('-').reverse().join('.')}`}
+            </div>
+          )}
         </div>
         <div style={{ textAlign: 'right' }} onClick={tourDays !== undefined ? e => { e.stopPropagation(); onToggle(); } : undefined}>
           {isPaid ? paidBadge : unpaidBadge((window.__isStaff || window.__isTeacher)
@@ -3422,6 +3443,8 @@ function PaymentsGardenScreen() {
   }, []);
   const maxMonthIdx = GARDEN_MONTHS.length - 1;
   const [monthIdx,  setMonthIdx] = React.useState(curCalMonthIdx);
+  const [selDate,   setSelDate]  = React.useState(todayStr);
+  const [calOpen,   setCalOpen]  = React.useState(false);
   const touchStart = React.useRef(null);
 
   const initEmpty = () => {
@@ -3469,6 +3492,10 @@ function PaymentsGardenScreen() {
     (paid[m.id][k.id]||false) !== (saved[m.id][k.id]||false) ||
     (days[m.id][k.id]||1) !== (savedDays[m.id][k.id]||1)
   ));
+
+  function isPaidOnSelDate(kid) {
+    return !!(kid.paidUntil && normDate(kid.paidUntil) >= selDate);
+  }
 
   function toggle(kidId) {
     setPaid(prev => ({ ...prev, [mo.id]: { ...prev[mo.id], [kidId]: !prev[mo.id][kidId] } }));
@@ -3558,6 +3585,21 @@ function PaymentsGardenScreen() {
             fontSize: 20, color: '#B07848', fontWeight: 800, lineHeight: 1 }}>›</button>
         </div>
       </div>
+
+      {/* date check — is a specific day covered by "Paid until"? */}
+      <div style={{ display: 'flex', justifyContent: 'center', padding: '0 20px 14px' }}>
+        <button onClick={() => setCalOpen(true)} className="bk-press" style={{
+          display: 'flex', alignItems: 'center', gap: 6, border: 'none', cursor: 'pointer',
+          background: selDate === todayStr() ? '#F0E4D4' : '#E8D8C4', borderRadius: 999,
+          padding: '7px 16px', fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 800,
+          color: '#7A4828' }}>
+          📅 {selDate === todayStr() ? L('Проверить на сегодня', 'Check for today')
+            : `${L('Проверить на', 'Check for')} ${selDate.split('-').reverse().join('.')}`}
+        </button>
+      </div>
+      {calOpen && <Portal><MiniCalendar selected={selDate} onSelect={setSelDate} onClose={() => setCalOpen(false)}
+        disableWeekends={false} disableFuture={false} /></Portal>}
+
       <PayStats cp={countPaid} cu={countUnpaid} total={total} filter={payFilter} onFilter={setPayFilter} />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 9, padding: '0 20px' }}>
@@ -3566,7 +3608,8 @@ function PaymentsGardenScreen() {
             onToggle={() => toggle(kid.id)}
             amount={getAmount(kid)}
             tourDays={isTour ? (curDays[kid.id] || 1) : undefined}
-            onDaysChange={isTour ? (n) => changeDays(kid.id, n) : undefined} />
+            onDaysChange={isTour ? (n) => changeDays(kid.id, n) : undefined}
+            dateCheck={{ date: selDate, ok: isPaidOnSelDate(kid) }} />
         ))}
       </div>
       <SaveBar hasChanges={hasChanges} onSave={handleSave} />
