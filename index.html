@@ -2853,7 +2853,7 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
             const kidIndex = activeKids().filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
             const badges = careBadges(kid, { includeMeals: false });
             if (!(kid.paidUntil && normDate(kid.paidUntil) >= selDate)) {
-              badges.push({ emoji: '💰', label: 'Unpaid', tone: 'warn' });
+              badges.push({ emoji: '❗', label: 'Unpaid', tone: 'warn' });
             }
             return (
               <Card key={kid.id} pad={12} onClick={() => go('child', { childId: kid.id })}
