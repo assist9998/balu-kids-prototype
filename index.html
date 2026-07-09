@@ -3025,16 +3025,16 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
   const [saveErr, setSaveErr] = React.useState(null);
   async function handleSave() {
     setSaveErr(null);
-    const changed = {};
-    activeKids().forEach(k => {
-      if (local[k.id] !== savedLocal[k.id]) changed[k.id] = local[k.id];
-    });
-    if (Object.keys(changed).length === 0) return;
+    if (!hasChanges) return;
+    // Send everyone's status, not just what changed — otherwise a kid who
+    // stays "absent" the whole time never gets an explicit row in the sheet
+    // (upsert only writes what it's told about), so Olga sees no record at
+    // all for them instead of an "Away" mark.
     try {
       if (isToday) {
-        await actions.saveStatuses(local, changed);
+        await actions.saveStatuses(local);
       } else {
-        await window.saveAttendance(selDate, changed);
+        await window.saveAttendance(selDate, local);
       }
       setSavedLocal({ ...local });
     } catch (e) {
