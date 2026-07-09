@@ -487,19 +487,26 @@ window.API_BASE = "https://rmxois1uv0a24xrbi2dfcfac.95.179.188.141.sslip.io";
     if (!res.ok) throw new Error(`POST /club-attendance failed: ${res.status}`);
   };
 
-  window.loadClubPayments = async function (month, clubId) {
-    const res = await fetch(`${window.API_BASE}/club-payments/${encodeURIComponent(month)}/${clubId}`);
-    if (!res.ok) throw new Error(`GET /club-payments failed: ${res.status}`);
+  window.loadClubPaymentLog = async function (clubId) {
+    const res = await fetch(`${window.API_BASE}/club-payment-log/${clubId}`);
+    if (!res.ok) throw new Error(`GET /club-payment-log failed: ${res.status}`);
     return res.json();
   };
 
-  window.saveClubPayments = async function (month, clubId, paid) {
-    const res = await fetch(`${window.API_BASE}/club-payments`, {
+  window.addClubPaymentLogEntry = async function (kidId, clubId, dateFrom, dateUntil, amount) {
+    const res = await fetch(`${window.API_BASE}/club-payment-log`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ month, club_id: clubId, paid }),
+      body: JSON.stringify({ kidId, clubId, dateFrom, dateUntil, amount }),
     });
-    if (!res.ok) throw new Error(`POST /club-payments failed: ${res.status}`);
+    if (!res.ok) throw new Error(`POST /club-payment-log failed: ${res.status}`);
+    return res.json();
+  };
+
+  window.deleteClubPaymentLogEntry = async function (rowId) {
+    const res = await fetch(`${window.API_BASE}/club-payment-log/${rowId}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error(`DELETE /club-payment-log failed: ${res.status}`);
+    return res.json();
   };
 
   window.setChildEmoji = async function (childId, emoji) {
@@ -2727,7 +2734,19 @@ function dayCount(a, b) {
   return Math.round((d2 - d1) / 86400000) + 1;
 }
 
-function PayRangeSheet({ kid, tariff, onConfirm, onDelete, onClose }) {
+// picks whichever log entry covers furthest into the future — mirrors the
+// backend's _best_coverage, used client-side for clubs since a kid's
+// per-club coverage is never cached anywhere, only derived from the log
+function bestCoverage(entries) {
+  let best = null;
+  entries.forEach(e => {
+    if (!e.until) return;
+    if (!best || normDate(e.until) > normDate(best.until)) best = e;
+  });
+  return best ? { from: best.from, until: best.until } : { from: '', until: '' };
+}
+
+function PayRangeSheet({ kid, tariff, price, loadHistory, onConfirm, onDelete, onClose }) {
   const today = todayStr();
   const init = new Date(today + 'T12:00:00');
   const [viewYear,  setViewYear]  = React.useState(init.getFullYear());
@@ -2740,7 +2759,7 @@ function PayRangeSheet({ kid, tariff, onConfirm, onDelete, onClose }) {
   const [saving,     setSaving]     = React.useState(false);
 
   React.useEffect(() => {
-    window.loadPaymentLog(kid.id).then(setHistory).catch(() => {});
+    loadHistory().then(setHistory).catch(() => {});
   }, [kid.id]);
 
   // every day covered by an already-logged payment, for the "you can already
@@ -2762,8 +2781,12 @@ function PayRangeSheet({ kid, tariff, onConfirm, onDelete, onClose }) {
 
   React.useEffect(() => {
     if (amountTouched || !rangeFrom || !rangeTo) return;
-    const price = Number(kid.price) || 0;
-    const suggested = tariff === 'tourist' ? price * dayCount(rangeFrom, rangeTo) : price;
+    // price === undefined means the caller didn't pass one at all (garden
+    // rows), so fall back to the child's own price; price === null means
+    // the caller (clubs) explicitly has no price on record — don't guess
+    // by falling back to an unrelated field, just leave the amount blank
+    const basePrice = Number(price !== undefined ? price : kid.price) || 0;
+    const suggested = tariff === 'tourist' ? basePrice * dayCount(rangeFrom, rangeTo) : basePrice;
     setAmount(suggested ? String(suggested) : '');
   }, [rangeFrom, rangeTo, tariff]);
 
@@ -2807,7 +2830,7 @@ function PayRangeSheet({ kid, tariff, onConfirm, onDelete, onClose }) {
       // re-fetch rather than locally filter — deleting shifts every later
       // row's sheet row number, so a second delete in the same session
       // needs fresh ids, not the ones fetched before the first delete
-      const fresh = await window.loadPaymentLog(kid.id);
+      const fresh = await loadHistory();
       setHistory(fresh);
     } catch (e) {
       window.showToast(L('Не удалось удалить: ', 'Failed to delete: ') + String(e));
@@ -3523,7 +3546,7 @@ function fmtTourDate(iso) {
   return L(`${d.getDate()} ${mRu[d.getMonth()]}`, `${mEn[d.getMonth()]} ${d.getDate()}`);
 }
 
-function KidPayRow({ kid, isPaid, onToggle, onConfirmPaid, onDeletePaid, tariff, dateCheck }) {
+function KidPayRow({ kid, isPaid, onToggle, onConfirmPaid, onDeletePaid, tariff, price, loadHistory, dateCheck }) {
   const [showRange, setShowRange] = React.useState(false);
   const grp = DATA.GROUPS.find(g => g.id === kid.group);
   const kidIndex = activeKids().filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
@@ -3563,7 +3586,8 @@ function KidPayRow({ kid, isPaid, onToggle, onConfirmPaid, onDeletePaid, tariff,
 
       {showRange && (
         <Portal>
-          <PayRangeSheet kid={kid} tariff={tariff}
+          <PayRangeSheet kid={kid} tariff={tariff} price={price}
+            loadHistory={loadHistory || (() => window.loadPaymentLog(kid.id))}
             onConfirm={async (from, to, amount) => { await onConfirmPaid(from, to, amount); setShowRange(false); }}
             onDelete={onDeletePaid}
             onClose={() => setShowRange(false)} />
@@ -3618,13 +3642,6 @@ function PaymentsScreen({ go }) {
     </div>
   );
 }
-
-const GARDEN_MONTHS = [
-  { id: 'jun', ru: 'Июнь',     en: 'June'      },
-  { id: 'jul', ru: 'Июль',     en: 'July'       },
-  { id: 'aug', ru: 'Август',   en: 'August'     },
-  { id: 'sep', ru: 'Сентябрь', en: 'September'  },
-];
 
 function PaymentsGardenScreen() {
   const [tariff,    setTariff]    = React.useState('longterm');
@@ -3732,63 +3749,58 @@ function PaymentsGardenScreen() {
 }
 
 function PaymentsClubsScreen() {
-  const [clubId,    setClubId]   = React.useState(() => DATA.CLUBS[0]?.id ?? null);
+  const [clubId,    setClubId]    = React.useState(() => DATA.CLUBS[0]?.id ?? null);
   const [payFilter, setPayFilter] = React.useState('all');
-  const curCalMonthIdx = React.useMemo(() => {
-    const m = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'][new Date().getMonth()];
-    const i = GARDEN_MONTHS.findIndex(x => x.id === m);
-    return i === -1 ? 0 : i;
-  }, []);
-  const maxMonthIdx = Math.min(curCalMonthIdx + 1, GARDEN_MONTHS.length - 1);
-  const [monthIdx,  setMonthIdx] = React.useState(curCalMonthIdx);
-  const [paid,      setPaid]     = React.useState({});
-  const [saved,     setSaved]    = React.useState({});
-  const [saving,    setSaving]   = React.useState(false);
-  const touchStart = React.useRef(null);
+  const [log,       setLog]       = React.useState([]);
 
-  const mo         = GARDEN_MONTHS[monthIdx];
   const activeClub = DATA.CLUBS.find(c => c.id === clubId);
   const allKids    = activeClub ? activeKids().filter(k => activeClub.kids.includes(k.id)) : [];
-  const curPaid    = paid[`${mo.id}_${clubId}`] || {};
-  const curSaved   = saved[`${mo.id}_${clubId}`] || {};
-  const countPaid   = allKids.filter(k =>  curPaid[k.id]).length;
-  const countUnpaid = allKids.filter(k => !curPaid[k.id]).length;
-  const price       = activeClub?.price ?? null;
-  const total       = price != null ? countPaid * price : null;
-  const kids        = allKids.filter(k => payFilter === 'paid' ? curPaid[k.id] : payFilter === 'unpaid' ? !curPaid[k.id] : true);
-  const hasChanges  = JSON.stringify(curPaid) !== JSON.stringify(curSaved);
+  const price      = activeClub?.price ?? null;
+  const today      = todayStr();
 
   React.useEffect(() => {
-    if (!clubId || !mo) return;
-    window.loadClubPayments(mo.id, clubId).then(remote => {
-      const key = `${mo.id}_${clubId}`;
-      setPaid(prev => ({ ...prev, [key]: remote }));
-      setSaved(prev => ({ ...prev, [key]: { ...remote } }));
-    }).catch(() => {});
-  }, [mo?.id, clubId]);
-
-  function toggle(kid) {
-    const key = `${mo.id}_${clubId}`;
-    setPaid(prev => ({ ...prev, [key]: { ...(prev[key] || {}), [kid.id]: !(prev[key] || {})[kid.id] } }));
-  }
-
-  async function handleSave() {
     if (!clubId) return;
-    setSaving(true);
-    const key = `${mo.id}_${clubId}`;
-    const changed = {};
-    allKids.forEach(k => {
-      if (!!curPaid[k.id] !== !!curSaved[k.id]) changed[k.id] = !!curPaid[k.id];
-    });
-    if (Object.keys(changed).length > 0) {
-      await window.saveClubPayments(mo.id, clubId, changed).catch(() => {});
-    }
-    setSaved(prev => ({ ...prev, [key]: { ...curPaid } }));
-    setSaving(false);
+    window.loadClubPaymentLog(clubId).then(setLog).catch(() => {});
+  }, [clubId]);
+
+  // a kid can be in more than one club, each with its own paid-through date,
+  // so coverage is derived from the log here rather than cached on the kid
+  const coverage = React.useMemo(() => {
+    const map = {};
+    allKids.forEach(k => { map[k.id] = bestCoverage(log.filter(e => e.child === k.id)); });
+    return map;
+  }, [log, allKids.length]);
+
+  function isCovered(kid) {
+    const c = coverage[kid.id];
+    return !!(c && c.until && normDate(c.until) >= today);
   }
 
-  function prevMonth() { if (monthIdx > 0) { setMonthIdx(i => i - 1); setPayFilter('all'); } }
-  function nextMonth() { if (monthIdx < maxMonthIdx) { setMonthIdx(i => i + 1); setPayFilter('all'); } }
+  const countPaid   = allKids.filter(isCovered).length;
+  const countUnpaid = allKids.length - countPaid;
+  const total       = price != null ? countPaid * price : null;
+  const kids        = allKids.filter(k => payFilter === 'paid' ? isCovered(k) : payFilter === 'unpaid' ? !isCovered(k) : true);
+
+  function refetchLog() {
+    return window.loadClubPaymentLog(clubId).then(setLog);
+  }
+
+  async function confirmPayment(kid, from, to, amount) {
+    const fromDmy = from.split('-').reverse().join('.');
+    const toDmy = to.split('-').reverse().join('.');
+    try {
+      await window.addClubPaymentLogEntry(kid.id, clubId, fromDmy, toDmy, amount);
+      await refetchLog();
+    } catch (e) {
+      window.showToast(L('Не удалось сохранить оплату: ', 'Failed to save payment: ') + String(e));
+      throw e;
+    }
+  }
+
+  async function deletePayment(rowId) {
+    await window.deleteClubPaymentLogEntry(rowId);
+    await refetchLog();
+  }
 
   if (!activeClub) return (
     <div style={{ padding: 20, color: 'var(--ink-faint)', fontSize: 14, textAlign: 'center' }}>
@@ -3810,29 +3822,6 @@ function PaymentsClubsScreen() {
           </button>
         ))}
       </div>
-      {/* month nav */}
-      <div style={{ display: 'flex', justifyContent: 'center', padding: '0 20px 14px' }}>
-        <div
-          onTouchStart={e => { touchStart.current = e.touches[0].clientX; }}
-          onTouchEnd={e => {
-            if (touchStart.current === null) return;
-            const dx = e.changedTouches[0].clientX - touchStart.current;
-            touchStart.current = null;
-            if (dx < -50) nextMonth();
-            else if (dx > 50) prevMonth();
-          }}
-          style={{ display: 'flex', alignItems: 'center', gap: 14, width: '100%',
-            background: '#FBF7F2', borderRadius: 999, padding: '9px 18px',
-            boxShadow: '0 1px 3px rgba(60,40,20,0.07)', userSelect: 'none' }}>
-          <button onClick={prevMonth} style={{ border: 'none', background: 'none', padding: 0,
-            cursor: monthIdx > 0 ? 'pointer' : 'default', opacity: monthIdx > 0 ? 1 : 0.2,
-            fontSize: 20, color: '#B07848', fontWeight: 800, lineHeight: 1 }}>‹</button>
-          <span style={{ flex: 1, fontSize: 15, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)', textAlign: 'center' }}>{Lo(mo)}</span>
-          <button onClick={nextMonth} style={{ border: 'none', background: 'none', padding: 0,
-            cursor: monthIdx < maxMonthIdx ? 'pointer' : 'default', opacity: monthIdx < maxMonthIdx ? 1 : 0.2,
-            fontSize: 20, color: '#B07848', fontWeight: 800, lineHeight: 1 }}>›</button>
-        </div>
-      </div>
       <PayStats cp={countPaid} cu={countUnpaid} total={total} filter={payFilter} onFilter={setPayFilter} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 9, padding: '0 20px' }}>
         {allKids.length === 0 && (
@@ -3841,12 +3830,13 @@ function PaymentsClubsScreen() {
           </div>
         )}
         {kids.map(kid => (
-          <KidPayRow key={kid.id} kid={kid} isPaid={!!curPaid[kid.id]}
-            onToggle={() => toggle(kid)}
-            amount={price} />
+          <KidPayRow key={kid.id} kid={kid} isPaid={isCovered(kid)}
+            tariff="club" price={price}
+            loadHistory={() => window.loadClubPaymentLog(clubId).then(l => l.filter(e => e.child === kid.id))}
+            onConfirmPaid={(from, to, amount) => confirmPayment(kid, from, to, amount)}
+            onDeletePaid={(rowId) => deletePayment(rowId)} />
         ))}
       </div>
-      <SaveBar hasChanges={hasChanges} onSave={handleSave} />
     </div>
   );
 }
