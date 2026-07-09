@@ -2746,7 +2746,7 @@ function bestCoverage(entries) {
   return best ? { from: best.from, until: best.until } : { from: '', until: '' };
 }
 
-function PayRangeSheet({ kid, tariff, price, loadHistory, onConfirm, onDelete, onClose }) {
+function PayRangeSheet({ kid, tariff, price, loadHistory, legacyCoverage, onConfirm, onDelete, onClose }) {
   const today = todayStr();
   const init = new Date(today + 'T12:00:00');
   const [viewYear,  setViewYear]  = React.useState(init.getFullYear());
@@ -2763,10 +2763,16 @@ function PayRangeSheet({ kid, tariff, price, loadHistory, onConfirm, onDelete, o
   }, [kid.id]);
 
   // every day covered by an already-logged payment, for the "you can already
-  // see what's paid" highlight — separate from the new range being picked
+  // see what's paid" highlight — separate from the new range being picked.
+  // Also folds in legacyCoverage (the child's cached Paid from/until) for
+  // kids whose current coverage predates the payment log entirely — the
+  // log would otherwise be empty and show nothing highlighted even though
+  // they're actually marked paid right now.
   const paidDays = React.useMemo(() => {
     const set = new Set();
-    history.forEach(h => {
+    const entries = legacyCoverage && legacyCoverage.from && legacyCoverage.until
+      ? [...history, legacyCoverage] : history;
+    entries.forEach(h => {
       const from = normDate(h.from), until = normDate(h.until);
       if (!from || !until) return;
       let d = new Date(from + 'T12:00:00');
@@ -2777,7 +2783,7 @@ function PayRangeSheet({ kid, tariff, price, loadHistory, onConfirm, onDelete, o
       }
     });
     return set;
-  }, [history]);
+  }, [history, legacyCoverage]);
 
   React.useEffect(() => {
     if (amountTouched || !rangeFrom || !rangeTo) return;
@@ -3546,7 +3552,7 @@ function fmtTourDate(iso) {
   return L(`${d.getDate()} ${mRu[d.getMonth()]}`, `${mEn[d.getMonth()]} ${d.getDate()}`);
 }
 
-function KidPayRow({ kid, isPaid, onToggle, onConfirmPaid, onDeletePaid, tariff, price, loadHistory }) {
+function KidPayRow({ kid, isPaid, onToggle, onConfirmPaid, onDeletePaid, tariff, price, loadHistory, legacyCoverage }) {
   const [showRange, setShowRange] = React.useState(false);
   const grp = DATA.GROUPS.find(g => g.id === kid.group);
   const kidIndex = activeKids().filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
@@ -3578,7 +3584,7 @@ function KidPayRow({ kid, isPaid, onToggle, onConfirmPaid, onDeletePaid, tariff,
 
       {showRange && (
         <Portal>
-          <PayRangeSheet kid={kid} tariff={tariff} price={price}
+          <PayRangeSheet kid={kid} tariff={tariff} price={price} legacyCoverage={legacyCoverage}
             loadHistory={loadHistory || (() => window.loadPaymentLog(kid.id))}
             onConfirm={async (from, to, amount) => { await onConfirmPaid(from, to, amount); setShowRange(false); }}
             onDelete={onDeletePaid}
@@ -3739,6 +3745,15 @@ function PaymentsGardenScreen() {
         {kids.map(kid => (
           <KidPayRow key={kid.id} kid={kid} isPaid={isCoveredOn(kid, selDate)}
             tariff={tariff}
+            legacyCoverage={{
+              // most kids' current paidUntil predates the payment log and
+              // has no matching entry there — without a fallback, opening
+              // their calendar would show nothing highlighted at all even
+              // though they're marked paid. Most also have no paidFrom on
+              // record either, so shade from today rather than guess a
+              // start date we don't actually know.
+              from: kid.paidFrom || todayStr(), until: kid.paidUntil,
+            }}
             onConfirmPaid={(from, to, amount) => confirmPayment(kid, from, to, amount)}
             onDeletePaid={(rowId) => deletePayment(kid, rowId)} />
         ))}
