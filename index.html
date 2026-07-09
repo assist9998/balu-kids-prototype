@@ -1713,8 +1713,12 @@ function HomeScreen({ go, statuses, feed, homeStyle }) {
       badge: `${kids.length} ${t('kids')}` },
     { key: 'attendance',    emoji: '📋', color: '#CDE8FB', colorLight: '#E8F4FD', colorDark: '#A4BCE9', ink: '#1f5f86', go: 'attendance',
       badge: `${present}/${kids.length}` },
-    { key: 'payments',      emoji: '💰', color: '#FBE0C0', colorLight: '#FDF4EA', colorDark: '#C9A882', ink: '#8a5010', go: 'payments',
-      badge: null },
+    // teachers don't handle money — director/staff only, see also the
+    // route guard in App() that catches direct navigation there too
+    ...(window.__isTeacher ? [] : [
+      { key: 'payments', emoji: '💰', color: '#FBE0C0', colorLight: '#FDF4EA', colorDark: '#C9A882', ink: '#8a5010', go: 'payments',
+        badge: null },
+    ]),
     { key: 'activities',    emoji: '🎨', color: '#E8D5FB', colorLight: '#F5EFFD', colorDark: '#B8A0D8', ink: '#5a2a86', go: 'activities',
       badge: null },
     { key: 'summary',       emoji: '🗞️', color: '#FBE7A8', colorLight: '#FDFAF0', colorDark: '#C9B986', ink: '#8a6410', go: 'summary',
@@ -3210,7 +3214,8 @@ function SummaryScreen({ statuses, go }) {
         <WeekChart />
       </Card>
 
-      {/* payments */}
+      {/* payments — director/staff only, teachers don't handle money */}
+      {!window.__isTeacher && (
       <Card pad={18} style={{ background: '#FBF7F2' }}>
         <SectionLabel>{t('payments')}</SectionLabel>
         <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
@@ -3226,15 +3231,14 @@ function SummaryScreen({ statuses, go }) {
               <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 700, marginTop: 4 }}>{s.label}</div>
             </div>
           ))}
-          {!(window.__isStaff || window.__isTeacher) && (
-            <div style={{ flex: 1.4, textAlign: 'center', borderRadius: 14, padding: '12px 8px',
-              background: '#fff', boxShadow: '0 1px 4px rgba(60,40,20,0.07)' }}>
-              <div style={{ fontSize: 22, fontWeight: 800, color: '#B07848', lineHeight: 1, fontFamily: 'var(--font-display)' }}>{totalCollected > 0 ? totalCollected.toLocaleString() : '—'}</div>
-              <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 700, marginTop: 4 }}>{L('Собрано', 'Collected')}</div>
-            </div>
-          )}
+          <div style={{ flex: 1.4, textAlign: 'center', borderRadius: 14, padding: '12px 8px',
+            background: '#fff', boxShadow: '0 1px 4px rgba(60,40,20,0.07)' }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: '#B07848', lineHeight: 1, fontFamily: 'var(--font-display)' }}>{totalCollected > 0 ? totalCollected.toLocaleString() : '—'}</div>
+            <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 700, marginTop: 4 }}>{L('Собрано', 'Collected')}</div>
+          </div>
         </div>
       </Card>
+      )}
 
     </div>
   );
@@ -3534,12 +3538,10 @@ function PayStats({ cp, cu, total, filter, onFilter }) {
     <div style={{ display: 'flex', gap: 10, padding: '0 20px 16px' }}>
       {statBox('paid',   cp, L('Оплатили', 'Paid'),      'var(--ok)')}
       {statBox('unpaid', cu, L('Не оплатили', 'Unpaid'), 'var(--no)')}
-      {!(window.__isStaff || window.__isTeacher) && (
-        <div style={{ flex: 1.4, background: '#FBF7F2', borderRadius: 18, padding: '12px 8px', textAlign: 'center' }}>
-          <div style={{ fontSize: 22, fontWeight: 600, color: '#B07848', lineHeight: 1 }}>{fmtMoney(total)}</div>
-          <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 600, marginTop: 4 }}>{L('Собрано', 'Collected')}</div>
-        </div>
-      )}
+      <div style={{ flex: 1.4, background: '#FBF7F2', borderRadius: 18, padding: '12px 8px', textAlign: 'center' }}>
+        <div style={{ fontSize: 22, fontWeight: 600, color: '#B07848', lineHeight: 1 }}>{fmtMoney(total)}</div>
+        <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 600, marginTop: 4 }}>{L('Собрано', 'Collected')}</div>
+      </div>
     </div>
   );
 }
@@ -5136,6 +5138,13 @@ function App() {
 
   function showToast(msg) { setToast(msg); clearTimeout(window.__tt); window.__tt = setTimeout(() => setToast(null), 1900); }
   window.showToast = showToast; // reachable from screens that don't get `actions` as a prop (e.g. PaymentsGardenScreen)
+
+  // Teachers don't handle money — only director/staff process payments.
+  // The home tile is already hidden for them, this just closes the gap if
+  // a teacher lands on a payments route some other way (stale nav stack, ...).
+  React.useEffect(() => {
+    if (role === 'teacher' && top.name.startsWith('payments')) home();
+  }, [role, top.name]);
 
   const actions = {
     setStatus: (id, st) => setStatuses(m => ({ ...m, [id]: st })),
