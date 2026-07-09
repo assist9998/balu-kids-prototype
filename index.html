@@ -1735,7 +1735,7 @@ function HomeScreen({ go, statuses, feed, homeStyle }) {
   const hour = new Date().getHours();
   const greet = hour < 12 ? t('greetingAM') : t('greetingPM');
   const greetName = window.__isDirector ? L('Ольга', 'Olga')
-    : (window.__isTeacher && window.__teacherName) ? window.__teacherName
+    : ((window.__isTeacher || window.__isStaff) && window.__teacherName) ? window.__teacherName
     : L('Команда', 'Team');
 
   return (
