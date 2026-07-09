@@ -5118,6 +5118,18 @@ function App() {
     });
   }, [childrenReady]);
 
+  // Teachers don't handle money — only director/staff process payments.
+  // The home tile is already hidden for them, this just closes the gap if
+  // a teacher lands on a payments route some other way (stale nav stack, ...).
+  // Must stay above the `if (!role) return <LoginGate/>` below — every hook
+  // in this component has to run on every render regardless of role, or
+  // React throws a "rendered fewer/more hooks than expected" crash the
+  // instant role flips (login/logout), which blanks the whole app.
+  React.useEffect(() => {
+    const t = stack[stack.length - 1];
+    if (role === 'teacher' && t.name.startsWith('payments')) { setDir('back'); setStack([{ name: 'home', params: {} }]); }
+  }, [role, stack]);
+
   // keep i18n + global lang in sync BEFORE children render
   window.__lang = lang;
   setI18nLang(lang);
@@ -5138,13 +5150,6 @@ function App() {
 
   function showToast(msg) { setToast(msg); clearTimeout(window.__tt); window.__tt = setTimeout(() => setToast(null), 1900); }
   window.showToast = showToast; // reachable from screens that don't get `actions` as a prop (e.g. PaymentsGardenScreen)
-
-  // Teachers don't handle money — only director/staff process payments.
-  // The home tile is already hidden for them, this just closes the gap if
-  // a teacher lands on a payments route some other way (stale nav stack, ...).
-  React.useEffect(() => {
-    if (role === 'teacher' && top.name.startsWith('payments')) home();
-  }, [role, top.name]);
 
   const actions = {
     setStatus: (id, st) => setStatuses(m => ({ ...m, [id]: st })),
