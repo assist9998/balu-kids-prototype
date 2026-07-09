@@ -3412,7 +3412,7 @@ function fmtTourDate(iso) {
   return L(`${d.getDate()} ${mRu[d.getMonth()]}`, `${mEn[d.getMonth()]} ${d.getDate()}`);
 }
 
-function KidPayRow({ kid, isPaid, onToggle, onConfirmPaid, amount, tourDays, onDaysChange, tourDate, onDateChange, dateCheck }) {
+function KidPayRow({ kid, isPaid, onToggle, onConfirmPaid, onCancelPaid, amount, tourDays, onDaysChange, tourDate, onDateChange, dateCheck }) {
   const [showDays, setShowDays] = React.useState(false);
   const [showRange, setShowRange] = React.useState(false);
   const grp = DATA.GROUPS.find(g => g.id === kid.group);
@@ -3426,7 +3426,8 @@ function KidPayRow({ kid, isPaid, onToggle, onConfirmPaid, amount, tourDays, onD
     display: 'flex', alignItems: 'center', justifyContent: 'center' };
   function handlePayClick(e) {
     if (e) e.stopPropagation();
-    if (isPaid || !onConfirmPaid) { onToggle(); return; }
+    if (!onConfirmPaid) { onToggle(); return; } // clubs: no dates involved, plain toggle
+    if (isPaid) { onCancelPaid(); return; }      // cancelling a payment clears its coverage dates too
     setShowRange(true);
   }
 
@@ -3636,6 +3637,15 @@ function PaymentsGardenScreen() {
       window.showToast(L('Не удалось сохранить даты: ', 'Failed to save dates: ') + String(e));
     });
   }
+  function cancelPaidDates(kid) {
+    toggle(kid.id);
+    const prevFrom = kid.paidFrom, prevTo = kid.paidUntil;
+    Object.assign(kid, { paidFrom: '', paidUntil: '' }); // optimistic
+    window.updateChild(kid.id, { paidFrom: '', paidUntil: '' }).catch(e => {
+      Object.assign(kid, { paidFrom: prevFrom, paidUntil: prevTo });
+      window.showToast(L('Не удалось отменить оплату: ', 'Failed to cancel payment: ') + String(e));
+    });
+  }
   function handleSave() {
     const prevPaid = saved[mo.id] || {};
     const prevDays = savedDays[mo.id] || {};
@@ -3736,6 +3746,7 @@ function PaymentsGardenScreen() {
           <KidPayRow key={kid.id} kid={kid} isPaid={curPaid[kid.id]}
             onToggle={() => toggle(kid.id)}
             onConfirmPaid={(from, to) => confirmPaidDates(kid, from, to)}
+            onCancelPaid={() => cancelPaidDates(kid)}
             amount={getAmount(kid)}
             tourDays={isTour ? (curDays[kid.id] || 1) : undefined}
             onDaysChange={isTour ? (n) => changeDays(kid.id, n) : undefined}
