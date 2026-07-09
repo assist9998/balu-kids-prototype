@@ -1494,7 +1494,7 @@ function ScoutBadgeRow({ kid, grp, status, onEdit, onDelete }) {
     ? { dot: 'var(--ok)', label: t('present'), tone: 'ok' }
     : { dot: 'var(--ink-faint)', label: t('absent'), tone: 'neutral' });
   if (kid.paidUntil && normDate(kid.paidUntil) < todayStr()) petals.push({ emoji: '⚠️', label: 'Overdue', tone: 'warn' });
-  if (kid.contract === 'tourist') petals.push({ emoji: '🧳', label: kid.dayType ? `Tourist · ${kid.dayType}` : 'Tourist', tone: 'info' });
+  if (kid.contract === 'tourist') petals.push({ emoji: '🧳', label: kid.dayType ? `Short term · ${kid.dayType}` : 'Short term', tone: 'info' });
   if (kid.contract && kid.contract !== 'tourist') petals.push({ emoji: '🏠', label: kid.dayType ? `Long term · ${kid.dayType}` : 'Long term', tone: 'ok' });
   petals.push(...careBadges(kid));
   if (kid.napTime) petals.push({ emoji: '😴', label: 'Nap time', tone: 'info' });
@@ -2432,8 +2432,8 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
             </FRow>
             <FRow label={L('Договор', 'Contract')}>
               <FPills value={form.contractType} onChange={set('contractType')} options={[
-                { id: 'longterm', label: L('Долгосрочный', 'Long-term') },
-                { id: 'tourist', label: L('Турист', 'Tourist') },
+                { id: 'longterm', label: L('Долгосрочный', 'Long term') },
+                { id: 'tourist', label: L('Краткосрочный', 'Short term') },
               ]} />
             </FRow>
             <div style={{ display: 'flex', gap: 10 }}>
@@ -2589,7 +2589,7 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)' }}>{k.id}</div>
                   <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 500 }}>
-                    {k.group} · {k.contract}
+                    {k.group} · {k.contract === 'tourist' ? L('Краткосрочный', 'Short term') : L('Долгосрочный', 'Long term')}
                   </div>
                 </div>
               </button>
@@ -3539,7 +3539,7 @@ function PaymentsGardenScreen() {
 
       {/* tariff toggle */}
       <div style={{ display: 'flex', margin: '0 20px 14px', background: '#FBF7F2', borderRadius: 999, padding: 4, gap: 4 }}>
-        {[['longterm', L('Долгосрочные', 'Long term')], ['tourist', L('Туристы', 'Tourist')]].map(([id, label]) => (
+        {[['longterm', L('Долгосрочные', 'Long term')], ['tourist', L('Краткосрочные', 'Short term')]].map(([id, label]) => (
           <button key={id} onClick={() => { setTariff(id); setGroup('all'); setPayFilter('all'); }} className="bk-press" style={{
             flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
             padding: '9px 4px', borderRadius: 999, fontSize: 13, fontWeight: 800,
