@@ -3653,7 +3653,12 @@ function PaymentsGardenScreen() {
     .filter(k => group === 'all' || k.group === group);
 
   function isCoveredOn(kid, date) {
-    return !!(kid.paidUntil && normDate(kid.paidUntil) >= date);
+    // both bounds matter — a kid paid ahead for a period that hasn't
+    // started yet (paidFrom in the future) isn't covered *today* just
+    // because paidUntil is comfortably far off
+    if (!kid.paidUntil || normDate(kid.paidUntil) < date) return false;
+    if (kid.paidFrom && normDate(kid.paidFrom) > date) return false;
+    return true;
   }
 
   // the "Оплачено" badge, the stats, and the filter all check the same
