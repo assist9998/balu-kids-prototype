@@ -289,19 +289,25 @@ window.API_BASE = "https://rmxois1uv0a24xrbi2dfcfac.95.179.188.141.sslip.io";
     if (!res.ok) throw new Error(`POST /attendance failed: ${res.status}`);
   };
 
-  window.loadPayments = async function (month) {
-    const res = await fetch(`${window.API_BASE}/payments/${encodeURIComponent(month)}`);
-    if (!res.ok) throw new Error(`GET /payments failed: ${res.status}`);
+  window.loadPaymentLog = async function (kidId) {
+    const res = await fetch(`${window.API_BASE}/payment-log/${encodeURIComponent(kidId)}`);
+    if (!res.ok) throw new Error(`GET /payment-log failed: ${res.status}`);
     return res.json();
   };
 
-  window.savePayments = async function (month, rows) {
-    const res = await fetch(`${window.API_BASE}/payments`, {
+  window.addPaymentLogEntry = async function (kidId, tariff, dateFrom, dateUntil, amount) {
+    const res = await fetch(`${window.API_BASE}/payment-log`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ month, rows }),
+      body: JSON.stringify({ kidId, tariff, dateFrom, dateUntil, amount }),
     });
-    if (!res.ok) throw new Error(`POST /payments failed: ${res.status}`);
+    if (!res.ok) throw new Error(`POST /payment-log failed: ${res.status}`);
+    return res.json();
+  };
+
+  window.deletePaymentLogEntry = async function (rowId) {
+    const res = await fetch(`${window.API_BASE}/payment-log/${rowId}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error(`DELETE /payment-log failed: ${res.status}`);
     return res.json();
   };
 
@@ -2716,14 +2722,50 @@ function MiniCalendar({ selected, onSelect, onClose, disableWeekends = true, dis
   );
 }
 
-function PayRangeSheet({ kid, initialFrom, initialTo, onConfirm, onClose }) {
+function dayCount(a, b) {
+  const d1 = new Date(a + 'T12:00:00'), d2 = new Date(b + 'T12:00:00');
+  return Math.round((d2 - d1) / 86400000) + 1;
+}
+
+function PayRangeSheet({ kid, tariff, onConfirm, onDelete, onClose }) {
   const today = todayStr();
-  const seed = initialFrom || initialTo || today;
-  const init = new Date(seed + 'T12:00:00');
+  const init = new Date(today + 'T12:00:00');
   const [viewYear,  setViewYear]  = React.useState(init.getFullYear());
   const [viewMonth, setViewMonth] = React.useState(init.getMonth());
-  const [rangeFrom, setRangeFrom] = React.useState(initialFrom || null);
-  const [rangeTo,   setRangeTo]   = React.useState(initialTo || null);
+  const [rangeFrom, setRangeFrom] = React.useState(null);
+  const [rangeTo,   setRangeTo]   = React.useState(null);
+  const [amount,        setAmount]        = React.useState('');
+  const [amountTouched, setAmountTouched] = React.useState(false);
+  const [history,    setHistory]    = React.useState([]);
+  const [saving,     setSaving]     = React.useState(false);
+
+  React.useEffect(() => {
+    window.loadPaymentLog(kid.id).then(setHistory).catch(() => {});
+  }, [kid.id]);
+
+  // every day covered by an already-logged payment, for the "you can already
+  // see what's paid" highlight — separate from the new range being picked
+  const paidDays = React.useMemo(() => {
+    const set = new Set();
+    history.forEach(h => {
+      const from = normDate(h.from), until = normDate(h.until);
+      if (!from || !until) return;
+      let d = new Date(from + 'T12:00:00');
+      const end = new Date(until + 'T12:00:00');
+      while (d <= end) {
+        set.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+        d.setDate(d.getDate() + 1);
+      }
+    });
+    return set;
+  }, [history]);
+
+  React.useEffect(() => {
+    if (amountTouched || !rangeFrom || !rangeTo) return;
+    const price = Number(kid.price) || 0;
+    const suggested = tariff === 'tourist' ? price * dayCount(rangeFrom, rangeTo) : price;
+    setAmount(suggested ? String(suggested) : '');
+  }, [rangeFrom, rangeTo, tariff]);
 
   const MR = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
   const ME = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -2754,19 +2796,43 @@ function PayRangeSheet({ kid, initialFrom, initialTo, onConfirm, onClose }) {
     else { setRangeTo(dateStr); }
   }
 
-  const canConfirm = !!(rangeFrom && rangeTo);
+  const [deletingId, setDeletingId] = React.useState(null);
+  const canConfirm = !!(rangeFrom && rangeTo && Number(amount) > 0) && !saving;
   const fmt = d => d ? d.split('-').reverse().join('.') : '—';
+
+  async function handleDelete(id) {
+    setDeletingId(id);
+    try {
+      await onDelete(id);
+      // re-fetch rather than locally filter — deleting shifts every later
+      // row's sheet row number, so a second delete in the same session
+      // needs fresh ids, not the ones fetched before the first delete
+      const fresh = await window.loadPaymentLog(kid.id);
+      setHistory(fresh);
+    } catch (e) {
+      window.showToast(L('Не удалось удалить: ', 'Failed to delete: ') + String(e));
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  async function handleConfirm() {
+    if (!canConfirm) return;
+    setSaving(true);
+    try { await onConfirm(rangeFrom, rangeTo, amount); }
+    finally { setSaving(false); }
+  }
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 260, background: 'rgba(0,0,0,0.4)',
       display: 'flex', alignItems: 'flex-end' }} onClick={onClose}>
-      <div style={{ width: '100%', background: 'var(--bg)', borderRadius: '24px 24px 0 0',
+      <div style={{ width: '100%', maxHeight: '88vh', overflowY: 'auto', background: 'var(--bg)', borderRadius: '24px 24px 0 0',
         padding: '12px 20px 32px' }} onClick={e => e.stopPropagation()}>
         <div style={{ width: 40, height: 4, background: 'rgba(60,40,20,0.15)', borderRadius: 2, margin: '0 auto 14px' }} />
         <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink-soft)', textAlign: 'center', marginBottom: 12 }}>
           {Lo(kid)}
         </div>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 28, marginBottom: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 20, marginBottom: 16, flexWrap: 'wrap' }}>
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-faint)', marginBottom: 2 }}>{L('Оплачено с', 'Paid from')}</div>
             <div style={{ fontSize: 16, fontWeight: 800, fontFamily: 'var(--font-display)',
@@ -2776,6 +2842,15 @@ function PayRangeSheet({ kid, initialFrom, initialTo, onConfirm, onClose }) {
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-faint)', marginBottom: 2 }}>{L('Оплачено до', 'Paid until')}</div>
             <div style={{ fontSize: 16, fontWeight: 800, fontFamily: 'var(--font-display)',
               color: rangeTo ? 'var(--ink)' : 'var(--ink-faint)' }}>{fmt(rangeTo)}</div>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-faint)', marginBottom: 2 }}>{L('Сумма', 'Amount')}</div>
+            <input type="number" inputMode="numeric" value={amount}
+              onChange={e => { setAmount(e.target.value); setAmountTouched(true); }}
+              placeholder="0"
+              style={{ width: 110, textAlign: 'center', fontSize: 16, fontWeight: 800, fontFamily: 'var(--font-display)',
+                border: 'none', borderBottom: '2px solid #E7DCC8', background: 'transparent', color: 'var(--ink)',
+                outline: 'none', padding: '0 4px 2px' }} />
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
@@ -2787,33 +2862,69 @@ function PayRangeSheet({ kid, initialFrom, initialTo, onConfirm, onClose }) {
         </div>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:2, marginBottom:4 }}>
           {DH.map((d,i) => <div key={d} style={{ textAlign:'center', fontSize:11, fontWeight:700,
-            color: i>=5 ? '#C09080' : 'var(--ink-faint)', padding:'3px 0' }}>{d}</div>)}
+            color: i>=5 ? '#C0748E' : 'var(--ink-faint)', padding:'3px 0' }}>{d}</div>)}
         </div>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:2, marginBottom: 22 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:2, marginBottom: 10 }}>
           {cells.map((d, i) => {
             if (!d) return <div key={`e${i}`} />;
             const dateStr = ds(d);
+            const dow     = new Date(dateStr + 'T12:00:00').getDay();
+            const isWknd  = dow === 0 || dow === 6;
             const isEdge  = dateStr === rangeFrom || dateStr === rangeTo;
             const inRange = rangeFrom && rangeTo && dateStr > rangeFrom && dateStr < rangeTo;
+            const isPaidDay = paidDays.has(dateStr);
             const isTdy   = dateStr === today;
+            // weekends stay visually "weekend" even inside a selected/paid
+            // range instead of getting swallowed by the brown fill — makes
+            // them easy to spot when eyeballing a stretch of paid days
+            let background = 'transparent', color = 'var(--ink)';
+            if (isEdge)            { background = '#B07848'; color = '#fff'; }
+            else if (isWknd)       { background = inRange ? '#F6C9D6' : isPaidDay ? '#F9DCE5' : '#FBD9E1'; }
+            else if (inRange)      { background = '#F0E4D4'; }
+            else if (isPaidDay)    { background = '#E7DCC8'; }
+            else if (isTdy)        { background = '#F7EFE4'; }
             return (
               <button key={d} onClick={() => handlePick(dateStr)}
                 style={{ border:'none', borderRadius: 10, padding:'9px 2px', fontSize:14,
                   fontWeight: isEdge||isTdy ? 800 : 500, cursor: 'pointer',
-                  background: isEdge ? '#B07848' : inRange ? '#F0E4D4' : isTdy ? '#F7EFE4' : 'transparent',
-                  color: isEdge ? '#fff' : 'var(--ink)' }}>
+                  background, color }}>
                 {d}
               </button>
             );
           })}
         </div>
-        <button onClick={() => canConfirm && onConfirm(rangeFrom, rangeTo)} disabled={!canConfirm} className="bk-press"
+        <div style={{ display: 'flex', gap: 12, fontSize: 11, fontWeight: 700, color: 'var(--ink-faint)',
+          justifyContent: 'center', marginBottom: 20 }}>
+          <span><span style={{ display:'inline-block', width:9, height:9, borderRadius:3, background:'#E7DCC8', marginRight:4 }} />{L('уже оплачено', 'already paid')}</span>
+          <span><span style={{ display:'inline-block', width:9, height:9, borderRadius:3, background:'#FBD9E1', marginRight:4 }} />{L('выходной', 'weekend')}</span>
+        </div>
+        {history.length > 0 && (
+          <div style={{ marginBottom: 18 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-faint)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+              {L('История платежей', 'Payment history')}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {history.slice().reverse().map(h => (
+                <div key={h.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  background: '#FBF7F2', borderRadius: 12, padding: '8px 12px' }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>
+                    {h.from.split('.').slice(0,2).join('.')}–{h.until} · {fmtMoney(h.amount)}
+                  </span>
+                  <button onClick={() => handleDelete(h.id)} disabled={deletingId === h.id}
+                    style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 16,
+                      color: '#c0392b', padding: 4, opacity: deletingId === h.id ? 0.4 : 1 }}>✕</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        <button onClick={handleConfirm} disabled={!canConfirm} className="bk-press"
           style={{ width: '100%', border: 'none', cursor: canConfirm ? 'pointer' : 'default',
             fontFamily: 'var(--font-display)', background: canConfirm ? '#B07848' : '#E7E1D9',
             color: canConfirm ? '#fff' : 'var(--ink-faint)', fontSize: 17, fontWeight: 800,
             padding: 15, borderRadius: 18,
             boxShadow: canConfirm ? '0 10px 24px -8px #B07848' : 'none' }}>
-          {L('Подтвердить', 'Confirm')}
+          {saving ? L('Сохраняю…', 'Saving…') : L('Подтвердить оплату', 'Confirm payment')}
         </button>
       </div>
     </div>
@@ -3412,28 +3523,24 @@ function fmtTourDate(iso) {
   return L(`${d.getDate()} ${mRu[d.getMonth()]}`, `${mEn[d.getMonth()]} ${d.getDate()}`);
 }
 
-function KidPayRow({ kid, isPaid, onToggle, onConfirmPaid, onCancelPaid, amount, tourDays, onDaysChange, tourDate, onDateChange, dateCheck }) {
-  const [showDays, setShowDays] = React.useState(false);
+function KidPayRow({ kid, isPaid, onToggle, onConfirmPaid, onDeletePaid, tariff, dateCheck }) {
   const [showRange, setShowRange] = React.useState(false);
   const grp = DATA.GROUPS.find(g => g.id === kid.group);
   const kidIndex = activeKids().filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
   const paidBadge = <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
     background: '#E6F7EE', color: '#1f7a55' }}>{L('Оплачено', 'Paid')}</span>;
-  const unpaidBadge = (label) => <span style={{ fontSize: 13, fontWeight: 700, padding: '4px 10px', borderRadius: 999,
-    background: '#FEF0ED', color: '#c0392b' }}>{label}</span>;
-  const bigBtn = { width: 52, height: 52, borderRadius: 999, border: '2px solid #B07848',
-    background: 'none', cursor: 'pointer', fontSize: 28, color: '#B07848', fontWeight: 800,
-    display: 'flex', alignItems: 'center', justifyContent: 'center' };
-  function handlePayClick(e) {
+  const unpaidBadge = <span style={{ fontSize: 13, fontWeight: 700, padding: '4px 10px', borderRadius: 999,
+    background: '#FEF0ED', color: '#c0392b' }}>{L('Не оплачено', 'Unpaid')}</span>;
+
+  function handleClick(e) {
     if (e) e.stopPropagation();
-    if (!onConfirmPaid) { onToggle(); return; } // clubs: no dates involved, plain toggle
-    if (isPaid) { onCancelPaid(); return; }      // cancelling a payment clears its coverage dates too
-    setShowRange(true);
+    if (!onConfirmPaid) { onToggle(); return; } // clubs: no calendar, plain toggle
+    setShowRange(true); // garden: open the calendar to see history / log a new payment
   }
 
   return (
     <>
-      <Card pad={12} onClick={tourDays !== undefined ? () => setShowDays(true) : handlePayClick}
+      <Card pad={12} onClick={handleClick}
         style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2' }}>
         <Avatar emoji={kid.emoji} color={PAY_PALETTE[kidIndex % PAY_PALETTE.length]} size={44} />
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -3449,53 +3556,17 @@ function KidPayRow({ kid, isPaid, onToggle, onConfirmPaid, onCancelPaid, amount,
             </div>
           )}
         </div>
-        <div style={{ textAlign: 'right' }} onClick={tourDays !== undefined ? handlePayClick : undefined}>
-          {isPaid ? paidBadge : unpaidBadge((window.__isStaff || window.__isTeacher)
-            ? (tourDays !== undefined ? `${tourDays} ${L('дн.','days')}` : L('Не оплачено', 'Unpaid'))
-            : (tourDays !== undefined ? `${fmtMoney(amount)} · ${tourDays} ${L('дн.','days')}` : fmtMoney(amount)))}
+        <div style={{ textAlign: 'right' }}>
+          {isPaid ? paidBadge : unpaidBadge}
         </div>
       </Card>
 
       {showRange && (
         <Portal>
-          <PayRangeSheet kid={kid} initialFrom={null} initialTo={null}
-            onConfirm={(from, to) => { setShowRange(false); onConfirmPaid(from, to); }}
+          <PayRangeSheet kid={kid} tariff={tariff}
+            onConfirm={async (from, to, amount) => { await onConfirmPaid(from, to, amount); setShowRange(false); }}
+            onDelete={onDeletePaid}
             onClose={() => setShowRange(false)} />
-        </Portal>
-      )}
-
-      {showDays && (
-        <Portal>
-        <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'flex-end',
-          background: 'rgba(0,0,0,0.35)' }} onClick={() => setShowDays(false)}>
-          <div style={{ width: '100%', background: 'var(--bg)', borderRadius: '24px 24px 0 0',
-            padding: '28px 32px 40px' }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-soft)', textAlign: 'center', marginBottom: 2 }}>
-              {Lo(kid)}
-            </div>
-            <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--ink)', textAlign: 'center',
-              marginBottom: 20, fontFamily: 'var(--font-display)' }}>
-              {L('Количество дней', 'Number of days')}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 32, marginBottom: 10 }}>
-              <button style={bigBtn} onClick={() => onDaysChange(Math.max(1, tourDays - 1))}>−</button>
-              <span style={{ fontSize: 52, fontWeight: 800, color: 'var(--ink)', minWidth: 72,
-                textAlign: 'center', fontFamily: 'var(--font-display)' }}>{tourDays}</span>
-              <button style={bigBtn} onClick={() => onDaysChange(tourDays + 1)}>+</button>
-            </div>
-            {!(window.__isStaff || window.__isTeacher) && (
-              <div style={{ textAlign: 'center', fontSize: 16, fontWeight: 700, color: 'var(--ink-soft)', marginBottom: 24 }}>
-                {fmtMoney(amount)}
-              </div>
-            )}
-            <button onClick={() => setShowDays(false)} className="bk-press" style={{ width: '100%', border: 'none',
-              cursor: 'pointer', fontFamily: 'var(--font-display)', background: '#B07848', color: '#fff',
-              fontSize: 17, fontWeight: 800, padding: 15, borderRadius: 18,
-              boxShadow: '0 10px 24px -8px #B07848' }}>
-              {L('Готово', 'Done')}
-            </button>
-          </div>
-        </div>
         </Portal>
       )}
     </>
@@ -3556,129 +3627,50 @@ const GARDEN_MONTHS = [
 ];
 
 function PaymentsGardenScreen() {
-  const [tariff,    setTariff]   = React.useState('longterm');
-  const [group,     setGroup]    = React.useState('all');
+  const [tariff,    setTariff]    = React.useState('longterm');
+  const [group,     setGroup]     = React.useState('all');
   const [payFilter, setPayFilter] = React.useState('all');
-  const curCalMonthIdx = React.useMemo(() => {
-    const m = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'][new Date().getMonth()];
-    const i = GARDEN_MONTHS.findIndex(x => x.id === m);
-    return i === -1 ? 0 : i;
-  }, []);
-  const maxMonthIdx = GARDEN_MONTHS.length - 1;
-  const [monthIdx,  setMonthIdx] = React.useState(curCalMonthIdx);
-  const [selDate,   setSelDate]  = React.useState(todayStr);
-  const [calOpen,   setCalOpen]  = React.useState(false);
-  const touchStart = React.useRef(null);
+  const [selDate,   setSelDate]   = React.useState(todayStr);
+  const [calOpen,   setCalOpen]   = React.useState(false);
+  // Confirming or deleting a logged payment patches kid.paidFrom/paidUntil
+  // in place on the shared DATA.CHILDREN object (see confirmPayment below) —
+  // this tick just forces a re-render so the list picks that up immediately.
+  const [, forceTick] = React.useReducer(x => x + 1, 0);
 
-  const initEmpty = () => {
-    const m = {};
-    GARDEN_MONTHS.forEach(mo => { m[mo.id] = {}; });
-    return m;
-  };
-  const [paid,      setPaid]      = React.useState(initEmpty);
-  const [saved,     setSaved]     = React.useState(initEmpty);
-  const [days,      setDays]      = React.useState(initEmpty);
-  const [savedDays, setSavedDays] = React.useState(initEmpty);
-  const [loadedMonths, setLoadedMonths] = React.useState({});
-  // Paid-from/until edits made via the calendar sheet — held here, not written
-  // to the child until Save, same as the paid checklist and day counts below,
-  // so a stray tap (mark or cancel) doesn't touch the sheet until confirmed.
-  const [pendingDates, setPendingDates] = React.useState({});
-
-  const mo = GARDEN_MONTHS[monthIdx];
-
-  React.useEffect(() => {
-    if (loadedMonths[mo.id]) return;
-    window.loadPayments(mo.id).then(remote => {
-      const p = {}, d = {};
-      activeKids().forEach(k => {
-        p[k.id] = !!(remote[k.id] && remote[k.id].paid);
-        d[k.id] = (remote[k.id] && remote[k.id].days) || 1;
-      });
-      setPaid(prev => ({ ...prev, [mo.id]: p }));
-      setSaved(prev => ({ ...prev, [mo.id]: p }));
-      setDays(prev => ({ ...prev, [mo.id]: d }));
-      setSavedDays(prev => ({ ...prev, [mo.id]: d }));
-      setLoadedMonths(prev => ({ ...prev, [mo.id]: true }));
-    }).catch(() => setLoadedMonths(prev => ({ ...prev, [mo.id]: true })));
-  }, [mo.id]);
-
-  const curPaid  = paid[mo.id];
-  const curDays  = days[mo.id];
-  const isTour   = tariff === 'tourist';
+  const isTour = tariff === 'tourist';
+  const today  = todayStr();
 
   const allKids = activeKids()
     .filter(k => isTour ? k.contract === 'tourist' : k.contract !== 'tourist')
     .filter(k => group === 'all' || k.group === group);
-  const getAmount   = kid => isTour ? (curDays[kid.id] || 1) * Number(kid.price || 0) : Number(kid.price || 0);
-  const countPaid   = allKids.filter(k =>  curPaid[k.id]).length;
-  const countUnpaid = allKids.filter(k => !curPaid[k.id]).length;
-  const total       = allKids.filter(k =>  curPaid[k.id]).reduce((s, k) => s + getAmount(k), 0);
-  const kids        = allKids.filter(k => payFilter === 'paid' ? curPaid[k.id] : payFilter === 'unpaid' ? !curPaid[k.id] : true);
-  const hasChanges  = GARDEN_MONTHS.some(m => activeKids().some(k =>
-    (paid[m.id][k.id]||false) !== (saved[m.id][k.id]||false) ||
-    (days[m.id][k.id]||1) !== (savedDays[m.id][k.id]||1)
-  )) || Object.keys(pendingDates).length > 0;
 
-  function isPaidOnSelDate(kid) {
-    const until = pendingDates[kid.id] ? pendingDates[kid.id].to : kid.paidUntil;
-    return !!(until && normDate(until) >= selDate);
+  function isCoveredOn(kid, date) {
+    return !!(kid.paidUntil && normDate(kid.paidUntil) >= date);
   }
 
-  function toggle(kidId) {
-    setPaid(prev => ({ ...prev, [mo.id]: { ...prev[mo.id], [kidId]: !prev[mo.id][kidId] } }));
-  }
-  function changeDays(kidId, n) {
-    setDays(prev => ({ ...prev, [mo.id]: { ...prev[mo.id], [kidId]: n } }));
-  }
-  function confirmPaidDates(kid, from, to) {
-    toggle(kid.id);
+  const countPaid   = allKids.filter(k => isCoveredOn(k, today)).length;
+  const countUnpaid = allKids.length - countPaid;
+  const total       = allKids.filter(k => isCoveredOn(k, today)).reduce((s, k) => s + (Number(k.price) || 0), 0);
+  const kids        = allKids.filter(k => payFilter === 'paid' ? isCoveredOn(k, today) : payFilter === 'unpaid' ? !isCoveredOn(k, today) : true);
+
+  async function confirmPayment(kid, from, to, amount) {
     const fromDmy = from.split('-').reverse().join('.');
     const toDmy = to.split('-').reverse().join('.');
-    setPendingDates(prev => ({ ...prev, [kid.id]: { from: fromDmy, to: toDmy } }));
-  }
-  function cancelPaidDates(kid) {
-    toggle(kid.id);
-    setPendingDates(prev => ({ ...prev, [kid.id]: { from: '', to: '' } }));
-  }
-  function handleSave() {
-    const prevPaid = saved[mo.id] || {};
-    const prevDays = savedDays[mo.id] || {};
-    setSaved(JSON.parse(JSON.stringify(paid)));
-    setSavedDays(JSON.parse(JSON.stringify(days)));
-    const curPaidNow = paid[mo.id] || {};
-    const curDaysNow = days[mo.id] || {};
-    const rows = activeKids()
-      .filter(k => !!curPaidNow[k.id] !== !!prevPaid[k.id] || (curDaysNow[k.id] || 1) !== (prevDays[k.id] || 1))
-      .map(k => {
-        const kIsTour = k.contract === 'tourist';
-        return {
-          kid_id: k.id,
-          paid: !!curPaidNow[k.id],
-          days: curDaysNow[k.id] || 1,
-          amount: kIsTour ? (curDaysNow[k.id] || 1) * Number(k.price || 0) : Number(k.price || 0),
-        };
-      });
-    if (rows.length > 0) {
-      window.savePayments(mo.id, rows).catch(() => {});
-    }
-    const dateChanges = Object.entries(pendingDates);
-    if (dateChanges.length > 0) {
-      setPendingDates({});
-      dateChanges.forEach(([kidId, { from, to }]) => {
-        const kid = activeKids().find(k => k.id === kidId);
-        if (!kid) return;
-        const prevFrom = kid.paidFrom, prevTo = kid.paidUntil;
-        Object.assign(kid, { paidFrom: from, paidUntil: to }); // optimistic
-        window.updateChild(kidId, { paidFrom: from, paidUntil: to }).catch(e => {
-          Object.assign(kid, { paidFrom: prevFrom, paidUntil: prevTo });
-          window.showToast(L('Не удалось сохранить даты: ', 'Failed to save dates: ') + String(e));
-        });
-      });
+    try {
+      const res = await window.addPaymentLogEntry(kid.id, tariff, fromDmy, toDmy, amount);
+      Object.assign(kid, { paidFrom: res.paidFrom || '', paidUntil: res.paidUntil || '' });
+      forceTick();
+    } catch (e) {
+      window.showToast(L('Не удалось сохранить оплату: ', 'Failed to save payment: ') + String(e));
+      throw e;
     }
   }
-  function prevMonth() { if (monthIdx > 0) { setMonthIdx(i => i - 1); setPayFilter('all'); } }
-  function nextMonth() { if (monthIdx < maxMonthIdx) { setMonthIdx(i => i + 1); setPayFilter('all'); } }
+
+  async function deletePayment(kid, rowId) {
+    const res = await window.deletePaymentLogEntry(rowId);
+    Object.assign(kid, { paidFrom: res.paidFrom || '', paidUntil: res.paidUntil || '' });
+    forceTick();
+  }
 
   const chips = [{ id: 'all', label: t('all'), emoji: '🗂️' }, ...DATA.GROUPS.map(g => ({ id: g.id, label: Lo(g), emoji: g.emoji }))];
 
@@ -3710,30 +3702,6 @@ function PaymentsGardenScreen() {
         ))}
       </div>
 
-      {/* month nav */}
-      <div style={{ display: 'flex', justifyContent: 'center', padding: '0 20px 14px' }}>
-        <div
-          onTouchStart={e => { touchStart.current = e.touches[0].clientX; }}
-          onTouchEnd={e => {
-            if (touchStart.current === null) return;
-            const dx = e.changedTouches[0].clientX - touchStart.current;
-            touchStart.current = null;
-            if (dx < -50) nextMonth();
-            else if (dx > 50) prevMonth();
-          }}
-          style={{ display: 'flex', alignItems: 'center', gap: 14, width: '100%',
-            background: '#FBF7F2', borderRadius: 999, padding: '9px 18px',
-            boxShadow: '0 1px 3px rgba(60,40,20,0.07)', userSelect: 'none' }}>
-          <button onClick={prevMonth} style={{ border: 'none', background: 'none', padding: 0,
-            cursor: monthIdx > 0 ? 'pointer' : 'default', opacity: monthIdx > 0 ? 1 : 0.2,
-            fontSize: 20, color: '#B07848', fontWeight: 800, lineHeight: 1 }}>‹</button>
-          <span style={{ flex: 1, fontSize: 15, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)', textAlign: 'center' }}>{Lo(mo)}</span>
-          <button onClick={nextMonth} style={{ border: 'none', background: 'none', padding: 0,
-            cursor: monthIdx < maxMonthIdx ? 'pointer' : 'default', opacity: monthIdx < maxMonthIdx ? 1 : 0.2,
-            fontSize: 20, color: '#B07848', fontWeight: 800, lineHeight: 1 }}>›</button>
-        </div>
-      </div>
-
       {/* date check — is a specific day covered by "Paid until"? */}
       <div style={{ display: 'flex', justifyContent: 'center', padding: '0 20px 14px' }}>
         <button onClick={() => setCalOpen(true)} className="bk-press" style={{
@@ -3752,17 +3720,13 @@ function PaymentsGardenScreen() {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 9, padding: '0 20px' }}>
         {kids.map(kid => (
-          <KidPayRow key={kid.id} kid={kid} isPaid={curPaid[kid.id]}
-            onToggle={() => toggle(kid.id)}
-            onConfirmPaid={(from, to) => confirmPaidDates(kid, from, to)}
-            onCancelPaid={() => cancelPaidDates(kid)}
-            amount={getAmount(kid)}
-            tourDays={isTour ? (curDays[kid.id] || 1) : undefined}
-            onDaysChange={isTour ? (n) => changeDays(kid.id, n) : undefined}
-            dateCheck={{ date: selDate, ok: isPaidOnSelDate(kid) }} />
+          <KidPayRow key={kid.id} kid={kid} isPaid={isCoveredOn(kid, today)}
+            tariff={tariff}
+            onConfirmPaid={(from, to, amount) => confirmPayment(kid, from, to, amount)}
+            onDeletePaid={(rowId) => deletePayment(kid, rowId)}
+            dateCheck={{ date: selDate, ok: isCoveredOn(kid, selDate) }} />
         ))}
       </div>
-      <SaveBar hasChanges={hasChanges} onSave={handleSave} />
     </div>
   );
 }
