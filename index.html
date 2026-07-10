@@ -295,6 +295,12 @@ window.API_BASE = "https://rmxois1uv0a24xrbi2dfcfac.95.179.188.141.sslip.io";
     return res.json();
   };
 
+  window.loadClubAttendanceHistory = async function (clubId, kidId) {
+    const res = await fetch(`${window.API_BASE}/club-attendance-history/${clubId}/${encodeURIComponent(kidId)}`);
+    if (!res.ok) throw new Error(`GET /club-attendance-history failed: ${res.status}`);
+    return res.json();
+  };
+
   window.loadPaymentLog = async function (kidId) {
     const res = await fetch(`${window.API_BASE}/payment-log/${encodeURIComponent(kidId)}`);
     if (!res.ok) throw new Error(`GET /payment-log failed: ${res.status}`);
@@ -2793,7 +2799,7 @@ function PaidBadge() {
   );
 }
 
-function PayRangeSheet({ kid, tariff, price, loadHistory, legacyCoverage, onConfirm, onDelete, onClose }) {
+function PayRangeSheet({ kid, tariff, price, loadHistory, loadAttendanceHistory, legacyCoverage, onConfirm, onDelete, onClose }) {
   const today = todayStr();
   const init = new Date(today + 'T12:00:00');
   const [viewYear,  setViewYear]  = React.useState(init.getFullYear());
@@ -2808,7 +2814,11 @@ function PayRangeSheet({ kid, tariff, price, loadHistory, legacyCoverage, onConf
 
   React.useEffect(() => {
     loadHistory().then(setHistory).catch(() => {});
-    window.loadAttendanceHistory(kid.id).then(setAttHistory).catch(() => {});
+    // Garden (no prop passed) shows whether the kid was at the garden;
+    // Clubs pass their own loader so the calendar shows whether the kid
+    // showed up to THAT club instead — they're different attendance sheets.
+    (loadAttendanceHistory || (() => window.loadAttendanceHistory(kid.id)))()
+      .then(setAttHistory).catch(() => {});
   }, [kid.id]);
 
   // every day covered by an already-logged payment, for the "you can already
@@ -3744,7 +3754,7 @@ function fmtTourDate(iso) {
   return L(`${d.getDate()} ${mRu[d.getMonth()]}`, `${mEn[d.getMonth()]} ${d.getDate()}`);
 }
 
-function KidPayRow({ kid, isPaid, onToggle, onConfirmPaid, onDeletePaid, tariff, price, loadHistory, legacyCoverage }) {
+function KidPayRow({ kid, isPaid, onToggle, onConfirmPaid, onDeletePaid, tariff, price, loadHistory, loadAttendanceHistory, legacyCoverage }) {
   const [showRange, setShowRange] = React.useState(false);
   const grp = DATA.GROUPS.find(g => g.id === kid.group);
   const kidIndex = activeKids().filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
@@ -3778,6 +3788,7 @@ function KidPayRow({ kid, isPaid, onToggle, onConfirmPaid, onDeletePaid, tariff,
         <Portal>
           <PayRangeSheet kid={kid} tariff={tariff} price={price} legacyCoverage={legacyCoverage}
             loadHistory={loadHistory || (() => window.loadPaymentLog(kid.id))}
+            loadAttendanceHistory={loadAttendanceHistory}
             onConfirm={async (from, to, amount) => { await onConfirmPaid(from, to, amount); setShowRange(false); }}
             onDelete={onDeletePaid}
             onClose={() => setShowRange(false)} />
@@ -4039,6 +4050,7 @@ function PaymentsClubsScreen() {
           <KidPayRow key={kid.id} kid={kid} isPaid={isCovered(kid)}
             tariff="club" price={price}
             loadHistory={() => window.loadClubPaymentLog(clubId).then(l => l.filter(e => e.child === kid.id))}
+            loadAttendanceHistory={() => window.loadClubAttendanceHistory(clubId, kid.id)}
             onConfirmPaid={(from, to, amount) => confirmPayment(kid, from, to, amount)}
             onDeletePaid={(rowId) => deletePayment(rowId)} />
         ))}
