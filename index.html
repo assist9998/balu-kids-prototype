@@ -4152,6 +4152,7 @@ function ClubScreen({ params }) {
   const [attDate, setAttDate] = React.useState(todayStr());
   const [attData, setAttData] = React.useState({});
   const [attSaving, setAttSaving] = React.useState(false);
+  const [attCalOpen, setAttCalOpen] = React.useState(false);
 
   React.useEffect(() => {
     if (!club || tab !== 'attendance') return;
@@ -4259,11 +4260,10 @@ function ClubScreen({ params }) {
       {tab === 'attendance' && (
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-            <input type="date" value={attDate} onChange={e => setAttDate(e.target.value)}
-              style={{ flex: 1, padding: '10px 14px', borderRadius: 12, border: '1.5px solid rgba(107,92,74,0.2)',
-                fontSize: 14, fontFamily: 'inherit', background: '#FBF7F2', color: 'var(--ink)', outline: 'none' }} />
+            <CalendarSquareButton date={attDate} onClick={() => setAttCalOpen(true)} />
             {attSaving && <span style={{ fontSize: 12, color: 'var(--ink-faint)' }}>...</span>}
           </div>
+          {attCalOpen && <Portal><MiniCalendar selected={attDate} onSelect={setAttDate} onClose={() => setAttCalOpen(false)} /></Portal>}
           {kids.length === 0 && (
             <div style={{ textAlign: 'center', color: 'var(--ink-faint)', padding: 24, fontSize: 14 }}>
               {L('Нет участников', 'No members')}
