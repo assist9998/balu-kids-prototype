@@ -289,6 +289,12 @@ window.API_BASE = "https://rmxois1uv0a24xrbi2dfcfac.95.179.188.141.sslip.io";
     if (!res.ok) throw new Error(`POST /attendance failed: ${res.status}`);
   };
 
+  window.loadAttendanceHistory = async function (kidId) {
+    const res = await fetch(`${window.API_BASE}/attendance-history/${encodeURIComponent(kidId)}`);
+    if (!res.ok) throw new Error(`GET /attendance-history failed: ${res.status}`);
+    return res.json();
+  };
+
   window.loadPaymentLog = async function (kidId) {
     const res = await fetch(`${window.API_BASE}/payment-log/${encodeURIComponent(kidId)}`);
     if (!res.ok) throw new Error(`GET /payment-log failed: ${res.status}`);
@@ -1956,6 +1962,7 @@ function ChildScreen({ params, statuses, back }) {
   const [pickerOpen, setPickerOpen] = React.useState(false);
   const [editOpen, setEditOpen] = React.useState(false);
   const [deleteConfirm, setDeleteConfirm] = React.useState(false);
+  const [attHistOpen, setAttHistOpen] = React.useState(false);
   const kid = DATA.CHILDREN.find(k => k.id === params.childId);
   if (!kid) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--ink-faint)' }}>—</div>;
   const grp = DATA.GROUPS.find(g => g.id === kid.group);
@@ -2115,20 +2122,26 @@ function ChildScreen({ params, statuses, back }) {
         </React.Fragment>
       )}
 
-      {/* attendance ring */}
-      <Card pad={16} style={{ display: 'flex', alignItems: 'center', gap: 18, marginBottom: 16, background: '#FBF7F2' }}>
+      {/* attendance ring — tap to open the full history + payment calendar */}
+      <Card pad={16} onClick={() => setAttHistOpen(true)}
+        style={{ display: 'flex', alignItems: 'center', gap: 18, marginBottom: 16, background: '#FBF7F2' }}>
         <Ring pct={kid.rate ?? 0} size={92} stroke={11} color='#B07848'>
           <div>
             <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink)', lineHeight: 1 }}>{kid.rate ?? '—'}{kid.rate != null ? '%' : ''}</div>
           </div>
         </Ring>
-        <div>
-          <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--ink)' }}>{t('attendance30')}</div>
-          <div style={{ fontSize: 13, color: 'var(--ink-soft)', fontWeight: 600, marginTop: 4, textWrap: 'pretty' }}>
-            {L('Хорошая посещаемость в этом месяце', 'Good attendance this month')}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--ink)' }}>{t('attendance30')}</div>
+            <div style={{ fontSize: 13, color: 'var(--ink-soft)', fontWeight: 600, marginTop: 4, textWrap: 'pretty' }}>
+              {L('Хорошая посещаемость в этом месяце', 'Good attendance this month')}
+            </div>
           </div>
+          <Chevron />
         </div>
       </Card>
+
+      {attHistOpen && <Portal><AttendanceHistorySheet kid={kid} onClose={() => setAttHistOpen(false)} /></Portal>}
 
       {/* notes */}
       {kid.noteRu && (
@@ -2959,6 +2972,148 @@ function PayRangeSheet({ kid, tariff, price, loadHistory, legacyCoverage, onConf
             boxShadow: canConfirm ? '0 10px 24px -8px #B07848' : 'none' }}>
           {saving ? L('Сохраняю…', 'Saving…') : L('Подтвердить оплату', 'Confirm payment')}
         </button>
+      </div>
+    </div>
+  );
+}
+
+// Per-kid history: green fill = was in the garden that day, small brown
+// dot = that day is covered by a payment. Tap a past/today day to toggle
+// attendance right there — same present/absent flip the Journal uses, it
+// just writes through window.saveAttendance for that one (date, kid) pair
+// instead of the whole day's roster.
+function AttendanceHistorySheet({ kid, onClose }) {
+  const today = todayStr();
+  const init = new Date(today + 'T12:00:00');
+  const [viewYear,  setViewYear]  = React.useState(init.getFullYear());
+  const [viewMonth, setViewMonth] = React.useState(init.getMonth());
+  const [history,   setHistory]   = React.useState(null);
+  const [log,       setLog]       = React.useState([]);
+  const [pending,   setPending]   = React.useState(null);
+
+  React.useEffect(() => {
+    Promise.all([
+      window.loadAttendanceHistory(kid.id),
+      window.loadPaymentLog(kid.id).catch(() => []),
+    ]).then(([h, l]) => { setHistory(h); setLog(l); }).catch(() => setHistory({}));
+  }, [kid.id]);
+
+  const legacyCoverage = { from: kid.paidFrom, until: kid.paidUntil };
+  const paidDays = React.useMemo(() => {
+    const set = new Set();
+    const entries = legacyCoverage.from && legacyCoverage.until ? [...log, legacyCoverage] : log;
+    entries.forEach(h => {
+      const from = normDate(h.from), until = normDate(h.until);
+      if (!from || !until) return;
+      let d = new Date(from + 'T12:00:00');
+      const end = new Date(until + 'T12:00:00');
+      while (d <= end) {
+        set.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+        d.setDate(d.getDate() + 1);
+      }
+    });
+    return set;
+  }, [log, kid.paidFrom, kid.paidUntil]);
+
+  const MR = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+  const ME = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const DH = [L('Пн','Mo'),L('Вт','Tu'),L('Ср','We'),L('Чт','Th'),L('Пт','Fr'),L('Сб','Sa'),L('Вс','Su')];
+
+  function prevMonth() {
+    if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
+    else setViewMonth(m => m - 1);
+  }
+  function nextMonth() {
+    if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); }
+    else setViewMonth(m => m + 1);
+  }
+
+  const firstDay = new Date(viewYear, viewMonth, 1);
+  let startDow = firstDay.getDay(); if (startDow === 0) startDow = 7; startDow -= 1;
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const cells = [...Array(startDow).fill(null), ...Array.from({length: daysInMonth}, (_, i) => i + 1)];
+
+  function ds(d) {
+    return `${viewYear}-${String(viewMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  }
+
+  async function toggleDay(dateStr) {
+    if (dateStr > today || pending) return;
+    const cur = (history || {})[dateStr] || 'absent';
+    const next = cur === 'present' ? 'absent' : 'present';
+    setPending(dateStr);
+    setHistory(h => ({ ...h, [dateStr]: next }));
+    try {
+      await window.saveAttendance(dateStr, { [kid.id]: next });
+    } catch (e) {
+      setHistory(h => ({ ...h, [dateStr]: cur }));
+      window.showToast(L('Не удалось сохранить: ', 'Failed to save: ') + String(e));
+    } finally {
+      setPending(null);
+    }
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 260, background: 'rgba(0,0,0,0.4)',
+      display: 'flex', alignItems: 'flex-end' }} onClick={onClose}>
+      <div style={{ width: '100%', maxHeight: '88vh', overflowY: 'auto', background: 'var(--bg)', borderRadius: '24px 24px 0 0',
+        padding: '12px 20px 32px' }} onClick={e => e.stopPropagation()}>
+        <div style={{ width: 40, height: 4, background: 'rgba(60,40,20,0.15)', borderRadius: 2, margin: '0 auto 14px' }} />
+        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink-soft)', textAlign: 'center', marginBottom: 12 }}>
+          {Lo(kid)}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <button onClick={prevMonth} style={{ border:'none', background:'none', fontSize:24, cursor:'pointer', color:'var(--ink)', padding:'0 10px' }}>‹</button>
+          <div style={{ fontSize:16, fontWeight:800, color:'var(--ink)', fontFamily:'var(--font-display)' }}>
+            {L(MR[viewMonth], ME[viewMonth])} {viewYear}
+          </div>
+          <button onClick={nextMonth} style={{ border:'none', background:'none', fontSize:24, cursor:'pointer', color:'var(--ink)', padding:'0 10px' }}>›</button>
+        </div>
+        {history === null ? (
+          <div style={{ textAlign: 'center', padding: 40, color: 'var(--ink-faint)', fontSize: 15 }}>…</div>
+        ) : (
+        <>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:2, marginBottom:4 }}>
+          {DH.map((d,i) => <div key={d} style={{ textAlign:'center', fontSize:11, fontWeight:700,
+            color: i>=5 ? '#C0748E' : 'var(--ink-faint)', padding:'3px 0' }}>{d}</div>)}
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:2, marginBottom: 10 }}>
+          {cells.map((d, i) => {
+            if (!d) return <div key={`e${i}`} />;
+            const dateStr = ds(d);
+            const dow      = new Date(dateStr + 'T12:00:00').getDay();
+            const isWknd   = dow === 0 || dow === 6;
+            const isFuture = dateStr > today;
+            const isTdy    = dateStr === today;
+            const isPresent = history[dateStr] === 'present';
+            const isPaidDay = paidDays.has(dateStr);
+            let background = 'transparent', color = 'var(--ink)';
+            if (isPresent)      { background = '#8FCB9E'; color = '#1a4a2c'; }
+            else if (isWknd)    { background = '#FBD9E1'; }
+            else if (isTdy)     { background = '#F7EFE4'; }
+            return (
+              <button key={d} onClick={() => toggleDay(dateStr)} disabled={isFuture}
+                style={{ position: 'relative', border:'none', borderRadius: 10, padding:'9px 2px', fontSize:14,
+                  fontWeight: isTdy ? 800 : 500, cursor: isFuture ? 'default' : 'pointer',
+                  opacity: isFuture ? 0.35 : (pending === dateStr ? 0.5 : 1),
+                  background, color }}>
+                {d}
+                {isPaidDay && (
+                  <span style={{ position: 'absolute', top: 3, right: 4, width: 6, height: 6,
+                    borderRadius: '50%', background: '#B07848' }} />
+                )}
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ display: 'flex', gap: 12, fontSize: 11, fontWeight: 700, color: 'var(--ink-faint)',
+          justifyContent: 'center', flexWrap: 'wrap' }}>
+          <span><span style={{ display:'inline-block', width:9, height:9, borderRadius:3, background:'#8FCB9E', marginRight:4 }} />{L('был в саду', 'was here')}</span>
+          <span><span style={{ display:'inline-block', width:6, height:6, borderRadius:'50%', background:'#B07848', marginRight:5 }} />{L('оплачено', 'paid')}</span>
+          <span><span style={{ display:'inline-block', width:9, height:9, borderRadius:3, background:'#FBD9E1', marginRight:4 }} />{L('выходной', 'weekend')}</span>
+        </div>
+        </>
+        )}
       </div>
     </div>
   );
