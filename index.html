@@ -3386,11 +3386,13 @@ function SummaryScreen({ statuses, go }) {
               <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 700, marginTop: 4 }}>{s.label}</div>
             </div>
           ))}
+          {!window.__isStaff && (
           <div style={{ flex: 1.4, textAlign: 'center', borderRadius: 14, padding: '12px 8px',
             background: '#fff', boxShadow: '0 1px 4px rgba(60,40,20,0.07)' }}>
             <div style={{ fontSize: 22, fontWeight: 800, color: '#B07848', lineHeight: 1, fontFamily: 'var(--font-display)' }}>{totalCollected > 0 ? totalCollected.toLocaleString() : '—'}</div>
             <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 700, marginTop: 4 }}>{L('Собрано', 'Collected')}</div>
           </div>
+          )}
         </div>
       </Card>
       )}
@@ -3693,10 +3695,12 @@ function PayStats({ cp, cu, total, filter, onFilter }) {
     <div style={{ display: 'flex', gap: 10, padding: '0 20px 16px' }}>
       {statBox('paid',   cp, L('Оплатили', 'Paid'),      'var(--ok)')}
       {statBox('unpaid', cu, L('Не оплатили', 'Unpaid'), 'var(--no)')}
+      {!window.__isStaff && (
       <div style={{ flex: 1.4, background: '#FBF7F2', borderRadius: 18, padding: '12px 8px', textAlign: 'center' }}>
         <div style={{ fontSize: 22, fontWeight: 600, color: '#B07848', lineHeight: 1 }}>{fmtMoney(total)}</div>
         <div style={{ fontSize: 12, color: 'var(--ink-soft)', fontWeight: 600, marginTop: 4 }}>{L('Собрано', 'Collected')}</div>
       </div>
+      )}
     </div>
   );
 }
