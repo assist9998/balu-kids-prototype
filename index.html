@@ -2777,9 +2777,14 @@ function bestCoverage(entries) {
 // a new payment range (Payments calendar only, takes priority over green
 // since it's the thing being actively edited).
 function calendarCellVisual({ isEdge, inRange, isWknd, isPresent, isTdy }) {
-  if (isEdge)     return { background: '#B07848', color: '#fff' };
-  if (inRange)    return { background: '#F0E4D4', color: 'var(--ink)' };
+  // the exact start/end of a range you're picking gets a beige mark so you
+  // can see your two taps; everything between them stays plain — the
+  // sticker preview (rendered separately, see isPicking) carries that
+  // signal instead of a solid fill, and weekends keep looking like
+  // weekends throughout instead of getting swallowed by range shading
+  if (isEdge)     return { background: '#F0E4D4', color: 'var(--ink)' };
   if (isWknd)     return { background: '#FBD9E1', color: 'var(--ink)' };
+  if (inRange)    return { background: 'transparent', color: 'var(--ink)' };
   if (isPresent)  return { background: '#8FCB9E', color: '#1a4a2c' };
   if (isTdy)      return { background: '#F7EFE4', color: 'var(--ink)' };
   return { background: 'transparent', color: 'var(--ink)' };
