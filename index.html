@@ -2779,6 +2779,20 @@ function calendarCellVisual({ isEdge, inRange, isWknd, isPresent, isTdy }) {
   return { background: 'transparent', color: 'var(--ink)' };
 }
 
+// "Paid" badge, styled like a little sticker slapped on top of the day
+// cell — gradient + lift shadow + a slight tilt — rather than a flat icon.
+function PaidBadge() {
+  return (
+    <span style={{
+      position: 'absolute', top: -6, right: -6, width: 16, height: 16, borderRadius: '50%',
+      background: 'linear-gradient(135deg, #F0D060, #C2941A)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: 9.5, fontWeight: 900, color: '#4a3705', lineHeight: 1,
+      boxShadow: '0 2px 3px rgba(60,40,10,0.35), 0 0 0 2px var(--bg)',
+      transform: 'rotate(-9deg)' }}>✓</span>
+  );
+}
+
 function PayRangeSheet({ kid, tariff, price, loadHistory, legacyCoverage, onConfirm, onDelete, onClose }) {
   const today = todayStr();
   const init = new Date(today + 'T12:00:00');
@@ -2946,9 +2960,7 @@ function PayRangeSheet({ kid, tariff, price, loadHistory, legacyCoverage, onConf
                   fontWeight: isEdge||isTdy ? 800 : 500, cursor: 'pointer',
                   background, color }}>
                 {d}
-                {isPaidDay && !isWknd && (
-                  <span style={{ position: 'absolute', top: -1, right: -1, fontSize: 10, lineHeight: 1 }}>🪙</span>
-                )}
+                {isPaidDay && !isWknd && <PaidBadge />}
               </button>
             );
           })}
@@ -2956,7 +2968,10 @@ function PayRangeSheet({ kid, tariff, price, loadHistory, legacyCoverage, onConf
         <div style={{ display: 'flex', gap: 12, fontSize: 11, fontWeight: 700, color: 'var(--ink-faint)',
           justifyContent: 'center', marginBottom: 20, flexWrap: 'wrap' }}>
           <span><span style={{ display:'inline-block', width:9, height:9, borderRadius:3, background:'#8FCB9E', marginRight:4 }} />{L('был в саду', 'was here')}</span>
-          <span>🪙 {L('оплачено', 'paid')}</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ position: 'relative', width: 12, height: 12, display: 'inline-block' }}><PaidBadge /></span>
+            {L('оплачено', 'paid')}
+          </span>
           <span><span style={{ display:'inline-block', width:9, height:9, borderRadius:3, background:'#FBD9E1', marginRight:4 }} />{L('выходной', 'weekend')}</span>
         </div>
         {history.length > 0 && (
@@ -3114,9 +3129,7 @@ function AttendanceHistorySheet({ kid, onClose }) {
                   opacity: isFuture ? 0.35 : (pending === dateStr ? 0.5 : 1),
                   background, color }}>
                 {d}
-                {isPaidDay && !isWknd && (
-                  <span style={{ position: 'absolute', top: -1, right: -1, fontSize: 10, lineHeight: 1 }}>🪙</span>
-                )}
+                {isPaidDay && !isWknd && <PaidBadge />}
               </button>
             );
           })}
@@ -3124,7 +3137,10 @@ function AttendanceHistorySheet({ kid, onClose }) {
         <div style={{ display: 'flex', gap: 12, fontSize: 11, fontWeight: 700, color: 'var(--ink-faint)',
           justifyContent: 'center', flexWrap: 'wrap' }}>
           <span><span style={{ display:'inline-block', width:9, height:9, borderRadius:3, background:'#8FCB9E', marginRight:4 }} />{L('был в саду', 'was here')}</span>
-          <span>🪙 {L('оплачено', 'paid')}</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ position: 'relative', width: 12, height: 12, display: 'inline-block' }}><PaidBadge /></span>
+            {L('оплачено', 'paid')}
+          </span>
           <span><span style={{ display:'inline-block', width:9, height:9, borderRadius:3, background:'#FBD9E1', marginRight:4 }} />{L('выходной', 'weekend')}</span>
         </div>
         </>
