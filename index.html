@@ -2787,7 +2787,7 @@ function calendarCellVisual({ isEdge, inRange, isWknd, isPresent, isTdy }) {
 
 // "Paid" badge, styled like a little sticker slapped on top of the day
 // cell — gradient + lift shadow + a slight tilt — rather than a flat icon.
-function PaidBadge() {
+function PaidBadge({ muted }) {
   return (
     <span style={{
       position: 'absolute', top: -6, right: -6, width: 16, height: 16, borderRadius: '50%',
@@ -2795,6 +2795,7 @@ function PaidBadge() {
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontSize: 9.5, fontWeight: 900, color: '#4a3705', lineHeight: 1,
       boxShadow: '0 2px 3px rgba(60,40,10,0.35), 0 0 0 2px var(--bg)',
+      opacity: muted ? 0.4 : 1, transition: 'opacity 0.4s ease',
       transform: 'rotate(-9deg)' }}>✓</span>
   );
 }
@@ -2879,13 +2880,18 @@ function PayRangeSheet({ kid, tariff, price, loadHistory, loadAttendanceHistory,
 
   // first tap starts a fresh range; second tap closes it (swapping if picked before the start)
   function handlePick(dateStr) {
+    if (saving || justConfirmed) return;
     if (!rangeFrom || rangeTo) { setRangeFrom(dateStr); setRangeTo(null); }
     else if (dateStr < rangeFrom) { setRangeTo(rangeFrom); setRangeFrom(dateStr); }
     else { setRangeTo(dateStr); }
   }
 
   const [deletingId, setDeletingId] = React.useState(null);
-  const canConfirm = !!(rangeFrom && rangeTo && Number(amount) > 0) && !saving;
+  // held true for a beat after a successful confirm so the just-picked
+  // range's stickers can visibly brighten before the sheet closes, instead
+  // of the days you just paid for silently vanishing off-screen
+  const [justConfirmed, setJustConfirmed] = React.useState(false);
+  const canConfirm = !!(rangeFrom && rangeTo && Number(amount) > 0) && !saving && !justConfirmed;
   const fmt = d => d ? d.split('-').reverse().join('.') : '—';
 
   async function handleDelete(id) {
@@ -2907,8 +2913,14 @@ function PayRangeSheet({ kid, tariff, price, loadHistory, loadAttendanceHistory,
   async function handleConfirm() {
     if (!canConfirm) return;
     setSaving(true);
-    try { await onConfirm(rangeFrom, rangeTo, amount); }
-    finally { setSaving(false); }
+    try {
+      await onConfirm(rangeFrom, rangeTo, amount);
+      setSaving(false);
+      setJustConfirmed(true);
+      setTimeout(onClose, 1100);
+    } catch (e) {
+      setSaving(false);
+    }
   }
 
   return (
@@ -2964,6 +2976,10 @@ function PayRangeSheet({ kid, tariff, price, loadHistory, loadAttendanceHistory,
             const isTdy   = dateStr === today;
             const isPresent = attHistory[dateStr] === 'present';
             const { background, color } = calendarCellVisual({ isEdge, inRange, isWknd, isPresent, isTdy });
+            // the range you're actively picking previews as a dim sticker —
+            // "this is about to be marked paid" — then brightens for a beat
+            // once Confirm actually saves it, instead of just vanishing
+            const isPicking = (isEdge || inRange) && !isWknd && !isPaidDay;
             return (
               <button key={d} onClick={() => handlePick(dateStr)}
                 style={{ position: 'relative', border:'none', borderRadius: 10, padding:'9px 2px', fontSize:14,
@@ -2971,6 +2987,7 @@ function PayRangeSheet({ kid, tariff, price, loadHistory, loadAttendanceHistory,
                   background, color }}>
                 {d}
                 {isPaidDay && !isWknd && <PaidBadge />}
+                {isPicking && <PaidBadge muted={!justConfirmed} />}
               </button>
             );
           })}
@@ -3006,11 +3023,12 @@ function PayRangeSheet({ kid, tariff, price, loadHistory, loadAttendanceHistory,
         )}
         <button onClick={handleConfirm} disabled={!canConfirm} className="bk-press"
           style={{ width: '100%', border: 'none', cursor: canConfirm ? 'pointer' : 'default',
-            fontFamily: 'var(--font-display)', background: canConfirm ? '#B07848' : '#E7E1D9',
-            color: canConfirm ? '#fff' : 'var(--ink-faint)', fontSize: 17, fontWeight: 800,
-            padding: 15, borderRadius: 18,
-            boxShadow: canConfirm ? '0 10px 24px -8px #B07848' : 'none' }}>
-          {saving ? L('Сохраняю…', 'Saving…') : L('Подтвердить оплату', 'Confirm payment')}
+            fontFamily: 'var(--font-display)',
+            background: justConfirmed ? '#F2A81D' : canConfirm ? '#B07848' : '#E7E1D9',
+            color: justConfirmed ? '#3E2510' : canConfirm ? '#fff' : 'var(--ink-faint)',
+            fontSize: 17, fontWeight: 800, padding: 15, borderRadius: 18, transition: 'background 0.25s, color 0.25s',
+            boxShadow: justConfirmed ? '0 10px 24px -8px #F2A81D' : canConfirm ? '0 10px 24px -8px #B07848' : 'none' }}>
+          {justConfirmed ? L('Сохранено ✓', 'Saved ✓') : saving ? L('Сохраняю…', 'Saving…') : L('Подтвердить оплату', 'Confirm payment')}
         </button>
       </div>
     </div>
@@ -3164,6 +3182,7 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
   const [filter,    setFilter]    = React.useState('all');
   const [loading,   setLoading]   = React.useState(false);
   const [allMarked, setAllMarked] = React.useState(false);
+  const [calKid,    setCalKid]    = React.useState(null);
   const snapRef = React.useRef(null);
 
   const isToday = selDate === todayStr();
@@ -3277,6 +3296,7 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
 
         {/* count strip */}
         <div style={{ display:'flex', gap:10, padding:'0 20px 8px' }}>
+          <CalendarSquareButton date={selDate} onClick={() => setCalOpen(true)} />
           <CountStat n={counts.present} label={t('present')} tone={STATUS_TONE.present} />
           <CountStat n={counts.absent}  label={t('absent')}  tone={STATUS_TONE.absent} />
         </div>
@@ -3303,7 +3323,11 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
               badges.push({ emoji: '❗', label: 'Unpaid', tone: 'warn' });
             }
             return (
-              <Card key={kid.id} pad={12} onClick={() => go('child', { childId: kid.id })}
+              // Card visits are rare/deliberate via the Дети tab already —
+              // here in the daily roster, tapping a kid is far more likely
+              // to mean "show me their history", same as tapping a row in
+              // Payments does. Profile is one tap away from Дети if needed.
+              <Card key={kid.id} pad={12} onClick={() => setCalKid(kid)}
                 style={{ display:'flex', alignItems:'center', gap:13, background:'#FBF7F2' }}>
                 <Avatar emoji={kid.emoji} color={PALETTE[kidIndex % PALETTE.length]} size={44} />
                 <div style={{ flex:1, minWidth:0 }}>
@@ -3328,7 +3352,30 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
       )}
 
       {calOpen && <Portal><MiniCalendar selected={selDate} onSelect={setSelDate} onClose={() => setCalOpen(false)} /></Portal>}
+      {calKid && <Portal><AttendanceHistorySheet kid={calKid} onClose={() => setCalKid(null)} /></Portal>}
     </div>
+  );
+}
+
+// Square date-picker tile, styled like a torn calendar page (day number +
+// month), used to the left of the stat row in both Journal and Payments
+// instead of the old pill sitting in the header.
+function CalendarSquareButton({ date, onClick }) {
+  const isTdy = date === todayStr();
+  const d = new Date(date + 'T12:00:00');
+  const MR = ['ЯНВ','ФЕВ','МАР','АПР','МАЙ','ИЮН','ИЮЛ','АВГ','СЕН','ОКТ','НОЯ','ДЕК'];
+  const ME = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  return (
+    <button onClick={onClick} className="bk-press" style={{
+      width: 72, height: 72, flexShrink: 0, border: 'none', cursor: 'pointer', borderRadius: 18,
+      background: isTdy ? '#F0E4D4' : '#E8D8C4',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      boxShadow: '0 1px 2px rgba(60,40,20,0.04)' }}>
+      <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1, fontFamily: 'var(--font-display)',
+        color: isTdy ? '#B07848' : '#7A4828' }}>{d.getDate()}</div>
+      <div style={{ fontSize: 9.5, fontWeight: 800, marginTop: 3, letterSpacing: '0.03em',
+        color: isTdy ? '#B07848' : '#7A4828' }}>{L(MR[d.getMonth()], ME[d.getMonth()])}</div>
+    </button>
   );
 }
 
@@ -3347,11 +3394,12 @@ function CountStat({ n, label, tone }) {
 // ════════════════════════════════════════════════════════════════
 function SummaryScreen({ statuses, go }) {
   const kids = activeKids();
+  // kid statuses are only ever 'present'/'absent' — 'late' is a staff-only
+  // concept (see StaffAttendanceScreen), never set for kids, so there's no
+  // "late" bucket here.
   const present = kids.filter(k => statuses[k.id] === 'present').length;
-  const late    = kids.filter(k => statuses[k.id] === 'late').length;
   const absent  = kids.filter(k => statuses[k.id] === 'absent').length;
-  const here    = present + late;
-  const rate = kids.length ? Math.round(here / kids.length * 100) : 0;
+  const rate = kids.length ? Math.round(present / kids.length * 100) : 0;
 
   const today = todayStr();
   const payPaid   = kids.filter(k => k.paidUntil && normDate(k.paidUntil) >= today).length;
@@ -3383,7 +3431,6 @@ function SummaryScreen({ statuses, go }) {
           </Ring>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
             <MiniStat dot="var(--ok)"   n={present} label={t('present')} />
-            <MiniStat dot="var(--warn)" n={late}    label={t('late')} />
             <MiniStat dot="var(--no)"   n={absent}  label={t('absent')} />
           </div>
           </>
@@ -3717,7 +3764,7 @@ function fmtMoney(n) {
   return n % 1000 === 0 ? `${n / 1000}k` : String(n);
 }
 
-function PayStats({ cp, cu, total, filter, onFilter }) {
+function PayStats({ cp, cu, total, filter, onFilter, dateSquare }) {
   const statBox = (id, count, label, color) => {
     const active = filter === id;
     return (
@@ -3734,6 +3781,7 @@ function PayStats({ cp, cu, total, filter, onFilter }) {
   };
   return (
     <div style={{ display: 'flex', gap: 10, padding: '0 20px 16px' }}>
+      {dateSquare}
       {statBox('paid',   cp, L('Оплатили', 'Paid'),      'var(--ok)')}
       {statBox('unpaid', cu, L('Не оплатили', 'Unpaid'), 'var(--no)')}
       {!window.__isStaff && (
@@ -3789,7 +3837,7 @@ function KidPayRow({ kid, isPaid, onToggle, onConfirmPaid, onDeletePaid, tariff,
           <PayRangeSheet kid={kid} tariff={tariff} price={price} legacyCoverage={legacyCoverage}
             loadHistory={loadHistory || (() => window.loadPaymentLog(kid.id))}
             loadAttendanceHistory={loadAttendanceHistory}
-            onConfirm={async (from, to, amount) => { await onConfirmPaid(from, to, amount); setShowRange(false); }}
+            onConfirm={(from, to, amount) => onConfirmPaid(from, to, amount)}
             onDelete={onDeletePaid}
             onClose={() => setShowRange(false)} />
         </Portal>
@@ -3818,11 +3866,19 @@ function SaveBar({ hasChanges, onSave }) {
 }
 
 function PaymentsScreen({ go }) {
+  // "X детей" used to filter out tourist kids for no real reason (a
+  // leftover from before short-term kids shared the same payments flow),
+  // so it undercounted what you'd actually see on that screen. Paid/unpaid
+  // is more useful anyway — it previews what's waiting for you there.
+  const today = todayStr();
+  const gardenKids = activeKids();
+  const gardenPaid = gardenKids.filter(k => k.paidUntil && normDate(k.paidUntil) >= today
+    && (!k.paidFrom || normDate(k.paidFrom) <= today)).length;
   return (
     <div style={{ padding: '8px 20px 30px', display: 'flex', flexDirection: 'column', gap: 14 }}>
       {[
         { route: 'payments-garden', emoji: '🏫', ru: 'Садик',  en: 'Childcare', color: '#FBE0C0',
-          sub: { ru: `${activeKids().filter(k=>k.contract!=='tourist').length} детей`, en: `${activeKids().filter(k=>k.contract!=='tourist').length} kids` } },
+          sub: { ru: `${gardenPaid} из ${gardenKids.length} оплатили`, en: `${gardenPaid} of ${gardenKids.length} paid` } },
         { route: 'payments-clubs',  emoji: '🎨', ru: 'Кружки', en: 'Clubs',     color: '#E8D5FB',
           sub: { ru: `${DATA.CLUBS.length} кружка`, en: `${DATA.CLUBS.length} clubs` } },
       ].map(s => (
@@ -3928,21 +3984,11 @@ function PaymentsGardenScreen() {
         ))}
       </div>
 
-      {/* date check — is a specific day covered by "Paid until"? */}
-      <div style={{ display: 'flex', justifyContent: 'center', padding: '0 20px 14px' }}>
-        <button onClick={() => setCalOpen(true)} className="bk-press" style={{
-          display: 'flex', alignItems: 'center', gap: 6, border: 'none', cursor: 'pointer',
-          background: selDate === todayStr() ? '#F0E4D4' : '#E8D8C4', borderRadius: 999,
-          padding: '7px 16px', fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 800,
-          color: '#7A4828' }}>
-          📅 {selDate === todayStr() ? L('Проверить на сегодня', 'Check for today')
-            : `${L('Проверить на', 'Check for')} ${selDate.split('-').reverse().join('.')}`}
-        </button>
-      </div>
       {calOpen && <Portal><MiniCalendar selected={selDate} onSelect={setSelDate} onClose={() => setCalOpen(false)}
         disableWeekends={false} disableFuture={false} /></Portal>}
 
-      <PayStats cp={countPaid} cu={countUnpaid} total={total} filter={payFilter} onFilter={setPayFilter} />
+      <PayStats cp={countPaid} cu={countUnpaid} total={total} filter={payFilter} onFilter={setPayFilter}
+        dateSquare={<CalendarSquareButton date={selDate} onClick={() => setCalOpen(true)} />} />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 9, padding: '0 20px' }}>
         {kids.map(kid => (
@@ -3969,11 +4015,12 @@ function PaymentsClubsScreen() {
   const [clubId,    setClubId]    = React.useState(() => DATA.CLUBS[0]?.id ?? null);
   const [payFilter, setPayFilter] = React.useState('all');
   const [log,       setLog]       = React.useState([]);
+  const [selDate,   setSelDate]   = React.useState(todayStr);
+  const [calOpen,   setCalOpen]   = React.useState(false);
 
   const activeClub = DATA.CLUBS.find(c => c.id === clubId);
   const allKids    = activeClub ? activeKids().filter(k => activeClub.kids.includes(k.id)) : [];
   const price      = activeClub?.price ?? null;
-  const today      = todayStr();
 
   React.useEffect(() => {
     if (!clubId) return;
@@ -3988,15 +4035,19 @@ function PaymentsClubsScreen() {
     return map;
   }, [log, allKids.length]);
 
-  function isCovered(kid) {
+  // same both-bounds check as Garden's isCoveredOn, and same "check any
+  // date, not just today" square date-picker next to the stats
+  function isCovered(kid, date) {
     const c = coverage[kid.id];
-    return !!(c && c.until && normDate(c.until) >= today);
+    if (!c || !c.until || normDate(c.until) < date) return false;
+    if (c.from && normDate(c.from) > date) return false;
+    return true;
   }
 
-  const countPaid   = allKids.filter(isCovered).length;
+  const countPaid   = allKids.filter(k => isCovered(k, selDate)).length;
   const countUnpaid = allKids.length - countPaid;
   const total       = price != null ? countPaid * price : null;
-  const kids        = allKids.filter(k => payFilter === 'paid' ? isCovered(k) : payFilter === 'unpaid' ? !isCovered(k) : true);
+  const kids        = allKids.filter(k => payFilter === 'paid' ? isCovered(k, selDate) : payFilter === 'unpaid' ? !isCovered(k, selDate) : true);
 
   function refetchLog() {
     return window.loadClubPaymentLog(clubId).then(setLog);
@@ -4039,7 +4090,11 @@ function PaymentsClubsScreen() {
           </button>
         ))}
       </div>
-      <PayStats cp={countPaid} cu={countUnpaid} total={total} filter={payFilter} onFilter={setPayFilter} />
+      {calOpen && <Portal><MiniCalendar selected={selDate} onSelect={setSelDate} onClose={() => setCalOpen(false)}
+        disableWeekends={false} disableFuture={false} /></Portal>}
+
+      <PayStats cp={countPaid} cu={countUnpaid} total={total} filter={payFilter} onFilter={setPayFilter}
+        dateSquare={<CalendarSquareButton date={selDate} onClick={() => setCalOpen(true)} />} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 9, padding: '0 20px' }}>
         {allKids.length === 0 && (
           <div style={{ textAlign: 'center', color: 'var(--ink-faint)', padding: 24, fontSize: 14 }}>
@@ -4047,7 +4102,7 @@ function PaymentsClubsScreen() {
           </div>
         )}
         {kids.map(kid => (
-          <KidPayRow key={kid.id} kid={kid} isPaid={isCovered(kid)}
+          <KidPayRow key={kid.id} kid={kid} isPaid={isCovered(kid, selDate)}
             tariff="club" price={price}
             loadHistory={() => window.loadClubPaymentLog(clubId).then(l => l.filter(e => e.child === kid.id))}
             loadAttendanceHistory={() => window.loadClubAttendanceHistory(clubId, kid.id)}
@@ -4221,12 +4276,7 @@ function ClubScreen({ params }) {
                     <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}</div>
                     {grp && <span style={{ background: grp.color, color: grp.ink, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999 }}>{grp.emoji} {Lo(grp)}</span>}
                   </div>
-                  <button onClick={() => toggleAtt(kid.id)} className="bk-press" style={{
-                    border: 'none', borderRadius: 10, padding: '6px 14px',
-                    fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-                    background: status === 'present' ? '#D4F0DF' : '#E7E1D9',
-                    color: status === 'present' ? '#1F6B4A' : '#6B5C4A',
-                  }}>{status === 'present' ? L('Пришёл', 'Present') : L('Нет', 'Absent')}</button>
+                  <StatusChip status={status} onClick={() => toggleAtt(kid.id)} />
                 </Card>
               );
             })}
@@ -5446,26 +5496,6 @@ function App() {
               </>
             )}
           </div>
-          {/* center: attendance date pill — absolutely centered */}
-          {top.name === 'attendance' && (() => {
-            const isTdy = attSelDate === todayStr();
-            const d = new Date(attSelDate + 'T12:00:00');
-            const MR = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
-            const ME = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-            const lbl = isTdy ? L('Сегодня','Today') : `${d.getDate()} ${L(MR[d.getMonth()],ME[d.getMonth()])} ${d.getFullYear()}`;
-            return (
-              <div style={{ position:'absolute', left:'50%', transform:'translateX(-50%)',
-                bottom: 10, display:'flex', alignItems:'center' }}>
-                <button onClick={() => setAttCalOpen(true)} className="bk-press" style={{
-                  display:'flex', alignItems:'center', gap:5, border:'none', cursor:'pointer',
-                  background: isTdy ? '#F0E4D4' : '#E8D8C4', borderRadius:999,
-                  padding:'5px 14px', fontFamily:'var(--font-display)', fontSize:13, fontWeight:800,
-                  color: isTdy ? '#B07848' : '#7A4828', whiteSpace:'nowrap' }}>
-                  📅 {lbl}
-                </button>
-              </div>
-            );
-          })()}
           {/* right: logout + lang toggle */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button onClick={logout} className="bk-press" title={L('Выйти', 'Log out')} style={{
