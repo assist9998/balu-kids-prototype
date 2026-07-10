@@ -2998,7 +2998,9 @@ function AttendanceHistorySheet({ kid, onClose }) {
     ]).then(([h, l]) => { setHistory(h); setLog(l); }).catch(() => setHistory({}));
   }, [kid.id]);
 
-  const legacyCoverage = { from: kid.paidFrom, until: kid.paidUntil };
+  // most real kids have no Paid-from on record — default the start to today,
+  // same fallback PaymentsGardenScreen uses, or the dot would never show up
+  const legacyCoverage = { from: kid.paidFrom || todayStr(), until: kid.paidUntil };
   const paidDays = React.useMemo(() => {
     const set = new Set();
     const entries = legacyCoverage.from && legacyCoverage.until ? [...log, legacyCoverage] : log;
