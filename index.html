@@ -2763,6 +2763,22 @@ function bestCoverage(entries) {
   return best ? { from: best.from, until: best.until } : { from: '', until: '' };
 }
 
+// Shared day-cell visual language for the Payments and Attendance calendars,
+// so they read identically wherever they're opened from: green fill = the
+// kid was present that day, small coin badge = the day is covered by a
+// payment (never on weekends — daycare's closed then, so "paid" doesn't
+// mean anything for those days), pink = weekend, brown = actively picking
+// a new payment range (Payments calendar only, takes priority over green
+// since it's the thing being actively edited).
+function calendarCellVisual({ isEdge, inRange, isWknd, isPresent, isTdy }) {
+  if (isEdge)     return { background: '#B07848', color: '#fff' };
+  if (inRange)    return { background: '#F0E4D4', color: 'var(--ink)' };
+  if (isWknd)     return { background: '#FBD9E1', color: 'var(--ink)' };
+  if (isPresent)  return { background: '#8FCB9E', color: '#1a4a2c' };
+  if (isTdy)      return { background: '#F7EFE4', color: 'var(--ink)' };
+  return { background: 'transparent', color: 'var(--ink)' };
+}
+
 function PayRangeSheet({ kid, tariff, price, loadHistory, legacyCoverage, onConfirm, onDelete, onClose }) {
   const today = todayStr();
   const init = new Date(today + 'T12:00:00');
@@ -2773,10 +2789,12 @@ function PayRangeSheet({ kid, tariff, price, loadHistory, legacyCoverage, onConf
   const [amount,        setAmount]        = React.useState('');
   const [amountTouched, setAmountTouched] = React.useState(false);
   const [history,    setHistory]    = React.useState([]);
+  const [attHistory, setAttHistory] = React.useState({});
   const [saving,     setSaving]     = React.useState(false);
 
   React.useEffect(() => {
     loadHistory().then(setHistory).catch(() => {});
+    window.loadAttendanceHistory(kid.id).then(setAttHistory).catch(() => {});
   }, [kid.id]);
 
   // every day covered by an already-logged payment, for the "you can already
@@ -2920,28 +2938,25 @@ function PayRangeSheet({ kid, tariff, price, loadHistory, legacyCoverage, onConf
             const inRange = rangeFrom && rangeTo && dateStr > rangeFrom && dateStr < rangeTo;
             const isPaidDay = paidDays.has(dateStr);
             const isTdy   = dateStr === today;
-            // weekends stay visually "weekend" even inside a selected/paid
-            // range instead of getting swallowed by the brown fill — makes
-            // them easy to spot when eyeballing a stretch of paid days
-            let background = 'transparent', color = 'var(--ink)';
-            if (isEdge)            { background = '#B07848'; color = '#fff'; }
-            else if (isWknd)       { background = inRange ? '#F6C9D6' : isPaidDay ? '#F9DCE5' : '#FBD9E1'; }
-            else if (inRange)      { background = '#F0E4D4'; }
-            else if (isPaidDay)    { background = '#E7DCC8'; }
-            else if (isTdy)        { background = '#F7EFE4'; }
+            const isPresent = attHistory[dateStr] === 'present';
+            const { background, color } = calendarCellVisual({ isEdge, inRange, isWknd, isPresent, isTdy });
             return (
               <button key={d} onClick={() => handlePick(dateStr)}
-                style={{ border:'none', borderRadius: 10, padding:'9px 2px', fontSize:14,
+                style={{ position: 'relative', border:'none', borderRadius: 10, padding:'9px 2px', fontSize:14,
                   fontWeight: isEdge||isTdy ? 800 : 500, cursor: 'pointer',
                   background, color }}>
                 {d}
+                {isPaidDay && !isWknd && (
+                  <span style={{ position: 'absolute', top: -1, right: -1, fontSize: 10, lineHeight: 1 }}>🪙</span>
+                )}
               </button>
             );
           })}
         </div>
         <div style={{ display: 'flex', gap: 12, fontSize: 11, fontWeight: 700, color: 'var(--ink-faint)',
-          justifyContent: 'center', marginBottom: 20 }}>
-          <span><span style={{ display:'inline-block', width:9, height:9, borderRadius:3, background:'#E7DCC8', marginRight:4 }} />{L('уже оплачено', 'already paid')}</span>
+          justifyContent: 'center', marginBottom: 20, flexWrap: 'wrap' }}>
+          <span><span style={{ display:'inline-block', width:9, height:9, borderRadius:3, background:'#8FCB9E', marginRight:4 }} />{L('был в саду', 'was here')}</span>
+          <span>🪙 {L('оплачено', 'paid')}</span>
           <span><span style={{ display:'inline-block', width:9, height:9, borderRadius:3, background:'#FBD9E1', marginRight:4 }} />{L('выходной', 'weekend')}</span>
         </div>
         {history.length > 0 && (
@@ -2977,11 +2992,13 @@ function PayRangeSheet({ kid, tariff, price, loadHistory, legacyCoverage, onConf
   );
 }
 
-// Per-kid history: green fill = was in the garden that day, small brown
-// dot = that day is covered by a payment. Tap a past/today day to toggle
-// attendance right there — same present/absent flip the Journal uses, it
-// just writes through window.saveAttendance for that one (date, kid) pair
-// instead of the whole day's roster.
+// Per-kid history — same day-cell visual language as PayRangeSheet (green
+// fill = was in the garden that day, coin badge = covered by a payment).
+// Tap a past/today day to toggle attendance right there — same
+// present/absent flip the Journal uses, it just writes through
+// window.saveAttendance for that one (date, kid) pair instead of the
+// whole day's roster. Unlike the Payments calendar, this one only edits
+// attendance, never payments, and future dates stay disabled.
 function AttendanceHistorySheet({ kid, onClose }) {
   const today = todayStr();
   const init = new Date(today + 'T12:00:00');
@@ -3089,10 +3106,7 @@ function AttendanceHistorySheet({ kid, onClose }) {
             const isTdy    = dateStr === today;
             const isPresent = history[dateStr] === 'present';
             const isPaidDay = paidDays.has(dateStr);
-            let background = 'transparent', color = 'var(--ink)';
-            if (isPresent)      { background = '#8FCB9E'; color = '#1a4a2c'; }
-            else if (isWknd)    { background = '#FBD9E1'; }
-            else if (isTdy)     { background = '#F7EFE4'; }
+            const { background, color } = calendarCellVisual({ isWknd, isPresent, isTdy });
             return (
               <button key={d} onClick={() => toggleDay(dateStr)} disabled={isFuture}
                 style={{ position: 'relative', border:'none', borderRadius: 10, padding:'9px 2px', fontSize:14,
@@ -3100,9 +3114,8 @@ function AttendanceHistorySheet({ kid, onClose }) {
                   opacity: isFuture ? 0.35 : (pending === dateStr ? 0.5 : 1),
                   background, color }}>
                 {d}
-                {isPaidDay && (
-                  <span style={{ position: 'absolute', top: 3, right: 4, width: 6, height: 6,
-                    borderRadius: '50%', background: '#B07848' }} />
+                {isPaidDay && !isWknd && (
+                  <span style={{ position: 'absolute', top: -1, right: -1, fontSize: 10, lineHeight: 1 }}>🪙</span>
                 )}
               </button>
             );
@@ -3111,7 +3124,7 @@ function AttendanceHistorySheet({ kid, onClose }) {
         <div style={{ display: 'flex', gap: 12, fontSize: 11, fontWeight: 700, color: 'var(--ink-faint)',
           justifyContent: 'center', flexWrap: 'wrap' }}>
           <span><span style={{ display:'inline-block', width:9, height:9, borderRadius:3, background:'#8FCB9E', marginRight:4 }} />{L('был в саду', 'was here')}</span>
-          <span><span style={{ display:'inline-block', width:6, height:6, borderRadius:'50%', background:'#B07848', marginRight:5 }} />{L('оплачено', 'paid')}</span>
+          <span>🪙 {L('оплачено', 'paid')}</span>
           <span><span style={{ display:'inline-block', width:9, height:9, borderRadius:3, background:'#FBD9E1', marginRight:4 }} />{L('выходной', 'weekend')}</span>
         </div>
         </>
