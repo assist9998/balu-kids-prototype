@@ -5642,17 +5642,34 @@ function App() {
 
       {/* ── scroll area ── */}
       <div ref={scrollAreaRef} style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', position: 'relative' }}>
-        {/* pull-to-refresh indicator */}
+        {/* pull-to-refresh indicator — same gold-sticker language as the
+            paid-day badge, so it reads as part of the same visual family */}
         {(pullY > 0 || pullRefreshing) && (
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: pullRefreshing ? PULL_TRIGGER : pullY,
-            display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: 6,
+            display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: 8,
             transition: pullRefreshing ? 'height 0.15s ease' : 'none', zIndex: 5, pointerEvents: 'none' }}>
-            <div style={{ width: 22, height: 22, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 14, transform: pullRefreshing ? 'none' : `rotate(${Math.min(pullY / PULL_TRIGGER, 1) * 180}deg)`,
-              transition: pullStartYRef.current == null ? 'transform 0.15s ease' : 'none',
-              color: pullY > PULL_TRIGGER || pullRefreshing ? '#B07848' : 'var(--ink-faint)',
-              animation: pullRefreshing ? 'bk-spin 0.8s linear infinite' : 'none' }}>
-              {pullRefreshing ? '⟳' : '↓'}
+            <div style={{ width: 30, height: 30, borderRadius: '50%',
+              background: pullY > PULL_TRIGGER || pullRefreshing
+                ? 'linear-gradient(135deg, #F0D060, #C2941A)' : '#FBF7F2',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 2px 6px -1px rgba(60,40,10,0.35)',
+              opacity: Math.max(pullY / PULL_SLOP, pullRefreshing ? 1 : 0.35),
+              transition: 'background 0.15s ease, opacity 0.1s ease' }}>
+              {pullRefreshing ? (
+                <svg width="16" height="16" viewBox="-9 -8 18 18" fill="#4a3705" style={{ animation: 'bk-spin 0.9s linear infinite' }}>
+                  <ellipse cx="0" cy="5" rx="5.4" ry="4.8" />
+                  <circle cx="-5.4" cy="-1" r="2.6" />
+                  <circle cx="-2"   cy="-4" r="2.6" />
+                  <circle cx="2"    cy="-4" r="2.6" />
+                  <circle cx="5.4"  cy="-1" r="2.6" />
+                </svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                  stroke={pullY > PULL_TRIGGER ? '#4a3705' : '#B07848'} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"
+                  style={{ transform: `rotate(${Math.min(pullY / PULL_TRIGGER, 1) * 180}deg)`, transition: 'transform 0.1s ease' }}>
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              )}
             </div>
           </div>
         )}
