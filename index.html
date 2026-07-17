@@ -58,6 +58,9 @@
   .scr-fwd  { animation: scrFwd  .34s cubic-bezier(.22,1,.36,1); }
   .scr-back { animation: scrBack .30s cubic-bezier(.22,1,.36,1); }
 
+  /* pull-to-refresh spinner */
+  @keyframes bk-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
   /* toast */
   @keyframes toastIn { from { opacity: 0; transform: translate(-50%, 14px); } to { opacity: 1; transform: translate(-50%, 0); } }
   .bk-toast { animation: toastIn .3s cubic-bezier(.22,1,.36,1); }
@@ -5372,33 +5375,96 @@ function App() {
   // never backgrounds the app at all and it sits open on one screen.
   const [updateAvailable, setUpdateAvailable] = React.useState(false);
   const htmlSnapshotRef = React.useRef(null);
+
+  // Shared by the automatic listeners below AND the manual pull-to-refresh
+  // gesture (see scroll container further down) — pull always calls this
+  // directly so it's never rate-limited by the automatic-trigger dedupe.
+  const checkForUpdate = React.useCallback(async () => {
+    loadAllData();
+    try {
+      const res = await fetch(location.href, { cache: 'no-store' });
+      const html = await res.text();
+      if (htmlSnapshotRef.current && html !== htmlSnapshotRef.current) setUpdateAvailable(true);
+    } catch {}
+  }, [loadAllData]);
+
   React.useEffect(() => {
     fetch(location.href, { cache: 'no-store' }).then(r => r.text()).then(t => { htmlSnapshotRef.current = t; }).catch(() => {});
     let lastCheck = 0;
-    async function checkForUpdate() {
+    function guarded() {
       const now = Date.now();
       if (now - lastCheck < 3000) return; // dedupe near-simultaneous triggers
       lastCheck = now;
-      loadAllData();
-      try {
-        const res = await fetch(location.href, { cache: 'no-store' });
-        const html = await res.text();
-        if (htmlSnapshotRef.current && html !== htmlSnapshotRef.current) setUpdateAvailable(true);
-      } catch {}
+      checkForUpdate();
     }
-    function onVisible() { if (document.visibilityState === 'visible') checkForUpdate(); }
-    function onPageShow(e) { if (e.persisted) checkForUpdate(); }
+    function onVisible() { if (document.visibilityState === 'visible') guarded(); }
+    function onPageShow(e) { if (e.persisted) guarded(); }
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('pageshow', onPageShow);
-    window.addEventListener('focus', checkForUpdate);
-    const fallbackTimer = setInterval(() => { if (document.visibilityState === 'visible') checkForUpdate(); }, 5 * 60 * 1000);
+    window.addEventListener('focus', guarded);
+    const fallbackTimer = setInterval(() => { if (document.visibilityState === 'visible') guarded(); }, 5 * 60 * 1000);
     return () => {
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('pageshow', onPageShow);
-      window.removeEventListener('focus', checkForUpdate);
+      window.removeEventListener('focus', guarded);
       clearInterval(fallbackTimer);
     };
-  }, [loadAllData]);
+  }, [checkForUpdate]);
+
+  // Pull-to-refresh — a manual, always-reliable fallback for the automatic
+  // triggers above, which depend on iOS/WebKit lifecycle events that turned
+  // out not to fire consistently for a home-screen-added app. Only starts
+  // tracking a pull when the scroll area is already at the very top, so it
+  // never fights with normal scrolling. Wired via a native (non-React)
+  // touchmove listener with {passive:false} — React's synthetic touch
+  // handlers are passive by default, so e.preventDefault() inside a plain
+  // JSX onTouchMove silently does nothing and the browser's own scroll
+  // bounce fights the gesture.
+  const [pullY, pullYState] = React.useState(0);
+  const pullYRef = React.useRef(0);
+  function setPullY(v) { pullYRef.current = v; pullYState(v); }
+  const [pullRefreshing, setPullRefreshing] = React.useState(false);
+  const pullStartYRef = React.useRef(null);
+  const scrollAreaRef = React.useRef(null);
+  const PULL_TRIGGER = 62;
+
+  React.useEffect(() => {
+    const el = scrollAreaRef.current;
+    if (!el) return;
+    function onTouchStart(e) {
+      pullStartYRef.current = el.scrollTop <= 0 ? e.touches[0].clientY : null;
+    }
+    function onTouchMove(e) {
+      if (pullStartYRef.current == null) return;
+      const delta = e.touches[0].clientY - pullStartYRef.current;
+      if (delta > 0 && el.scrollTop <= 0) {
+        e.preventDefault();
+        setPullY(Math.min(delta * 0.45, 88));
+      } else {
+        pullStartYRef.current = null;
+        setPullY(0);
+      }
+    }
+    async function onTouchEnd() {
+      if (pullStartYRef.current == null) return;
+      pullStartYRef.current = null;
+      if (pullYRef.current > PULL_TRIGGER) {
+        setPullRefreshing(true);
+        setPullY(PULL_TRIGGER);
+        await checkForUpdate();
+        setPullRefreshing(false);
+      }
+      setPullY(0);
+    }
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    el.addEventListener('touchend', onTouchEnd, { passive: true });
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+    };
+  }, [checkForUpdate]);
 
   React.useEffect(() => {
     if (childrenReady) persistAttendance(statuses);
@@ -5567,7 +5633,21 @@ function App() {
       </div>
 
       {/* ── scroll area ── */}
-      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', position: 'relative' }}>
+      <div ref={scrollAreaRef} style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', position: 'relative' }}>
+        {/* pull-to-refresh indicator */}
+        {(pullY > 0 || pullRefreshing) && (
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: pullRefreshing ? PULL_TRIGGER : pullY,
+            display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: 6,
+            transition: pullRefreshing ? 'height 0.15s ease' : 'none', zIndex: 5, pointerEvents: 'none' }}>
+            <div style={{ width: 22, height: 22, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 14, transform: pullRefreshing ? 'none' : `rotate(${Math.min(pullY / PULL_TRIGGER, 1) * 180}deg)`,
+              transition: pullStartYRef.current == null ? 'transform 0.15s ease' : 'none',
+              color: pullY > PULL_TRIGGER || pullRefreshing ? '#B07848' : 'var(--ink-faint)',
+              animation: pullRefreshing ? 'bk-spin 0.8s linear infinite' : 'none' }}>
+              {pullRefreshing ? '⟳' : '↓'}
+            </div>
+          </div>
+        )}
         {/* paw trail */}
         <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 0 }}
           xmlns="http://www.w3.org/2000/svg" viewBox="0 0 375 1980" preserveAspectRatio="xMidYMin slice">
@@ -5617,7 +5697,10 @@ function App() {
             </g>
           ))}
         </svg>
-        <div key={top.name + stack.length} className={dir === 'fwd' ? 'scr-fwd' : 'scr-back'} style={{ minHeight: '100%', position: 'relative', zIndex: 1 }}>
+        <div key={top.name + stack.length} className={dir === 'fwd' ? 'scr-fwd' : 'scr-back'}
+          style={{ minHeight: '100%', position: 'relative', zIndex: 1,
+            transform: `translateY(${pullRefreshing ? PULL_TRIGGER : pullY}px)`,
+            transition: pullStartYRef.current == null ? 'transform 0.15s ease' : 'none' }}>
           {loadError ? (
             <div style={{ padding: 40, textAlign: 'center', color: 'var(--no)', fontWeight: 700 }}>
               {L('Не удалось загрузить данные детей', 'Failed to load children data')}<br />
