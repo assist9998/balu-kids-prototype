@@ -5337,8 +5337,12 @@ function App() {
   const [role, setRole] = React.useState(() => loadStoredRole()?.role ?? null);
   const [teacherName, setTeacherName] = React.useState(() => loadStoredRole()?.name ?? null);
 
-  React.useEffect(() => {
-    Promise.all([
+  // Shared by the initial mount and the "user came back to the app" refresh
+  // below — same loaders, just without resetting childrenReady, so a
+  // background refresh updates data in place instead of flashing the
+  // loading screen again.
+  const loadAllData = React.useCallback(() => {
+    return Promise.all([
       window.loadChildren(),
       window.loadClubs().catch(() => {}),
       window.loadFeed().then(() => setFeed(DATA.FEED.map(f => ({ ...f })))).catch(() => {}),
@@ -5351,6 +5355,30 @@ function App() {
       })
       .catch(err => setLoadError(err.message));
   }, []);
+
+  React.useEffect(() => { loadAllData(); }, [loadAllData]);
+
+  // Refetch data — and check whether a newer build is live — whenever the
+  // user comes back to the app (switches back from another app/tab), not on
+  // a timer. This is the standard "refetch on focus" pattern instead of
+  // polling: cheap, no wasted requests while the app just sits open, and it
+  // catches the exact moment data is most likely stale.
+  const [updateAvailable, setUpdateAvailable] = React.useState(false);
+  const htmlSnapshotRef = React.useRef(null);
+  React.useEffect(() => {
+    fetch(location.href, { cache: 'no-store' }).then(r => r.text()).then(t => { htmlSnapshotRef.current = t; }).catch(() => {});
+    async function onVisible() {
+      if (document.visibilityState !== 'visible') return;
+      loadAllData();
+      try {
+        const res = await fetch(location.href, { cache: 'no-store' });
+        const html = await res.text();
+        if (htmlSnapshotRef.current && html !== htmlSnapshotRef.current) setUpdateAvailable(true);
+      } catch {}
+    }
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [loadAllData]);
 
   React.useEffect(() => {
     if (childrenReady) persistAttendance(statuses);
@@ -5588,6 +5616,19 @@ function App() {
         <div className="bk-toast" style={{ position: 'absolute', bottom: 56, left: '50%', transform: 'translateX(-50%)',
           background: '#F2A81D', color: '#3E2510', padding: '10px 22px', borderRadius: 999, fontWeight: 800,
           fontSize: 14, whiteSpace: 'nowrap', zIndex: 40, boxShadow: '0 4px 16px -4px rgba(242,168,29,0.5)' }}>{toast}</div>
+      )}
+
+      {/* ── new version available — detected on returning to the app, not
+          forced automatically so it never yanks the screen out from under
+          whatever the person is doing right now ── */}
+      {updateAvailable && (
+        <button onClick={() => window.location.reload()} className="bk-press" style={{
+          position: 'absolute', top: 0, left: 0, right: 0, zIndex: 50, border: 'none', cursor: 'pointer',
+          background: '#B07848', color: '#fff', fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 13,
+          padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          boxShadow: '0 4px 12px -4px rgba(60,40,20,0.4)' }}>
+          🔄 {L('Доступно обновление — нажмите, чтобы применить', 'Update available — tap to apply')}
+        </button>
       )}
 
       {/* ── tweaks ── */}
