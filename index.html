@@ -5427,6 +5427,7 @@ function App() {
   const pullStartYRef = React.useRef(null);
   const scrollAreaRef = React.useRef(null);
   const PULL_TRIGGER = 62;
+  const PULL_SLOP = 10;
 
   React.useEffect(() => {
     const el = scrollAreaRef.current;
@@ -5437,12 +5438,19 @@ function App() {
     function onTouchMove(e) {
       if (pullStartYRef.current == null) return;
       const delta = e.touches[0].clientY - pullStartYRef.current;
-      if (delta > 0 && el.scrollTop <= 0) {
-        e.preventDefault();
-        setPullY(Math.min(delta * 0.45, 88));
-      } else {
+      // A few px of slop before committing to "this is a pull" — without it,
+      // the tiny downward wobble that naturally happens at the start of an
+      // ordinary upward scroll swipe was calling preventDefault on the very
+      // first touchmove, which made the browser treat the *whole* gesture as
+      // JS-handled and silently killed normal scrolling for the rest of it.
+      if (el.scrollTop > 0 || delta <= -PULL_SLOP) {
         pullStartYRef.current = null;
         setPullY(0);
+        return;
+      }
+      if (delta > PULL_SLOP) {
+        e.preventDefault();
+        setPullY(Math.min((delta - PULL_SLOP) * 0.45, 88));
       }
     }
     async function onTouchEnd() {
