@@ -5600,6 +5600,20 @@ function App() {
 
   return (
     <div style={rootStyle}>
+      {/* ── new version available — a slim strip that pushes the header
+          down instead of covering it, detected on returning to the app,
+          not forced automatically so it never yanks the screen out from
+          under whatever the person is doing right now ── */}
+      {updateAvailable && (
+        <button onClick={() => window.location.reload()} className="bk-press" style={{
+          flexShrink: 0, border: 'none', cursor: 'pointer', width: '100%',
+          background: '#B07848', color: '#fff', fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 12.5,
+          padding: '8px 16px', paddingTop: 'calc(8px + env(safe-area-inset-top))',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+          🔄 {L('Доступно обновление — нажмите, чтобы применить', 'Update available — tap to apply')}
+        </button>
+      )}
+
       {/* ── header ── */}
       <div style={{ flexShrink: 0, position: 'relative', zIndex: 8,
         background: '#fff', paddingTop: 'env(safe-area-inset-top)',
@@ -5744,19 +5758,6 @@ function App() {
         <div className="bk-toast" style={{ position: 'absolute', bottom: 56, left: '50%', transform: 'translateX(-50%)',
           background: '#F2A81D', color: '#3E2510', padding: '10px 22px', borderRadius: 999, fontWeight: 800,
           fontSize: 14, whiteSpace: 'nowrap', zIndex: 40, boxShadow: '0 4px 16px -4px rgba(242,168,29,0.5)' }}>{toast}</div>
-      )}
-
-      {/* ── new version available — detected on returning to the app, not
-          forced automatically so it never yanks the screen out from under
-          whatever the person is doing right now ── */}
-      {updateAvailable && (
-        <button onClick={() => window.location.reload()} className="bk-press" style={{
-          position: 'absolute', top: 0, left: 0, right: 0, zIndex: 50, border: 'none', cursor: 'pointer',
-          background: '#B07848', color: '#fff', fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 13,
-          padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-          boxShadow: '0 4px 12px -4px rgba(60,40,20,0.4)' }}>
-          🔄 {L('Доступно обновление — нажмите, чтобы применить', 'Update available — tap to apply')}
-        </button>
       )}
 
       {/* ── tweaks ── */}
