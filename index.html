@@ -5360,16 +5360,25 @@ function App() {
   React.useEffect(() => { loadAllData(); }, [loadAllData]);
 
   // Refetch data — and check whether a newer build is live — whenever the
-  // user comes back to the app (switches back from another app/tab), not on
-  // a timer. This is the standard "refetch on focus" pattern instead of
-  // polling: cheap, no wasted requests while the app just sits open, and it
-  // catches the exact moment data is most likely stale.
+  // user comes back to the app. `visibilitychange` alone isn't reliable for
+  // a "added to home screen" app on iOS: after a few minutes backgrounded,
+  // iOS often evicts the WKWebView from memory and restores it from the
+  // bfcache without ever firing visibilitychange the way a normal browser
+  // tab would — `pageshow` with `event.persisted` is the correct signal for
+  // that specific case, and `focus` catches whatever's left. All three are
+  // wired to the same check, deduped so a real "came back" moment (which
+  // can trigger more than one of these at once) doesn't fire it 2-3 times.
+  // A slow 5-minute fallback timer covers the case where the person just
+  // never backgrounds the app at all and it sits open on one screen.
   const [updateAvailable, setUpdateAvailable] = React.useState(false);
   const htmlSnapshotRef = React.useRef(null);
   React.useEffect(() => {
     fetch(location.href, { cache: 'no-store' }).then(r => r.text()).then(t => { htmlSnapshotRef.current = t; }).catch(() => {});
-    async function onVisible() {
-      if (document.visibilityState !== 'visible') return;
+    let lastCheck = 0;
+    async function checkForUpdate() {
+      const now = Date.now();
+      if (now - lastCheck < 3000) return; // dedupe near-simultaneous triggers
+      lastCheck = now;
       loadAllData();
       try {
         const res = await fetch(location.href, { cache: 'no-store' });
@@ -5377,8 +5386,18 @@ function App() {
         if (htmlSnapshotRef.current && html !== htmlSnapshotRef.current) setUpdateAvailable(true);
       } catch {}
     }
+    function onVisible() { if (document.visibilityState === 'visible') checkForUpdate(); }
+    function onPageShow(e) { if (e.persisted) checkForUpdate(); }
     document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
+    window.addEventListener('pageshow', onPageShow);
+    window.addEventListener('focus', checkForUpdate);
+    const fallbackTimer = setInterval(() => { if (document.visibilityState === 'visible') checkForUpdate(); }, 5 * 60 * 1000);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('pageshow', onPageShow);
+      window.removeEventListener('focus', checkForUpdate);
+      clearInterval(fallbackTimer);
+    };
   }, [loadAllData]);
 
   React.useEffect(() => {
