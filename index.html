@@ -2339,7 +2339,7 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
   const [form, setForm] = React.useState(() => {
     if (!kid) return {
       firstName: '', lastName: '', group: 'big', contractType: 'longterm',
-      birthday: '', startDate: '', dayType: '', price: '', deposit: '', paidUntil: '',
+      birthday: '', startDate: '', dayType: '', price: '', deposit: '',
       allergens: [], allergyNote: '',
       paracetamol: '', photoConsent: '', adaptation: false,
       mealsIncluded: '', napTime: false, afterSchool: false,
@@ -2358,7 +2358,6 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
       dayType: kid.dayType || '',
       price: kid.price || '',
       deposit: kid.deposit || '',
-      paidUntil: kid.paidUntil || '',
       allergens,
       allergyNote,
       paracetamol: kid.paracetamol || '',
@@ -2426,7 +2425,7 @@ function ChildFormSheet({ kid, onClose, onSaved }) {
           group: payload.group, contract: payload.contractType,
           dob: payload.birthday, startDate: payload.startDate,
           dayType: payload.dayType, price: payload.price,
-          deposit: payload.deposit, paidUntil: payload.paidUntil,
+          deposit: payload.deposit,
           allergyEn: payload.allergies,
           paracetamol: payload.paracetamol, photoConsent: payload.photoConsent,
           adaptation: payload.adaptation,
