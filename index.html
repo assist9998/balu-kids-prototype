@@ -5385,6 +5385,12 @@ function App() {
   // background refresh updates data in place instead of flashing the
   // loading screen again.
   const loadAllData = React.useCallback(() => {
+    // Clear any previous failure up front — otherwise the very first
+    // attempt (which fires before login and always 401s now that the API
+    // requires a token) sets loadError once and it renders forever, even
+    // after a later successful retry sets childrenReady=true, since the
+    // error branch is checked first in the render below.
+    setLoadError(null);
     return Promise.all([
       window.loadChildren(),
       window.loadClubs().catch(() => {}),
@@ -5556,7 +5562,11 @@ function App() {
   window.__isTeacher   = role === 'teacher';
   window.__teacherName = teacherName;
 
-  if (!role) return <LoginGate onLogin={d => { persistRole(d.role, d.name, d.token); setRole(d.role); setTeacherName(d.name); }} />;
+  // The very first loadAllData() (from the mount effect below) fires before
+  // any login and now always 401s, since the API requires a token — retry
+  // it here with the freshly-issued token instead of leaving the app stuck
+  // on that first failed attempt's error screen.
+  if (!role) return <LoginGate onLogin={d => { persistRole(d.role, d.name, d.token); setRole(d.role); setTeacherName(d.name); loadAllData(); }} />;
 
   const top = stack[stack.length - 1];
 
