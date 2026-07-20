@@ -240,14 +240,19 @@ window.API_BASE = "https://rmxois1uv0a24xrbi2dfcfac.95.179.188.141.sslip.io";
   window.fetch = function (url, opts) {
     const isApiCall = typeof url === 'string' && url.startsWith(window.API_BASE);
     const isLogin = isApiCall && url.endsWith('/auth/login');
+    const token = isApiCall && !isLogin ? currentToken() : null;
     if (isApiCall && !isLogin) {
-      const token = currentToken();
       opts = Object.assign({}, opts, {
         headers: Object.assign({}, opts && opts.headers, token ? { Authorization: 'Bearer ' + token } : {}),
       });
     }
     return _origFetch(url, opts).then((res) => {
-      if (isApiCall && !isLogin && res.status === 401) {
+      // Only a *previously valid* session going stale (backend restarted,
+      // token expired) should force a re-login. Some data loads fire before
+      // any login (e.g. the home screen's initial fetch attempt) and 401
+      // there is normal/expected — reloading on those would loop forever,
+      // tearing the page down before the user can even submit the login form.
+      if (isApiCall && !isLogin && token && res.status === 401) {
         try { localStorage.removeItem('balu_role'); } catch {}
         window.location.reload();
       }
