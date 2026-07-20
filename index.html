@@ -227,6 +227,35 @@
 // data.js — Балу Кидс. CHILDREN грузится из API (Google Sheets), остальное демо/декоративное.
 window.API_BASE = "https://rmxois1uv0a24xrbi2dfcfac.95.179.188.141.sslip.io";
 
+// Auto-attach the per-login token to every request to our own API, and
+// force a re-login if the backend ever rejects it (expired/restarted
+// session) — without this, every /children, /attendance, etc. call would
+// be readable by anyone who just knows the API URL, login or not.
+(function () {
+  const _origFetch = window.fetch.bind(window);
+  function currentToken() {
+    try { return (JSON.parse(localStorage.getItem('balu_role') || 'null') || {}).token || null; }
+    catch { return null; }
+  }
+  window.fetch = function (url, opts) {
+    const isApiCall = typeof url === 'string' && url.startsWith(window.API_BASE);
+    const isLogin = isApiCall && url.endsWith('/auth/login');
+    if (isApiCall && !isLogin) {
+      const token = currentToken();
+      opts = Object.assign({}, opts, {
+        headers: Object.assign({}, opts && opts.headers, token ? { Authorization: 'Bearer ' + token } : {}),
+      });
+    }
+    return _origFetch(url, opts).then((res) => {
+      if (isApiCall && !isLogin && res.status === 401) {
+        try { localStorage.removeItem('balu_role'); } catch {}
+        window.location.reload();
+      }
+      return res;
+    });
+  };
+})();
+
 (function () {
   // groups carry the reference pastel palette
   const GROUPS = [
@@ -5278,8 +5307,8 @@ function loadStoredRole() {
   } catch { return null; }
 }
 
-function persistRole(role, name = null) {
-  try { localStorage.setItem('balu_role', JSON.stringify({ date: todayStr(), role, name })); } catch {}
+function persistRole(role, name = null, token = null) {
+  try { localStorage.setItem('balu_role', JSON.stringify({ date: todayStr(), role, name, token })); } catch {}
 }
 
 function LoginGate({ onLogin }) {
@@ -5517,7 +5546,7 @@ function App() {
   window.__isTeacher   = role === 'teacher';
   window.__teacherName = teacherName;
 
-  if (!role) return <LoginGate onLogin={d => { persistRole(d.role, d.name); setRole(d.role); setTeacherName(d.name); }} />;
+  if (!role) return <LoginGate onLogin={d => { persistRole(d.role, d.name, d.token); setRole(d.role); setTeacherName(d.name); }} />;
 
   const top = stack[stack.length - 1];
 
