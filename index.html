@@ -3288,15 +3288,20 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
   async function handleSave() {
     setSaveErr(null);
     if (!hasChanges) return;
-    // Send everyone's status, not just what changed — otherwise a kid who
-    // stays "absent" the whole time never gets an explicit row in the sheet
-    // (upsert only writes what it's told about), so Olga sees no record at
-    // all for them instead of an "Away" mark.
+    // Only send what this user actually changed since the last save — not
+    // everyone's status. The backend now records who marked each kid
+    // (Marked by), and a kid who stays "absent" all day untouched gets an
+    // explicit row from the end-of-day sweep instead of from us resending
+    // the whole roster. Sending everyone here would (a) wrongly attribute
+    // kids nobody touched to whoever happens to hit Save, and (b) let two
+    // people editing different kids at once stomp each other's changes.
+    const delta = {};
+    activeKids().forEach(k => { if (local[k.id] !== savedLocal[k.id]) delta[k.id] = local[k.id]; });
     try {
       if (isToday) {
-        await actions.saveStatuses(local);
+        await actions.saveStatuses(local, delta);
       } else {
-        await window.saveAttendance(selDate, local);
+        await window.saveAttendance(selDate, delta);
       }
       setSavedLocal({ ...local });
     } catch (e) {
@@ -4236,10 +4241,13 @@ function ClubScreen({ params }) {
   async function toggleAtt(childId) {
     const cur = attData[childId] || 'absent';
     const next = cur === 'present' ? 'absent' : 'present';
-    const updated = { ...attData, [childId]: next };
-    setAttData(updated);
+    setAttData(prev => ({ ...prev, [childId]: next }));
     setAttSaving(true);
-    await window.saveClubAttendance(club.id, attDate, updated).catch(() => {});
+    // Only this one child, not the whole roster — otherwise every tap
+    // re-sends everyone else's last-known status too, which stomps another
+    // staff member's own tap on a different kid with a stale copy (and
+    // wrongly attributes it to whoever tapped last, see Marked by).
+    await window.saveClubAttendance(club.id, attDate, { [childId]: next }).catch(() => {});
     setAttSaving(false);
   }
 
