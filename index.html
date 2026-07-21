@@ -2884,6 +2884,16 @@ function PayRangeSheet({ kid, tariff, price, loadHistory, loadAttendanceHistory,
         d.setDate(d.getDate() + 1);
       }
     });
+    // A carried-over day moves the paid mark from the missed day it names
+    // (embedded in Marked by, e.g. "Система: перенос пропуска 21.07.2026")
+    // onto the new day it adds — the total count of paid days doesn't grow,
+    // it just shifts by one, so the missed day itself no longer shows as
+    // paid. Detected off Marked by's text rather than Tariff, since Club
+    // payment log has no Tariff column at all (only the garden one does).
+    entries.forEach(h => {
+      const m = (h.markedBy || '').match(/^Система: перенос пропуска (\d{2}\.\d{2}\.\d{4})/);
+      if (m) set.delete(normDate(m[1]));
+    });
     return set;
   }, [history, legacyCoverage]);
 
@@ -3059,6 +3069,11 @@ function PayRangeSheet({ kid, tariff, price, loadHistory, loadAttendanceHistory,
                   background: '#FBF7F2', borderRadius: 12, padding: '8px 12px' }}>
                   <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>
                     {h.from.split('.').slice(0,2).join('.')}–{h.until} · {fmtMoney(h.amount)}
+                    {h.markedBy && (
+                      <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--ink-faint)', marginTop: 1 }}>
+                        {h.markedBy}
+                      </div>
+                    )}
                   </span>
                   <button onClick={() => handleDelete(h.id)} disabled={deletingId === h.id}
                     style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 16,
