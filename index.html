@@ -4464,19 +4464,26 @@ const FONTS = {
 // top of whatever the day's status is, same as the gold paid-day badge in
 // the payments calendar. 'unpaid' had no clear use and is gone for now.
 const STAFF_STATUSES = [
-  { id: 'present', emoji: '✅', ru: 'Работает',    en: 'Working'      },
-  { id: 'absent',  emoji: '❌', ru: 'Нет на месте', en: 'Absent'      },
-  { id: 'late',    emoji: '🕐', ru: 'Опоздал(а)',  en: 'Late'         },
-  { id: 'sick',    emoji: '🤒', ru: 'Болеет',      en: 'Sick'         },
-  { id: 'day-off', emoji: '🏖️', ru: 'Выходной',   en: 'Day off'      },
+  { id: 'present',  emoji: '✅', ru: 'Работает',    en: 'Working'      },
+  { id: 'half-day', emoji: '🌗', ru: 'Полдня',      en: 'Half day'     },
+  { id: 'absent',   emoji: '❌', ru: 'Нет на месте', en: 'Absent'      },
+  { id: 'late',     emoji: '🕐', ru: 'Опоздал(а)',  en: 'Late'         },
+  { id: 'sick',     emoji: '🤒', ru: 'Болеет',      en: 'Sick'         },
+  { id: 'day-off',  emoji: '🏖️', ru: 'Выходной',   en: 'Day off'      },
 ];
 
+// How much of a full day's pay each status is worth — everything not
+// listed (absent/sick/day-off) is 0. Used by StaffMonthlyScreen's salary
+// and "worked" total instead of a flat count, so a half day genuinely
+// counts as half instead of showing up as a full paid day.
+const STAFF_STATUS_WORKED_VALUE = { present: 1, 'half-day': 0.5, late: 1 };
+
 const SSTAFF_COLOR = {
-  present: '#D4F0DF', absent: '#FFE0E0', late: '#FBE7A8',
+  present: '#D4F0DF', 'half-day': '#FBE0C0', absent: '#FFE0E0', late: '#FBE7A8',
   sick: '#FBD9E1', 'day-off': '#E8D5FB',
 };
 const SSTAFF_INK = {
-  present: '#1f7a55', absent: '#a03030', late: '#8a6410',
+  present: '#1f7a55', 'half-day': '#7A3D00', absent: '#a03030', late: '#8a6410',
   sick: '#a8456a', 'day-off': '#5a2a86',
 };
 
@@ -4829,23 +4836,29 @@ function StaffScheduleScreen() {
     setPicker(null);
   }
 
-  const NAME_W = 100;
-  const CELL_W = 34;
-  const CELL_H = 32;
+  const NAME_W = 72;
+  const CELL_W = 46;
+  const CELL_H = 40;
+  // Weekends aren't workdays for this staff, so they never get a status —
+  // dropping those columns entirely (not just graying them out) frees up
+  // real width to make the days that matter bigger and actually readable.
+  const weekdays = Array.from({length: daysInMonth}, (_, i) => i + 1)
+    .filter(d => { const dow = new Date(year, month-1, d).getDay(); return dow !== 0 && dow !== 6; });
 
   return (
     <div style={{ paddingBottom: 32 }}>
       {/* Month nav */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, padding: '2px 20px 16px' }}>
         <button onClick={prevMonth} className="bk-press" style={{
-          width: 36, height: 36, border: 'none', cursor: 'pointer',
-          background: '#EDE8E0', borderRadius: 10, fontSize: 18, fontWeight: 700, color: 'var(--ink)' }}>‹</button>
-        <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--ink)', minWidth: 140, textAlign: 'center' }}>
+          border: 'none', background: 'none', cursor: 'pointer', padding: '0 10px',
+          display: 'grid', placeItems: 'center' }}><Chevron dir="left" size={20} /></button>
+        <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--ink)', minWidth: 140, textAlign: 'center',
+          fontFamily: 'var(--font-display)' }}>
           {window.__lang === 'ru' ? MONTHS_RU[month-1] : MONTHS_EN[month-1]} {year}
         </span>
         <button onClick={nextMonth} className="bk-press" style={{
-          width: 36, height: 36, border: 'none', cursor: 'pointer',
-          background: '#EDE8E0', borderRadius: 10, fontSize: 18, fontWeight: 700, color: 'var(--ink)' }}>›</button>
+          border: 'none', background: 'none', cursor: 'pointer', padding: '0 10px',
+          display: 'grid', placeItems: 'center' }}><Chevron dir="right" size={20} /></button>
       </div>
 
       {loading && (
@@ -4860,22 +4873,17 @@ function StaffScheduleScreen() {
       {!loading && staff.length > 0 && (
         <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }}>
           <div style={{ display: 'inline-block', paddingLeft: 12, paddingRight: 16,
-            minWidth: NAME_W + daysInMonth * (CELL_W + 2) + 24 }}>
+            minWidth: NAME_W + weekdays.length * (CELL_W + 3) + 24 }}>
 
             {/* Day-number header */}
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 5 }}>
               <div style={{ width: NAME_W, flexShrink: 0 }} />
-              {Array.from({length: daysInMonth}, (_, i) => i + 1).map(d => {
-                const dow = new Date(year, month-1, d).getDay();
-                const isWknd = dow === 0 || dow === 6;
-                return (
-                  <div key={d} style={{ width: CELL_W, flexShrink: 0, marginRight: 2,
-                    textAlign: 'center', fontSize: 10, fontWeight: 700,
-                    color: isWknd ? '#b03030' : 'var(--ink-faint)' }}>
-                    {d}
-                  </div>
-                );
-              })}
+              {weekdays.map(d => (
+                <div key={d} style={{ width: CELL_W, flexShrink: 0, marginRight: 3,
+                  textAlign: 'center', fontSize: 11, fontWeight: 700, color: 'var(--ink-faint)' }}>
+                  {d}
+                </div>
+              ))}
             </div>
 
             {/* Staff rows */}
@@ -4884,28 +4892,34 @@ function StaffScheduleScreen() {
               const firstName = parts[0];
               const rest = parts.slice(1).join(' ');
               return (
-                <div key={s.name} style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
-                  <div style={{ width: NAME_W, flexShrink: 0, paddingRight: 6, overflow: 'hidden' }}>
-                    <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink)',
+                <div key={s.name} style={{ display: 'flex', alignItems: 'center', marginBottom: 5 }}>
+                  <div style={{ width: NAME_W, flexShrink: 0, paddingRight: 5, overflow: 'hidden' }}>
+                    <span style={{ fontSize: 11.5, fontWeight: 800, color: 'var(--ink)',
                       display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {firstName}
-                      {rest && <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--ink-soft)', marginLeft: 3 }}>{rest}</span>}
                     </span>
+                    {rest && <span style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--ink-soft)',
+                      display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{rest}</span>}
                   </div>
-                  {Array.from({length: daysInMonth}, (_, i) => i + 1).map(d => {
+                  {weekdays.map(d => {
                     const rec = getCell(s.name, d);
                     const st  = rec?.status || null;
                     const ss  = st ? STAFF_STATUSES.find(x => x.id === st) : null;
-                    const dow = new Date(year, month-1, d).getDay();
-                    const isWknd = dow === 0 || dow === 6;
-                    const bg = st ? SSTAFF_COLOR[st] : (isWknd ? '#EDE8E0' : '#F5F3EE');
+                    const bg  = st ? SSTAFF_COLOR[st] : '#F5F3EE';
+                    const stickers = [];
+                    if (rec?.transfer) stickers.push('🚌');
+                    if (rec?.extra) stickers.push('⏰');
                     return (
                       <button key={d} onClick={() => openPicker(s.name, d)} className="bk-press"
-                        style={{ width: CELL_W, height: CELL_H, flexShrink: 0, marginRight: 2,
-                          border: 'none', cursor: 'pointer', borderRadius: 7,
-                          background: bg, fontSize: 13, fontFamily: 'inherit',
+                        style={{ position: 'relative', width: CELL_W, height: CELL_H, flexShrink: 0, marginRight: 3,
+                          border: 'none', cursor: 'pointer', borderRadius: 9,
+                          background: bg, fontSize: 17, fontFamily: 'inherit',
                           display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         {ss?.emoji || ''}
+                        {stickers.map((emoji, si) => (
+                          <span key={emoji} style={{ position: 'absolute',
+                            [si === 0 ? 'top' : 'bottom']: -4, right: -4, fontSize: 11 }}>{emoji}</span>
+                        ))}
                       </button>
                     );
                   })}
@@ -4974,8 +4988,7 @@ function ScheduleCellPicker({ picker, onClose, onPick }) {
             const sel = status === ss.id;
             return (
               <button key={ss.id} onClick={() => setStatus(ss.id)} className="bk-press"
-                style={{ border: sel ? `2px solid ${SSTAFF_INK[ss.id]}` : '2px solid transparent',
-                  cursor: 'pointer', fontFamily: 'inherit',
+                style={{ border: 'none', cursor: 'pointer', fontFamily: 'inherit',
                   background: sel ? SSTAFF_COLOR[ss.id] : '#F5F3EE',
                   borderRadius: 12, padding: '8px 4px',
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
@@ -5144,7 +5157,6 @@ function StaffDailyScreen({ params, go }) {
                   padding: '6px 12px', borderRadius: 999,
                   background: status === opt.id ? (SSTAFF_COLOR[opt.id] || '#B07848') : '#F0EBE3',
                   color: status === opt.id ? (SSTAFF_INK[opt.id] || '#fff') : 'var(--ink-soft)',
-                  outline: status === opt.id ? `2px solid ${SSTAFF_INK[opt.id] || '#B07848'}` : 'none',
                   transition: 'all 0.12s' }}>
                   {opt.emoji} {window.__lang === 'en' ? opt.en : opt.ru}
                 </button>
@@ -5217,6 +5229,10 @@ function StaffMonthlyScreen() {
   const [staff, setStaff] = React.useState([]);
   const [data, setData]   = React.useState({});
   const [loading, setLoading] = React.useState(true);
+  // One person at a time, flipped through with the arrows below their name
+  // — a long scrolling list of cards left no room to make any single
+  // person's calendar bigger, this way each one gets the full screen.
+  const [personIdx, setPersonIdx] = React.useState(0);
 
   React.useEffect(() => {
     setLoading(true);
@@ -5225,6 +5241,10 @@ function StaffMonthlyScreen() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [month]);
+
+  React.useEffect(() => {
+    setPersonIdx(i => Math.min(i, Math.max(0, staff.length - 1)));
+  }, [staff]);
 
   const RU_MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
   const EN_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -5245,16 +5265,27 @@ function StaffMonthlyScreen() {
     const days = data[name] || {};
     return Object.values(days).filter(d => d.status === statusId).length;
   }
+  // Sums each day's worked fraction (half day counts as 0.5) instead of
+  // just counting days, so salary reflects a genuine half day worked
+  // instead of paying it as a full one.
+  function workedDays(name) {
+    const days = data[name] || {};
+    return Object.values(days).reduce((sum, d) => sum + (STAFF_STATUS_WORKED_VALUE[d.status] || 0), 0);
+  }
+
+  const s = staff[personIdx];
 
   return (
     <div style={{ padding: '4px 20px 28px' }}>
-      {/* Month navigation — same flat-arrow style as MiniCalendar / AttendanceHistorySheet */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-        <button onClick={prevMonth} style={{ border: 'none', background: 'none', fontSize: 24, cursor: 'pointer', color: 'var(--ink)', padding: '0 10px' }}>‹</button>
-        <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>
+      {/* Month navigation */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, marginBottom: 14 }}>
+        <button onClick={prevMonth} className="bk-press" style={{
+          border: 'none', background: 'none', cursor: 'pointer', padding: '0 10px' }}><Chevron dir="left" size={18} /></button>
+        <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--ink-soft)', minWidth: 130, textAlign: 'center' }}>
           {monthLabel}
         </div>
-        <button onClick={nextMonth} style={{ border: 'none', background: 'none', fontSize: 24, cursor: 'pointer', color: 'var(--ink)', padding: '0 10px' }}>›</button>
+        <button onClick={nextMonth} className="bk-press" style={{
+          border: 'none', background: 'none', cursor: 'pointer', padding: '0 10px' }}><Chevron dir="right" size={18} /></button>
       </div>
 
       {loading && <div style={{ textAlign: 'center', padding: 40, color: 'var(--ink-faint)', fontSize: 13 }}>…</div>}
@@ -5265,14 +5296,15 @@ function StaffMonthlyScreen() {
         </div>
       )}
 
-      {!loading && staff.map(s => {
-        const worked  = countStatus(s.name, 'present') + countStatus(s.name, 'late');
-        const sick    = countStatus(s.name, 'sick');
-        const dayOff  = countStatus(s.name, 'day-off');
-        const absent  = countStatus(s.name, 'absent');
-        const allDays = data[s.name] || {};
-        const rate    = parseFloat(s.rate) || 0;
-        const salary  = rate > 0 ? worked * rate : null;
+      {!loading && s && (() => {
+        const worked   = workedDays(s.name);
+        const halfDays = countStatus(s.name, 'half-day');
+        const sick     = countStatus(s.name, 'sick');
+        const dayOff   = countStatus(s.name, 'day-off');
+        const absent   = countStatus(s.name, 'absent');
+        const allDays  = data[s.name] || {};
+        const rate     = parseFloat(s.rate) || 0;
+        const salary   = rate > 0 ? worked * rate : null;
         // Transfer and overtime are both "extras" — independent of the
         // day's status, someone can be "present" and still have done
         // either (or both) that same day — so both get the same treatment:
@@ -5289,12 +5321,18 @@ function StaffMonthlyScreen() {
           .sort((a, b) => a - b);
 
         return (
-          <Card key={s.name} pad={14} style={{ marginBottom: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-              <Avatar emoji={positionEmoji(s.position)} color="#EDE8E0" size={40} />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--ink)' }}>{s.name}</div>
-                <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{s.position}</div>
+          <>
+            {/* Person navigation — flip through staff one at a time */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+              <button onClick={() => setPersonIdx(i => Math.max(0, i - 1))} disabled={personIdx === 0}
+                className="bk-press" style={{ border: 'none', background: 'none', cursor: personIdx === 0 ? 'default' : 'pointer',
+                  padding: 6, opacity: personIdx === 0 ? 0.25 : 1 }}><Chevron dir="left" size={22} /></button>
+              <Avatar emoji={positionEmoji(s.position)} color="#EDE8E0" size={44} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 800, fontSize: 15.5, color: 'var(--ink)' }}>{s.name}</div>
+                <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>
+                  {s.position} · {personIdx + 1}/{staff.length}
+                </div>
               </div>
               {salary !== null && (
                 <div style={{ textAlign: 'right' }}>
@@ -5302,91 +5340,102 @@ function StaffMonthlyScreen() {
                     {salary.toLocaleString()}
                   </div>
                   <div style={{ fontSize: 10.5, color: 'var(--ink-faint)', fontWeight: 600 }}>
-                    {rate.toLocaleString()} × {worked}
+                    {rate.toLocaleString()} × {worked % 1 === 0 ? worked : worked.toFixed(1)}
                   </div>
                 </div>
               )}
+              <button onClick={() => setPersonIdx(i => Math.min(staff.length - 1, i + 1))} disabled={personIdx === staff.length - 1}
+                className="bk-press" style={{ border: 'none', background: 'none', cursor: personIdx === staff.length - 1 ? 'default' : 'pointer',
+                  padding: 6, opacity: personIdx === staff.length - 1 ? 0.25 : 1 }}><Chevron dir="right" size={22} /></button>
             </div>
 
-            {/* Calendar mini-grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 5, marginBottom: 12 }}>
-              {Array.from({ length: daysInMonth }, (_, i) => {
-                const d = String(i + 1).padStart(2, '0');
-                const key = `${month}-${d}`;
-                const rec = allDays[key];
-                const st = rec?.status;
-                const time = st === 'late' && rec?.arrival_time ? rec.arrival_time : null;
-                // Both stickers stack in the same top-right spot rather than
-                // opposite corners — whichever applies goes there first, and
-                // if both apply the second one sits just underneath instead
-                // of claiming a corner of its own.
-                const stickers = [];
-                if (rec?.transfer) stickers.push('🚌');
-                if (rec?.extra) stickers.push('⏰');
-                return (
-                  <div key={d} style={{
-                    position: 'relative', borderRadius: 9, fontSize: 13, fontWeight: 800,
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    padding: '6px 2px',
-                    background: st ? (SSTAFF_COLOR[st] || '#EDE8E0') : '#F5F2EE',
-                    color: st ? (SSTAFF_INK[st] || '#5a4a30') : '#C8BEB0' }}>
-                    <span>{i + 1}</span>
-                    {time && <span style={{ fontSize: 10, lineHeight: 1.2, opacity: 0.85 }}>{time.slice(0,5)}</span>}
-                    {stickers.map((emoji, si) => (
-                      <span key={emoji} style={{ position: 'absolute', top: -4 + si * 14, right: -4, fontSize: 13 }}>{emoji}</span>
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Summary chips */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
-              <span style={{ background: '#D4F0DF', color: '#1f7a55', padding: '4px 11px', borderRadius: 999, fontSize: 12, fontWeight: 700 }}>
-                ✅ {worked} {L('дн', 'd')}
-              </span>
-              {sick > 0 && <span style={{ background: '#FBD9E1', color: '#a8456a', padding: '4px 11px', borderRadius: 999, fontSize: 12, fontWeight: 700 }}>
-                🤒 {sick}
-              </span>}
-              {dayOff > 0 && <span style={{ background: '#E8D5FB', color: '#5a2a86', padding: '4px 11px', borderRadius: 999, fontSize: 12, fontWeight: 700 }}>
-                🏖️ {dayOff}
-              </span>}
-              {absent > 0 && <span style={{ background: '#FFE0E0', color: '#a03030', padding: '4px 11px', borderRadius: 999, fontSize: 12, fontWeight: 700 }}>
-                ❌ {absent}
-              </span>}
-            </div>
-
-            {/* Extras — transfer (bus escort) and overtime, both extra-paid
-                and independent of the day's status, so shown separately
-                with their own dates rather than folded into the status
-                chips above. Half-days on transfer count as 0.5 toward the
-                total, matching Ольга's own paper tracking ("18 and half
-                days"); overtime has no half-day case. */}
-            {transferEntries.length > 0 && (
-              <div style={{ marginTop: 8, background: '#EAF4FD', borderRadius: 12, padding: '8px 11px',
-                display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 12, fontWeight: 800, color: '#1f5f86' }}>
-                  🚌 {L('Трансфер', 'Transfer')}: {transferTotal % 1 === 0 ? transferTotal : `${Math.floor(transferTotal)}.5`} {L('дн', 'd')}
-                </span>
-                <span style={{ fontSize: 11.5, color: '#1f5f86', opacity: 0.85 }}>
-                  ({transferEntries.map(e => e.half ? `${e.day}½` : `${e.day}`).join(', ')})
-                </span>
+            <Card pad={14}>
+              {/* Calendar mini-grid — one person fills the whole screen now,
+                  so this can be noticeably bigger than when it had to share
+                  space with everyone else's card in a scrolling list. */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, marginBottom: 14 }}>
+                {Array.from({ length: daysInMonth }, (_, i) => {
+                  const d = String(i + 1).padStart(2, '0');
+                  const key = `${month}-${d}`;
+                  const rec = allDays[key];
+                  const st = rec?.status;
+                  const time = st === 'late' && rec?.arrival_time ? rec.arrival_time : null;
+                  // First sticker takes the top-right corner; a second one
+                  // goes to the bottom-right corner instead of stacking
+                  // right under the first — two badges crammed at the top
+                  // of such a small cell read as clutter.
+                  const stickers = [];
+                  if (rec?.transfer) stickers.push('🚌');
+                  if (rec?.extra) stickers.push('⏰');
+                  return (
+                    <div key={d} style={{
+                      position: 'relative', borderRadius: 11, fontSize: 16, fontWeight: 800,
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                      padding: '10px 2px',
+                      background: st ? (SSTAFF_COLOR[st] || '#EDE8E0') : '#F5F2EE',
+                      color: st ? (SSTAFF_INK[st] || '#5a4a30') : '#C8BEB0' }}>
+                      <span>{i + 1}</span>
+                      {time && <span style={{ fontSize: 11, lineHeight: 1.2, opacity: 0.85 }}>{time.slice(0,5)}</span>}
+                      {stickers.map((emoji, si) => (
+                        <span key={emoji} style={{ position: 'absolute',
+                          [si === 0 ? 'top' : 'bottom']: -5, right: -5, fontSize: 12 }}>{emoji}</span>
+                      ))}
+                    </div>
+                  );
+                })}
               </div>
-            )}
-            {extraDays.length > 0 && (
-              <div style={{ marginTop: 8, background: '#EAF4FD', borderRadius: 12, padding: '8px 11px',
-                display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 12, fontWeight: 800, color: '#1f5f86' }}>
-                  ⏰ {L('Переработка', 'Overtime')}: {extraDays.length} {L('дн', 'd')}
+
+              {/* Summary chips */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+                <span style={{ background: '#D4F0DF', color: '#1f7a55', padding: '4px 11px', borderRadius: 999, fontSize: 12, fontWeight: 700 }}>
+                  ✅ {worked % 1 === 0 ? worked : worked.toFixed(1)} {L('дн', 'd')}
                 </span>
-                <span style={{ fontSize: 11.5, color: '#1f5f86', opacity: 0.85 }}>
-                  ({extraDays.join(', ')})
-                </span>
+                {halfDays > 0 && <span style={{ background: SSTAFF_COLOR['half-day'], color: SSTAFF_INK['half-day'], padding: '4px 11px', borderRadius: 999, fontSize: 12, fontWeight: 700 }}>
+                  🌗 {halfDays}
+                </span>}
+                {sick > 0 && <span style={{ background: '#FBD9E1', color: '#a8456a', padding: '4px 11px', borderRadius: 999, fontSize: 12, fontWeight: 700 }}>
+                  🤒 {sick}
+                </span>}
+                {dayOff > 0 && <span style={{ background: '#E8D5FB', color: '#5a2a86', padding: '4px 11px', borderRadius: 999, fontSize: 12, fontWeight: 700 }}>
+                  🏖️ {dayOff}
+                </span>}
+                {absent > 0 && <span style={{ background: '#FFE0E0', color: '#a03030', padding: '4px 11px', borderRadius: 999, fontSize: 12, fontWeight: 700 }}>
+                  ❌ {absent}
+                </span>}
               </div>
-            )}
-          </Card>
+
+              {/* Extras — transfer (bus escort) and overtime, both extra-paid
+                  and independent of the day's status, so shown separately
+                  with their own dates rather than folded into the status
+                  chips above. Half-days on transfer count as 0.5 toward the
+                  total, matching Ольга's own paper tracking ("18 and half
+                  days"); overtime has no half-day case. */}
+              {transferEntries.length > 0 && (
+                <div style={{ marginTop: 8, background: '#EAF4FD', borderRadius: 12, padding: '8px 11px',
+                  display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: '#1f5f86' }}>
+                    🚌 {L('Трансфер', 'Transfer')}: {transferTotal % 1 === 0 ? transferTotal : `${Math.floor(transferTotal)}.5`} {L('дн', 'd')}
+                  </span>
+                  <span style={{ fontSize: 11.5, color: '#1f5f86', opacity: 0.85 }}>
+                    ({transferEntries.map(e => e.half ? `${e.day}½` : `${e.day}`).join(', ')})
+                  </span>
+                </div>
+              )}
+              {extraDays.length > 0 && (
+                <div style={{ marginTop: 8, background: '#EAF4FD', borderRadius: 12, padding: '8px 11px',
+                  display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: '#1f5f86' }}>
+                    ⏰ {L('Переработка', 'Overtime')}: {extraDays.length} {L('дн', 'd')}
+                  </span>
+                  <span style={{ fontSize: 11.5, color: '#1f5f86', opacity: 0.85 }}>
+                    ({extraDays.join(', ')})
+                  </span>
+                </div>
+              )}
+            </Card>
+          </>
         );
-      })}
+      })()}
     </div>
   );
 }
