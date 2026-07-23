@@ -4654,7 +4654,7 @@ function TeamScreen({ go }) {
   const today = todayStr();
 
   return (
-    <div style={{ padding: '8px 20px 32px' }}>
+    <div style={{ padding: '4px 20px 28px' }}>
       {/* Quick action buttons */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
         <button onClick={() => go('staff-daily', { date: today })} className="bk-press" style={{
@@ -4686,52 +4686,47 @@ function TeamScreen({ go }) {
         </div>
       )}
 
-      {(staff || []).map(s => {
-        const days = contractDaysLeft(s.contractEnd);
-        const isExpired  = days !== null && days < 0;
-        const isExpiring = days !== null && days >= 0 && days <= 30;
-        return (
-          <div key={s.name} style={{ background: 'var(--card)', borderRadius: 18, padding: '14px 16px',
-            marginBottom: 12, display: 'flex', alignItems: 'center', gap: 14,
-            boxShadow: '0 2px 10px rgba(60,40,20,0.07)' }}>
-            <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#EDE8E0',
-              display: 'grid', placeItems: 'center', fontSize: 24, flexShrink: 0 }}>
-              {positionEmoji(s.position)}
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--ink)' }}>{s.name}</div>
-              <div style={{ fontSize: 12.5, color: 'var(--ink-soft)', fontWeight: 600, marginTop: 2 }}>{s.position}</div>
-              {s.contractEnd && (
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 5,
-                  background: isExpired ? '#FFE0E0' : isExpiring ? '#FBE7A8' : '#EDE8E0',
-                  color: isExpired ? '#a03030' : isExpiring ? '#8a6410' : '#8a7a60',
-                  padding: '3px 10px', borderRadius: 999, fontSize: 11.5, fontWeight: 700 }}>
-                  {isExpired ? '⚠️' : isExpiring ? '⏳' : '📄'}
-                  {L('Договор до', 'Until')} {s.contractEnd}
-                  {isExpired && ` — ${L('истёк', 'EXPIRED')}`}
-                  {isExpiring && !isExpired && ` (${days} ${L('дн', 'd')})`}
-                </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {(staff || []).map(s => {
+          const days = contractDaysLeft(s.contractEnd);
+          const isExpired  = days !== null && days < 0;
+          const isExpiring = days !== null && days >= 0 && days <= 30;
+          return (
+            <Card key={s.name} pad={12} onClick={() => { setEditMember(s); setFormOpen(true); }}
+              style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2' }}>
+              <Avatar emoji={positionEmoji(s.position)} color="#EDE8E0" size={46} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{s.name}</div>
+                <div style={{ fontSize: 12.5, color: 'var(--ink-soft)', fontWeight: 600, marginTop: 2 }}>{s.position}</div>
+                {s.contractEnd && (
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 5,
+                    background: isExpired ? '#FFE0E0' : isExpiring ? '#FBE7A8' : '#EDE8E0',
+                    color: isExpired ? '#a03030' : isExpiring ? '#8a6410' : '#8a7a60',
+                    padding: '3px 10px', borderRadius: 999, fontSize: 11.5, fontWeight: 700 }}>
+                    {isExpired ? '⚠️' : isExpiring ? '⏳' : '📄'}
+                    {L('Договор до', 'Until')} {s.contractEnd}
+                    {isExpired && ` — ${L('истёк', 'EXPIRED')}`}
+                    {isExpiring && !isExpired && ` (${days} ${L('дн', 'd')})`}
+                  </div>
+                )}
+              </div>
+              {s.phone && (
+                <a href={`tel:${s.phone}`} onClick={e => e.stopPropagation()}
+                  style={{ width: 36, height: 36, borderRadius: '50%', background: '#D4F0DF',
+                    display: 'grid', placeItems: 'center', fontSize: 16, flexShrink: 0,
+                    textDecoration: 'none' }}>📞</a>
               )}
-            </div>
-            {s.phone && (
-              <a href={`tel:${s.phone}`} onClick={e => e.stopPropagation()}
-                style={{ width: 36, height: 36, borderRadius: '50%', background: '#D4F0DF',
-                  display: 'grid', placeItems: 'center', fontSize: 16, flexShrink: 0,
-                  textDecoration: 'none' }}>📞</a>
-            )}
-            <button onClick={() => { setEditMember(s); setFormOpen(true); }} className="bk-press" style={{
-              width: 36, height: 36, borderRadius: '50%', background: '#EDE8E0',
-              border: 'none', cursor: 'pointer', display: 'grid', placeItems: 'center',
-              fontSize: 15, flexShrink: 0 }}>✏️</button>
-          </div>
-        );
-      })}
+              <Chevron />
+            </Card>
+          );
+        })}
+      </div>
 
       {/* Add button */}
       <button onClick={() => { setEditMember(null); setFormOpen(true); }} className="bk-press" style={{
         width: '100%', border: '2px dashed #C8BEB0', cursor: 'pointer', fontFamily: 'inherit',
         background: 'none', color: 'var(--ink-soft)', fontSize: 14, fontWeight: 700,
-        padding: '13px 0', borderRadius: 18, marginTop: 4 }}>
+        padding: '13px 0', borderRadius: 18, marginTop: 12 }}>
         + {L('Добавить сотрудника', 'Add staff member')}
       </button>
 
@@ -4824,7 +4819,7 @@ function StaffScheduleScreen() {
           width: 36, height: 36, border: 'none', cursor: 'pointer',
           background: '#EDE8E0', borderRadius: 10, fontSize: 18, fontWeight: 700, color: 'var(--ink)' }}>‹</button>
         <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--ink)', minWidth: 140, textAlign: 'center' }}>
-          {LANG === 'ru' ? MONTHS_RU[month-1] : MONTHS_EN[month-1]} {year}
+          {window.__lang === 'ru' ? MONTHS_RU[month-1] : MONTHS_EN[month-1]} {year}
         </span>
         <button onClick={nextMonth} className="bk-press" style={{
           width: 36, height: 36, border: 'none', cursor: 'pointer',
@@ -4905,7 +4900,7 @@ function StaffScheduleScreen() {
           <span key={ss.id} style={{ fontSize: 11, fontWeight: 600,
             background: SSTAFF_COLOR[ss.id], color: SSTAFF_INK[ss.id],
             padding: '3px 8px', borderRadius: 999 }}>
-            {ss.emoji} {LANG === 'ru' ? ss.ru : ss.en}
+            {ss.emoji} {window.__lang === 'ru' ? ss.ru : ss.en}
           </span>
         ))}
       </div>
@@ -4923,7 +4918,7 @@ function ScheduleCellPicker({ picker, onClose, onPick }) {
   const [saving,  setSaving]  = React.useState(false);
 
   const [, , dayStr] = picker.date.split('-');
-  const dowNames = LANG === 'ru'
+  const dowNames = window.__lang === 'ru'
     ? ['вс','пн','вт','ср','чт','пт','сб']
     : ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const dow = new Date(picker.date).getDay();
@@ -4965,7 +4960,7 @@ function ScheduleCellPicker({ picker, onClose, onPick }) {
                 <span style={{ fontSize: 20 }}>{ss.emoji}</span>
                 <span style={{ fontSize: 9.5, fontWeight: 700, lineHeight: 1.2, textAlign: 'center',
                   color: sel ? SSTAFF_INK[ss.id] : 'var(--ink-soft)' }}>
-                  {LANG === 'ru' ? ss.ru : ss.en}
+                  {window.__lang === 'ru' ? ss.ru : ss.en}
                 </span>
               </button>
             );
@@ -5012,10 +5007,10 @@ function ScheduleCellPicker({ picker, onClose, onPick }) {
 function StaffDailyScreen({ params }) {
   const initDate = (params && params.date) || todayStr();
   const [date, setDate] = React.useState(initDate);
+  const [calOpen, setCalOpen] = React.useState(false);
   const [staff, setStaff] = React.useState([]);
   const [records, setRecords] = React.useState({});
-  const [saving, setSaving] = React.useState(false);
-  const [saved, setSaved]   = React.useState(false);
+  const [savedRecords, setSavedRecords] = React.useState({});
 
   React.useEffect(() => {
     Promise.all([window.loadStaff(), window.getStaffAttendance(date)])
@@ -5026,18 +5021,12 @@ function StaffDailyScreen({ params }) {
           : s;
         setStaff(filtered);
         setRecords(rec);
+        setSavedRecords(rec);
       })
       .catch(() => {});
   }, [date]);
 
-  function prevDay() {
-    const d = new Date(date); d.setDate(d.getDate() - 1);
-    setDate(d.toISOString().slice(0, 10));
-  }
-  function nextDay() {
-    const d = new Date(date); d.setDate(d.getDate() + 1);
-    setDate(d.toISOString().slice(0, 10));
-  }
+  const hasChanges = JSON.stringify(records) !== JSON.stringify(savedRecords);
 
   function setStatus(name, status) {
     setRecords(r => ({ ...r, [name]: { ...(r[name] || {}), status } }));
@@ -5048,39 +5037,27 @@ function StaffDailyScreen({ params }) {
   function setNote(name, note) {
     setRecords(r => ({ ...r, [name]: { ...(r[name] || {}), note } }));
   }
-
-  async function save() {
-    setSaving(true);
-    try {
-      await window.saveStaffAttendance(date, records);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 1600);
-    } finally {
-      setSaving(false);
-    }
+  // 0 (none) -> 1 (full day) -> 0.5 (half day) -> 0 — matches Ольга's own
+  // "+" / "#" paper tracking for bus transfer duty
+  function cycleTransfer(name) {
+    const cur = (records[name] || {}).transfer || 0;
+    const next = cur === 0 ? 1 : cur === 1 ? 0.5 : 0;
+    setRecords(r => ({ ...r, [name]: { ...(r[name] || {}), transfer: next } }));
   }
 
-  const [dd, mm, yyyy] = (() => {
-    const d = new Date(date + 'T12:00:00');
-    const RU_MONTHS = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
-    const EN_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    return [d.getDate(), window.__lang === 'en' ? EN_MONTHS[d.getMonth()] : RU_MONTHS[d.getMonth()], d.getFullYear()];
-  })();
+  async function save() {
+    await window.saveStaffAttendance(date, records).catch(() => {});
+    setSavedRecords(records);
+  }
 
   return (
-    <div style={{ padding: '8px 20px 32px' }}>
+    <div style={{ padding: '4px 20px 28px' }}>
       {/* Date navigation */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-        <button onClick={prevDay} className="bk-press" style={{
-          border: 'none', cursor: 'pointer', background: '#EDE8E0', borderRadius: 12,
-          width: 38, height: 38, display: 'grid', placeItems: 'center', fontSize: 18, color: 'var(--ink)' }}>‹</button>
-        <div style={{ flex: 1, textAlign: 'center', fontWeight: 800, fontSize: 15, color: 'var(--ink)' }}>
-          {dd} {mm} {yyyy}
-        </div>
-        <button onClick={nextDay} className="bk-press" style={{
-          border: 'none', cursor: 'pointer', background: '#EDE8E0', borderRadius: 12,
-          width: 38, height: 38, display: 'grid', placeItems: 'center', fontSize: 18, color: 'var(--ink)' }}>›</button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+        <CalendarSquareButton date={date} onClick={() => setCalOpen(true)} />
       </div>
+      {calOpen && <Portal><MiniCalendar selected={date} onSelect={setDate} onClose={() => setCalOpen(false)}
+        disableWeekends={false} disableFuture={false} /></Portal>}
 
       {staff.length === 0 && (
         <div style={{ textAlign: 'center', padding: 40, color: 'var(--ink-faint)', fontSize: 13 }}>
@@ -5088,18 +5065,16 @@ function StaffDailyScreen({ params }) {
         </div>
       )}
 
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {staff.map(s => {
-        const rec    = records[s.name] || {};
-        const status = rec.status || 'present';
-        const isLate = status === 'late';
+        const rec      = records[s.name] || {};
+        const status   = rec.status || 'present';
+        const isLate   = status === 'late';
+        const transfer = rec.transfer || 0;
         return (
-          <div key={s.name} style={{ background: 'var(--card)', borderRadius: 18, padding: '14px 16px',
-            marginBottom: 12, boxShadow: '0 2px 10px rgba(60,40,20,0.07)' }}>
+          <Card key={s.name} pad={14}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-              <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#EDE8E0',
-                display: 'grid', placeItems: 'center', fontSize: 20, flexShrink: 0 }}>
-                {positionEmoji(s.position)}
-              </div>
+              <Avatar emoji={positionEmoji(s.position)} color="#EDE8E0" size={40} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--ink)' }}>{s.name}</div>
                 <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{s.position}</div>
@@ -5124,6 +5099,22 @@ function StaffDailyScreen({ params }) {
                 </button>
               ))}
             </div>
+            {/* Transfer (bus escort duty) — independent of status: someone
+                can be "present" AND have done transfer that same day, it's
+                extra-paid on top of their regular work. Tap cycles none ->
+                full day -> half day -> none, matching Ольга's own "+"/"#"
+                paper tracking. */}
+            <button onClick={() => cycleTransfer(s.name)} className="bk-press" style={{
+              marginTop: 8, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700,
+              padding: '6px 12px', borderRadius: 999,
+              background: transfer ? '#CDE8FB' : '#F0EBE3',
+              color: transfer ? '#1f5f86' : 'var(--ink-soft)',
+              outline: transfer ? '2px solid #1f5f86' : 'none',
+              transition: 'all 0.12s' }}>
+              🚌 {L('Трансфер', 'Transfer')}
+              {transfer === 1 && ` — ${L('весь день', 'full day')}`}
+              {transfer === 0.5 && ` — ${L('полдня', 'half day')}`}
+            </button>
             {/* Time picker for late */}
             {isLate && (
               <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -5145,19 +5136,12 @@ function StaffDailyScreen({ params }) {
                 color: 'var(--ink)', outline: 'none', lineHeight: 1.4,
                 overflow: 'hidden', minHeight: 34 }}
               onInput={e => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }} />
-          </div>
+          </Card>
         );
       })}
+      </div>
 
-      {staff.length > 0 && (
-        <button onClick={save} disabled={saving} className="bk-press" style={{
-          width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-display)',
-          background: saved ? '#D4F0DF' : '#B07848', color: saved ? '#1f7a55' : '#fff',
-          fontSize: 15, fontWeight: 800, padding: 14, borderRadius: 16, marginTop: 8,
-          transition: 'background 0.2s', opacity: saving ? 0.7 : 1 }}>
-          {saving ? '…' : saved ? `✅ ${L('Сохранено', 'Saved')}` : L('Сохранить', 'Save')}
-        </button>
-      )}
+      {staff.length > 0 && <SaveBar hasChanges={hasChanges} onSave={save} />}
     </div>
   );
 }
@@ -5202,18 +5186,14 @@ function StaffMonthlyScreen() {
   }
 
   return (
-    <div style={{ padding: '8px 20px 32px' }}>
-      {/* Month navigation */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-        <button onClick={prevMonth} className="bk-press" style={{
-          border: 'none', cursor: 'pointer', background: '#EDE8E0', borderRadius: 12,
-          width: 38, height: 38, display: 'grid', placeItems: 'center', fontSize: 18, color: 'var(--ink)' }}>‹</button>
-        <div style={{ flex: 1, textAlign: 'center', fontWeight: 800, fontSize: 15, color: 'var(--ink)' }}>
+    <div style={{ padding: '4px 20px 28px' }}>
+      {/* Month navigation — same flat-arrow style as MiniCalendar / AttendanceHistorySheet */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+        <button onClick={prevMonth} style={{ border: 'none', background: 'none', fontSize: 24, cursor: 'pointer', color: 'var(--ink)', padding: '0 10px' }}>‹</button>
+        <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>
           {monthLabel}
         </div>
-        <button onClick={nextMonth} className="bk-press" style={{
-          border: 'none', cursor: 'pointer', background: '#EDE8E0', borderRadius: 12,
-          width: 38, height: 38, display: 'grid', placeItems: 'center', fontSize: 18, color: 'var(--ink)' }}>›</button>
+        <button onClick={nextMonth} style={{ border: 'none', background: 'none', fontSize: 24, cursor: 'pointer', color: 'var(--ink)', padding: '0 10px' }}>›</button>
       </div>
 
       {loading && <div style={{ textAlign: 'center', padding: 40, color: 'var(--ink-faint)', fontSize: 13 }}>…</div>}
@@ -5234,15 +5214,20 @@ function StaffMonthlyScreen() {
         const allDays = data[s.name] || {};
         const rate    = parseFloat(s.rate) || 0;
         const salary  = rate > 0 ? worked * rate : null;
+        // transfer (bus escort) is extra-paid, independent of status — Ольга
+        // needs the specific dates at month's end (not just a count), and
+        // half-days count as 0.5 toward the total, matching her own "+"/"#"
+        // paper tracking ("18 and half days")
+        const transferEntries = Object.entries(allDays)
+          .filter(([, rec]) => rec.transfer)
+          .map(([date, rec]) => ({ day: Number(date.slice(-2)), half: rec.transfer === 0.5 }))
+          .sort((a, b) => a.day - b.day);
+        const transferTotal = transferEntries.reduce((sum, e) => sum + (e.half ? 0.5 : 1), 0);
 
         return (
-          <div key={s.name} style={{ background: 'var(--card)', borderRadius: 18, padding: '14px 16px',
-            marginBottom: 14, boxShadow: '0 2px 10px rgba(60,40,20,0.07)' }}>
+          <Card key={s.name} pad={14} style={{ marginBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-              <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#EDE8E0',
-                display: 'grid', placeItems: 'center', fontSize: 20, flexShrink: 0 }}>
-                {positionEmoji(s.position)}
-              </div>
+              <Avatar emoji={positionEmoji(s.position)} color="#EDE8E0" size={40} />
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--ink)' }}>{s.name}</div>
                 <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{s.position}</div>
@@ -5269,13 +5254,14 @@ function StaffMonthlyScreen() {
                 const time = st === 'late' && rec?.arrival_time ? rec.arrival_time : null;
                 return (
                   <div key={d} style={{
-                    borderRadius: 6, fontSize: 9, fontWeight: 800,
+                    position: 'relative', borderRadius: 6, fontSize: 9, fontWeight: 800,
                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                     padding: '3px 1px',
                     background: st ? (SSTAFF_COLOR[st] || '#EDE8E0') : '#F5F2EE',
                     color: st ? (SSTAFF_INK[st] || '#5a4a30') : '#C8BEB0' }}>
                     <span>{i + 1}</span>
                     {time && <span style={{ fontSize: 7, lineHeight: 1.2, opacity: 0.85 }}>{time.slice(0,5)}</span>}
+                    {rec?.transfer && <span style={{ position: 'absolute', top: -3, right: -3, fontSize: 9 }}>🚌</span>}
                   </div>
                 );
               })}
@@ -5302,7 +5288,24 @@ function StaffMonthlyScreen() {
                 ⏰ +{extra}
               </span>}
             </div>
-          </div>
+
+            {/* Transfer (bus escort) dates — extra-paid, shown separately
+                since it's not a day-status, someone can be "present" and
+                still have done transfer that same day. Half-days count as
+                0.5 toward the total and are marked "½" next to the date,
+                matching Ольга's own paper tracking ("18 and half days"). */}
+            {transferEntries.length > 0 && (
+              <div style={{ marginTop: 8, background: '#EAF4FD', borderRadius: 12, padding: '8px 11px',
+                display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 12, fontWeight: 800, color: '#1f5f86' }}>
+                  🚌 {L('Трансфер', 'Transfer')}: {transferTotal % 1 === 0 ? transferTotal : `${Math.floor(transferTotal)}.5`} {L('дн', 'd')}
+                </span>
+                <span style={{ fontSize: 11.5, color: '#1f5f86', opacity: 0.85 }}>
+                  ({transferEntries.map(e => e.half ? `${e.day}½` : `${e.day}`).join(', ')})
+                </span>
+              </div>
+            )}
+          </Card>
         );
       })}
     </div>
