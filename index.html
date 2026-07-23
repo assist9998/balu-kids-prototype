@@ -1775,9 +1775,12 @@ function HomeScreen({ go, statuses, feed, homeStyle }) {
       badge: `${rate}%` },
     { key: 'notifications', emoji: '⭐', color: '#FBD9E1', colorLight: '#FDF0F3', colorDark: '#C9ADBA', ink: '#a8456a', go: 'notifications',
       badge: unread ? `${unread} ${t('unread')}` : null, dot: unread > 0, count: unread },
-    // director-only (Ольга + Alex) — staff module, not for teachers
+    // director-only (Ольга + Alex) — staff module, not for teachers.
+    // Opens straight into today's Journal (marking who's in/out) rather
+    // than the staff-cards list — that's the thing actually used day to
+    // day, cards are one tap away from there instead.
     ...(window.__isDirector ? [
-      { key: 'team', emoji: '👩‍🏫', color: '#E8E0D5', colorLight: '#F2EDE8', colorDark: '#C0B5A8', ink: '#5a4a30', go: 'team',
+      { key: 'team', emoji: '👩‍🏫', color: '#E8E0D5', colorLight: '#F2EDE8', colorDark: '#C0B5A8', ink: '#5a4a30', go: 'staff-daily',
         badge: null },
     ] : []),
   ];
@@ -4451,24 +4454,35 @@ const FONTS = {
 
 // ── Staff helpers ─────────────────────────────────────────────────────────────
 
+// Only mutually-exclusive day statuses live here now — 'late' stays a
+// status (it already implies present, just with its own icon so it's
+// never confused with the overtime sticker below). Overtime and transfer
+// used to include 'extra' as a status too, which meant a day could only
+// ever show ONE of {late, extra} even though both can genuinely happen at
+// once (present, ran late that morning, AND worked overtime that
+// evening) — they're both "extras" now (see EXTRA_STICKERS), stuck on
+// top of whatever the day's status is, same as the gold paid-day badge in
+// the payments calendar. 'unpaid' had no clear use and is gone for now.
 const STAFF_STATUSES = [
   { id: 'present', emoji: '✅', ru: 'Работает',    en: 'Working'      },
   { id: 'absent',  emoji: '❌', ru: 'Нет на месте', en: 'Absent'      },
   { id: 'late',    emoji: '🕐', ru: 'Опоздал(а)',  en: 'Late'         },
   { id: 'sick',    emoji: '🤒', ru: 'Болеет',      en: 'Sick'         },
   { id: 'day-off', emoji: '🏖️', ru: 'Выходной',   en: 'Day off'      },
-  { id: 'unpaid',  emoji: '💸', ru: 'Без оплаты',  en: 'Unpaid'      },
-  { id: 'extra',   emoji: '⏰', ru: 'Переработка', en: 'Extra work'   },
 ];
 
 const SSTAFF_COLOR = {
   present: '#D4F0DF', absent: '#FFE0E0', late: '#FBE7A8',
-  sick: '#FBD9E1', 'day-off': '#E8D5FB', unpaid: '#E8E0D5', extra: '#CDE8FB',
+  sick: '#FBD9E1', 'day-off': '#E8D5FB',
 };
 const SSTAFF_INK = {
   present: '#1f7a55', absent: '#a03030', late: '#8a6410',
-  sick: '#a8456a', 'day-off': '#5a2a86', unpaid: '#5a4a30', extra: '#1f5f86',
+  sick: '#a8456a', 'day-off': '#5a2a86',
 };
+
+// The two "extras" — independent of status, can both be true the same day,
+// shown as small stickers on the day cell rather than as a status pill.
+const EXTRA_COLOR = '#CDE8FB', EXTRA_INK = '#1f5f86';
 
 function staffStatusLabel(id) {
   const s = STAFF_STATUSES.find(x => x.id === id);
@@ -5012,7 +5026,7 @@ function ScheduleCellPicker({ picker, onClose, onPick }) {
 
 // ── StaffDailyScreen ──────────────────────────────────────────────────────────
 
-function StaffDailyScreen({ params }) {
+function StaffDailyScreen({ params, go }) {
   const initDate = (params && params.date) || todayStr();
   const [date, setDate] = React.useState(initDate);
   const [calOpen, setCalOpen] = React.useState(false);
@@ -5052,6 +5066,10 @@ function StaffDailyScreen({ params }) {
     const next = cur === 0 ? 1 : cur === 1 ? 0.5 : 0;
     setRecords(r => ({ ...r, [name]: { ...(r[name] || {}), transfer: next } }));
   }
+  function toggleExtra(name) {
+    const cur = !!(records[name] || {}).extra;
+    setRecords(r => ({ ...r, [name]: { ...(r[name] || {}), extra: !cur } }));
+  }
 
   async function save() {
     await window.saveStaffAttendance(date, records).catch(() => {});
@@ -5060,6 +5078,30 @@ function StaffDailyScreen({ params }) {
 
   return (
     <div style={{ padding: '4px 20px 28px' }}>
+      {/* Quick links to the rest of the staff module — this screen is now
+          the entry point (see HomeScreen's team tile), cards/schedule/
+          monthly are a tap away instead of the other way around. */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+        <button onClick={() => go('team')} className="bk-press" style={{
+          flex: 1, minWidth: 100, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+          background: '#E8E0D5', color: '#5a4a30', fontSize: 12.5, fontWeight: 800,
+          padding: '11px 10px', borderRadius: 14 }}>
+          🗂️ {L('Сотрудники', 'Staff')}
+        </button>
+        <button onClick={() => go('staff-schedule')} className="bk-press" style={{
+          flex: 1, minWidth: 100, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+          background: '#D4F0DF', color: '#1f7a55', fontSize: 12.5, fontWeight: 800,
+          padding: '11px 10px', borderRadius: 14 }}>
+          📅 {L('Расписание', 'Schedule')}
+        </button>
+        <button onClick={() => go('staff-monthly')} className="bk-press" style={{
+          flex: 1, minWidth: 100, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+          background: '#CDE8FB', color: '#1f5f86', fontSize: 12.5, fontWeight: 800,
+          padding: '11px 10px', borderRadius: 14 }}>
+          📊 {L('Итог за месяц', 'Monthly')}
+        </button>
+      </div>
+
       {/* Date navigation */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
         <CalendarSquareButton date={date} onClick={() => setCalOpen(true)} />
@@ -5079,6 +5121,7 @@ function StaffDailyScreen({ params }) {
         const status   = rec.status || 'present';
         const isLate   = status === 'late';
         const transfer = rec.transfer || 0;
+        const extra    = !!rec.extra;
         return (
           <Card key={s.name} pad={14}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
@@ -5107,22 +5150,32 @@ function StaffDailyScreen({ params }) {
                 </button>
               ))}
             </div>
-            {/* Transfer (bus escort duty) — independent of status: someone
-                can be "present" AND have done transfer that same day, it's
-                extra-paid on top of their regular work. Tap cycles none ->
-                full day -> half day -> none, matching Ольга's own "+"/"#"
-                paper tracking. */}
-            <button onClick={() => cycleTransfer(s.name)} className="bk-press" style={{
-              marginTop: 8, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700,
-              padding: '6px 12px', borderRadius: 999,
-              background: transfer ? '#CDE8FB' : '#F0EBE3',
-              color: transfer ? '#1f5f86' : 'var(--ink-soft)',
-              outline: transfer ? '2px solid #1f5f86' : 'none',
-              transition: 'all 0.12s' }}>
-              🚌 {L('Трансфер', 'Transfer')}
-              {transfer === 1 && ` — ${L('весь день', 'full day')}`}
-              {transfer === 0.5 && ` — ${L('полдня', 'half day')}`}
-            </button>
+            {/* Extras — transfer (bus escort) and overtime, both
+                independent of status: someone can be "present" AND have
+                done either (or both) that same day, it's extra-paid on
+                top of their regular work. */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 8 }}>
+              <button onClick={() => cycleTransfer(s.name)} className="bk-press" style={{
+                border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700,
+                padding: '6px 12px', borderRadius: 999,
+                background: transfer ? EXTRA_COLOR : '#F0EBE3',
+                color: transfer ? EXTRA_INK : 'var(--ink-soft)',
+                outline: transfer ? `2px solid ${EXTRA_INK}` : 'none',
+                transition: 'all 0.12s' }}>
+                🚌 {L('Трансфер', 'Transfer')}
+                {transfer === 1 && ` — ${L('весь день', 'full day')}`}
+                {transfer === 0.5 && ` — ${L('полдня', 'half day')}`}
+              </button>
+              <button onClick={() => toggleExtra(s.name)} className="bk-press" style={{
+                border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700,
+                padding: '6px 12px', borderRadius: 999,
+                background: extra ? EXTRA_COLOR : '#F0EBE3',
+                color: extra ? EXTRA_INK : 'var(--ink-soft)',
+                outline: extra ? `2px solid ${EXTRA_INK}` : 'none',
+                transition: 'all 0.12s' }}>
+                ⏰ {L('Переработка', 'Overtime')}
+              </button>
+            </div>
             {/* Time picker for late */}
             {isLate && (
               <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -5213,24 +5266,27 @@ function StaffMonthlyScreen() {
       )}
 
       {!loading && staff.map(s => {
-        const worked  = countStatus(s.name, 'present') + countStatus(s.name, 'late') + countStatus(s.name, 'extra');
+        const worked  = countStatus(s.name, 'present') + countStatus(s.name, 'late');
         const sick    = countStatus(s.name, 'sick');
         const dayOff  = countStatus(s.name, 'day-off');
         const absent  = countStatus(s.name, 'absent');
-        const unpaid  = countStatus(s.name, 'unpaid');
-        const extra   = countStatus(s.name, 'extra');
         const allDays = data[s.name] || {};
         const rate    = parseFloat(s.rate) || 0;
         const salary  = rate > 0 ? worked * rate : null;
-        // transfer (bus escort) is extra-paid, independent of status — Ольга
-        // needs the specific dates at month's end (not just a count), and
-        // half-days count as 0.5 toward the total, matching her own "+"/"#"
-        // paper tracking ("18 and half days")
+        // Transfer and overtime are both "extras" — independent of the
+        // day's status, someone can be "present" and still have done
+        // either (or both) that same day — so both get the same treatment:
+        // a small sticker on the day cell, plus their own dates-list block
+        // below, rather than living in the status pills/chips above.
         const transferEntries = Object.entries(allDays)
           .filter(([, rec]) => rec.transfer)
           .map(([date, rec]) => ({ day: Number(date.slice(-2)), half: rec.transfer === 0.5 }))
           .sort((a, b) => a.day - b.day);
         const transferTotal = transferEntries.reduce((sum, e) => sum + (e.half ? 0.5 : 1), 0);
+        const extraDays = Object.entries(allDays)
+          .filter(([, rec]) => rec.extra)
+          .map(([date]) => Number(date.slice(-2)))
+          .sort((a, b) => a - b);
 
         return (
           <Card key={s.name} pad={14} style={{ marginBottom: 12 }}>
@@ -5253,23 +5309,32 @@ function StaffMonthlyScreen() {
             </div>
 
             {/* Calendar mini-grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, marginBottom: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 5, marginBottom: 12 }}>
               {Array.from({ length: daysInMonth }, (_, i) => {
                 const d = String(i + 1).padStart(2, '0');
                 const key = `${month}-${d}`;
                 const rec = allDays[key];
                 const st = rec?.status;
                 const time = st === 'late' && rec?.arrival_time ? rec.arrival_time : null;
+                // Both stickers stack in the same top-right spot rather than
+                // opposite corners — whichever applies goes there first, and
+                // if both apply the second one sits just underneath instead
+                // of claiming a corner of its own.
+                const stickers = [];
+                if (rec?.transfer) stickers.push('🚌');
+                if (rec?.extra) stickers.push('⏰');
                 return (
                   <div key={d} style={{
-                    position: 'relative', borderRadius: 6, fontSize: 9, fontWeight: 800,
+                    position: 'relative', borderRadius: 9, fontSize: 13, fontWeight: 800,
                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    padding: '3px 1px',
+                    padding: '6px 2px',
                     background: st ? (SSTAFF_COLOR[st] || '#EDE8E0') : '#F5F2EE',
                     color: st ? (SSTAFF_INK[st] || '#5a4a30') : '#C8BEB0' }}>
                     <span>{i + 1}</span>
-                    {time && <span style={{ fontSize: 7, lineHeight: 1.2, opacity: 0.85 }}>{time.slice(0,5)}</span>}
-                    {rec?.transfer && <span style={{ position: 'absolute', top: -3, right: -3, fontSize: 9 }}>🚌</span>}
+                    {time && <span style={{ fontSize: 10, lineHeight: 1.2, opacity: 0.85 }}>{time.slice(0,5)}</span>}
+                    {stickers.map((emoji, si) => (
+                      <span key={emoji} style={{ position: 'absolute', top: -4 + si * 14, right: -4, fontSize: 13 }}>{emoji}</span>
+                    ))}
                   </div>
                 );
               })}
@@ -5289,19 +5354,14 @@ function StaffMonthlyScreen() {
               {absent > 0 && <span style={{ background: '#FFE0E0', color: '#a03030', padding: '4px 11px', borderRadius: 999, fontSize: 12, fontWeight: 700 }}>
                 ❌ {absent}
               </span>}
-              {unpaid > 0 && <span style={{ background: '#E8E0D5', color: '#5a4a30', padding: '4px 11px', borderRadius: 999, fontSize: 12, fontWeight: 700 }}>
-                💸 {unpaid}
-              </span>}
-              {extra > 0 && <span style={{ background: '#CDE8FB', color: '#1f5f86', padding: '4px 11px', borderRadius: 999, fontSize: 12, fontWeight: 700 }}>
-                ⏰ +{extra}
-              </span>}
             </div>
 
-            {/* Transfer (bus escort) dates — extra-paid, shown separately
-                since it's not a day-status, someone can be "present" and
-                still have done transfer that same day. Half-days count as
-                0.5 toward the total and are marked "½" next to the date,
-                matching Ольга's own paper tracking ("18 and half days"). */}
+            {/* Extras — transfer (bus escort) and overtime, both extra-paid
+                and independent of the day's status, so shown separately
+                with their own dates rather than folded into the status
+                chips above. Half-days on transfer count as 0.5 toward the
+                total, matching Ольга's own paper tracking ("18 and half
+                days"); overtime has no half-day case. */}
             {transferEntries.length > 0 && (
               <div style={{ marginTop: 8, background: '#EAF4FD', borderRadius: 12, padding: '8px 11px',
                 display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -5310,6 +5370,17 @@ function StaffMonthlyScreen() {
                 </span>
                 <span style={{ fontSize: 11.5, color: '#1f5f86', opacity: 0.85 }}>
                   ({transferEntries.map(e => e.half ? `${e.day}½` : `${e.day}`).join(', ')})
+                </span>
+              </div>
+            )}
+            {extraDays.length > 0 && (
+              <div style={{ marginTop: 8, background: '#EAF4FD', borderRadius: 12, padding: '8px 11px',
+                display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 12, fontWeight: 800, color: '#1f5f86' }}>
+                  ⏰ {L('Переработка', 'Overtime')}: {extraDays.length} {L('дн', 'd')}
+                </span>
+                <span style={{ fontSize: 11.5, color: '#1f5f86', opacity: 0.85 }}>
+                  ({extraDays.join(', ')})
                 </span>
               </div>
             )}
@@ -5702,7 +5773,7 @@ function App() {
       case 'compose':       return <ComposeScreen back={back} actions={actions} />;
       case 'team':           return <TeamScreen go={go} />;
       case 'staff-schedule': return <StaffScheduleScreen />;
-      case 'staff-daily':    return <StaffDailyScreen params={p} />;
+      case 'staff-daily':    return <StaffDailyScreen params={p} go={go} />;
       case 'staff-monthly':  return <StaffMonthlyScreen />;
       default:              return null;
     }
