@@ -203,7 +203,7 @@
     position:          { ru: 'Должность',       en: 'Position' },
     phone:             { ru: 'Телефон',         en: 'Phone' },
     noStaff:           { ru: 'Сотрудников нет', en: 'No staff' },
-    monthSummary:      { ru: 'Итог за месяц',   en: 'Monthly summary' },
+    monthSummary:      { ru: 'Сводка',          en: 'Summary' },
     daysWorked:        { ru: 'Отработано',      en: 'Days worked' },
     daysSick:          { ru: 'Болезни',         en: 'Sick days' },
     daysDayOff:        { ru: 'Выходные',        en: 'Days off' },
@@ -4669,6 +4669,48 @@ function StaffFormSheet({ member, onClose, onSaved }) {
 
 // ── TeamScreen ────────────────────────────────────────────────────────────────
 
+// ── StaffTabBar ───────────────────────────────────────────────────────────────
+// Shared across all 4 staff screens (Team/Calendar-picker/Journal/Schedule/
+// Summary) so the same row of tabs stays put no matter which one you're on,
+// instead of each screen inventing its own ad-hoc "jump to the others"
+// buttons that only pointed at the *other* 3 and vanished once you were on
+// one of them.
+function StaffTabBar({ go, active }) {
+  const [calOpen, setCalOpen] = React.useState(false);
+  const today = todayStr();
+  const tabs = [
+    { key: 'team',           emoji: '🗂️', label: L('Сотрудники', 'Staff'),
+      onClick: () => go('team') },
+    { key: 'calendar',       emoji: '📅', label: L('Календарь', 'Calendar'),
+      onClick: () => setCalOpen(true) },
+    { key: 'staff-daily',    emoji: '📋', label: L('Журнал', 'Journal'),
+      onClick: () => go('staff-daily', { date: today }) },
+    { key: 'staff-schedule', emoji: '🗓️', label: L('Расписание', 'Schedule'),
+      onClick: () => go('staff-schedule') },
+    { key: 'staff-monthly',  emoji: '📊', label: L('Сводка', 'Summary'),
+      onClick: () => go('staff-monthly') },
+  ];
+  return (
+    <>
+      <div style={{ display: 'flex', gap: 7, marginBottom: 16, overflowX: 'auto', scrollbarWidth: 'none' }}>
+        {tabs.map(t => (
+          <button key={t.key} onClick={t.onClick} className="bk-press" style={{
+            flexShrink: 0, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+            padding: '8px 13px', borderRadius: 999, fontSize: 12.5, fontWeight: 700,
+            background: active === t.key ? '#B07848' : '#FBF7F2',
+            color: active === t.key ? '#fff' : 'var(--ink-soft)',
+            boxShadow: active === t.key ? '0 6px 14px -6px #B07848' : '0 1px 2px rgba(60,40,20,0.05)' }}>
+            {t.emoji} {t.label}
+          </button>
+        ))}
+      </div>
+      {calOpen && <Portal><MiniCalendar selected={today}
+        onSelect={d => { setCalOpen(false); go('staff-daily', { date: d }); }}
+        onClose={() => setCalOpen(false)} disableWeekends={false} disableFuture={false} /></Portal>}
+    </>
+  );
+}
+
 function TeamScreen({ go }) {
   const [staff,     setStaff]     = React.useState(null);
   const [formOpen,  setFormOpen]  = React.useState(false);
@@ -4680,31 +4722,9 @@ function TeamScreen({ go }) {
 
   React.useEffect(reload, []);
 
-  const today = todayStr();
-
   return (
     <div style={{ padding: '4px 20px 28px' }}>
-      {/* Quick action buttons */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
-        <button onClick={() => go('staff-daily', { date: today })} className="bk-press" style={{
-          flex: 1, minWidth: 120, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-          background: '#CDE8FB', color: '#1f5f86', fontSize: 12.5, fontWeight: 800,
-          padding: '11px 10px', borderRadius: 14 }}>
-          📋 {L('Журнал сегодня', "Today's log")}
-        </button>
-        <button onClick={() => go('staff-schedule')} className="bk-press" style={{
-          flex: 1, minWidth: 100, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-          background: '#D4F0DF', color: '#1f7a55', fontSize: 12.5, fontWeight: 800,
-          padding: '11px 10px', borderRadius: 14 }}>
-          📅 {L('Расписание', 'Schedule')}
-        </button>
-        <button onClick={() => go('staff-monthly')} className="bk-press" style={{
-          flex: 1, minWidth: 100, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-          background: '#E8E0D5', color: '#5a4a30', fontSize: 12.5, fontWeight: 800,
-          padding: '11px 10px', borderRadius: 14 }}>
-          📊 {L('Итог за месяц', 'Monthly')}
-        </button>
-      </div>
+      <StaffTabBar go={go} active="team" />
 
       {staff === null && (
         <div style={{ textAlign: 'center', padding: 40, color: 'var(--ink-faint)', fontSize: 13 }}>…</div>
@@ -4775,46 +4795,66 @@ function TeamScreen({ go }) {
 const MONTHS_RU = ['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
 const MONTHS_EN = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-function StaffScheduleScreen() {
-  const today = new Date();
-  const [year,    setYear]    = React.useState(today.getFullYear());
-  const [month,   setMonth]   = React.useState(today.getMonth() + 1);
+function mondayOf(d) {
+  const day = d.getDay(); // 0=Sun..6=Sat
+  const diff = day === 0 ? -6 : 1 - day;
+  const m = new Date(d);
+  m.setDate(d.getDate() + diff);
+  m.setHours(0, 0, 0, 0);
+  return m;
+}
+function dateKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function StaffScheduleScreen({ go }) {
+  const [weekStart, setWeekStart] = React.useState(() => mondayOf(new Date()));
   const [staff,   setStaff]   = React.useState([]);
   const [data,    setData]    = React.useState({});
   const [loading, setLoading] = React.useState(true);
   const [picker,  setPicker]  = React.useState(null);
 
-  const monthKey = `${year}-${String(month).padStart(2,'0')}`;
+  // Mon–Fri only — weekends aren't workdays for this staff, so a full
+  // 7-column week would just waste two columns of dead space. A week at a
+  // time (instead of a whole month) means those 5 columns can be wide
+  // enough to actually read comfortably.
+  const weekdays = Array.from({length: 5}, (_, i) => {
+    const d = new Date(weekStart); d.setDate(weekStart.getDate() + i); return d;
+  });
+  const DOW_RU = ['Пн','Вт','Ср','Чт','Пт'], DOW_EN = ['Mon','Tue','Wed','Thu','Fri'];
 
   React.useEffect(() => {
     setLoading(true);
-    setData({});
-    Promise.all([window.loadStaff(), window.getStaffMonthly(monthKey)])
-      .then(([s, d]) => { setStaff(s); setData(d); })
+    // A week can straddle two calendar months near the boundary — fetch
+    // whichever month(s) its 5 days actually fall in and merge them,
+    // rather than adding a dedicated date-range endpoint for just this.
+    const monthKeys = [...new Set(weekdays.map(d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`))];
+    Promise.all([window.loadStaff(), ...monthKeys.map(mk => window.getStaffMonthly(mk))])
+      .then(([s, ...monthDatas]) => {
+        setStaff(s);
+        const merged = {};
+        monthDatas.forEach(md => {
+          Object.entries(md).forEach(([name, days]) => {
+            merged[name] = { ...(merged[name] || {}), ...days };
+          });
+        });
+        setData(merged);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [year, month]);
+  }, [weekStart.getTime()]);
 
-  const daysInMonth = new Date(year, month, 0).getDate();
+  function prevWeek() { setWeekStart(w => { const d = new Date(w); d.setDate(w.getDate() - 7); return d; }); }
+  function nextWeek() { setWeekStart(w => { const d = new Date(w); d.setDate(w.getDate() + 7); return d; }); }
 
-  function prevMonth() {
-    if (month === 1) { setYear(y => y - 1); setMonth(12); }
-    else setMonth(m => m - 1);
-  }
-  function nextMonth() {
-    if (month === 12) { setYear(y => y + 1); setMonth(1); }
-    else setMonth(m => m + 1);
+  function getCell(name, d) {
+    return data[name]?.[dateKey(d)] || null;
   }
 
-  function getCell(name, day) {
-    const date = `${monthKey}-${String(day).padStart(2,'0')}`;
-    return data[name]?.[date] || null;
-  }
-
-  function openPicker(name, day) {
-    const date = `${monthKey}-${String(day).padStart(2,'0')}`;
+  function openPicker(name, d) {
+    const date = dateKey(d);
     const rec = data[name]?.[date];
-    setPicker({ name, date, day, status: rec?.status || null, arrival_time: rec?.arrival_time || '' });
+    setPicker({ name, date, day: d.getDate(), status: rec?.status || null, arrival_time: rec?.arrival_time || '' });
   }
 
   async function handlePick(status, arrival_time) {
@@ -4837,28 +4877,32 @@ function StaffScheduleScreen() {
   }
 
   const NAME_W = 72;
-  const CELL_W = 46;
-  const CELL_H = 40;
-  // Weekends aren't workdays for this staff, so they never get a status —
-  // dropping those columns entirely (not just graying them out) frees up
-  // real width to make the days that matter bigger and actually readable.
-  const weekdays = Array.from({length: daysInMonth}, (_, i) => i + 1)
-    .filter(d => { const dow = new Date(year, month-1, d).getDay(); return dow !== 0 && dow !== 6; });
+  const CELL_W = 58;
+  const CELL_H = 46;
+
+  const weekEnd = weekdays[4];
+  const sameMonth = weekStart.getMonth() === weekEnd.getMonth();
+  const weekLabel = sameMonth
+    ? (window.__lang === 'ru'
+        ? `${weekStart.getDate()}–${weekEnd.getDate()} ${MONTHS_RU[weekEnd.getMonth()]}`
+        : `${MONTHS_EN[weekStart.getMonth()].slice(0,3)} ${weekStart.getDate()}–${weekEnd.getDate()}`)
+    : (window.__lang === 'ru'
+        ? `${weekStart.getDate()} ${MONTHS_RU[weekStart.getMonth()].slice(0,3)} – ${weekEnd.getDate()} ${MONTHS_RU[weekEnd.getMonth()].slice(0,3)}`
+        : `${MONTHS_EN[weekStart.getMonth()].slice(0,3)} ${weekStart.getDate()} – ${MONTHS_EN[weekEnd.getMonth()].slice(0,3)} ${weekEnd.getDate()}`);
 
   return (
-    <div style={{ paddingBottom: 32 }}>
-      {/* Month nav */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, padding: '2px 20px 16px' }}>
-        <button onClick={prevMonth} className="bk-press" style={{
-          border: 'none', background: 'none', cursor: 'pointer', padding: '0 10px',
-          display: 'grid', placeItems: 'center' }}><Chevron dir="left" size={20} /></button>
-        <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--ink)', minWidth: 140, textAlign: 'center',
-          fontFamily: 'var(--font-display)' }}>
-          {window.__lang === 'ru' ? MONTHS_RU[month-1] : MONTHS_EN[month-1]} {year}
+    <div style={{ padding: '4px 20px 28px' }}>
+      <StaffTabBar go={go} active="staff-schedule" />
+
+      {/* Week nav */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, marginBottom: 14 }}>
+        <button onClick={prevWeek} className="bk-press" style={{
+          border: 'none', background: 'none', cursor: 'pointer', padding: '0 10px' }}><Chevron dir="left" size={18} /></button>
+        <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--ink-soft)', minWidth: 150, textAlign: 'center' }}>
+          {weekLabel} {weekEnd.getFullYear()}
         </span>
-        <button onClick={nextMonth} className="bk-press" style={{
-          border: 'none', background: 'none', cursor: 'pointer', padding: '0 10px',
-          display: 'grid', placeItems: 'center' }}><Chevron dir="right" size={20} /></button>
+        <button onClick={nextWeek} className="bk-press" style={{
+          border: 'none', background: 'none', cursor: 'pointer', padding: '0 10px' }}><Chevron dir="right" size={18} /></button>
       </div>
 
       {loading && (
@@ -4872,16 +4916,18 @@ function StaffScheduleScreen() {
 
       {!loading && staff.length > 0 && (
         <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }}>
-          <div style={{ display: 'inline-block', paddingLeft: 12, paddingRight: 16,
-            minWidth: NAME_W + weekdays.length * (CELL_W + 3) + 24 }}>
+          <div style={{ display: 'inline-block',
+            minWidth: NAME_W + weekdays.length * (CELL_W + 4) }}>
 
-            {/* Day-number header */}
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 5 }}>
+            {/* Weekday-name + date header */}
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
               <div style={{ width: NAME_W, flexShrink: 0 }} />
-              {weekdays.map(d => (
-                <div key={d} style={{ width: CELL_W, flexShrink: 0, marginRight: 3,
-                  textAlign: 'center', fontSize: 11, fontWeight: 700, color: 'var(--ink-faint)' }}>
-                  {d}
+              {weekdays.map((d, i) => (
+                <div key={i} style={{ width: CELL_W, flexShrink: 0, marginRight: 4, textAlign: 'center' }}>
+                  <div style={{ fontSize: 11.5, fontWeight: 800, color: 'var(--ink-soft)' }}>
+                    {window.__lang === 'ru' ? DOW_RU[i] : DOW_EN[i]}
+                  </div>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--ink-faint)' }}>{d.getDate()}</div>
                 </div>
               ))}
             </div>
@@ -4901,7 +4947,7 @@ function StaffScheduleScreen() {
                     {rest && <span style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--ink-soft)',
                       display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{rest}</span>}
                   </div>
-                  {weekdays.map(d => {
+                  {weekdays.map((d, i) => {
                     const rec = getCell(s.name, d);
                     const st  = rec?.status || null;
                     const ss  = st ? STAFF_STATUSES.find(x => x.id === st) : null;
@@ -4910,15 +4956,15 @@ function StaffScheduleScreen() {
                     if (rec?.transfer) stickers.push('🚌');
                     if (rec?.extra) stickers.push('⏰');
                     return (
-                      <button key={d} onClick={() => openPicker(s.name, d)} className="bk-press"
-                        style={{ position: 'relative', width: CELL_W, height: CELL_H, flexShrink: 0, marginRight: 3,
-                          border: 'none', cursor: 'pointer', borderRadius: 9,
-                          background: bg, fontSize: 17, fontFamily: 'inherit',
+                      <button key={i} onClick={() => openPicker(s.name, d)} className="bk-press"
+                        style={{ position: 'relative', width: CELL_W, height: CELL_H, flexShrink: 0, marginRight: 4,
+                          border: 'none', cursor: 'pointer', borderRadius: 10,
+                          background: bg, fontSize: 19, fontFamily: 'inherit',
                           display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         {ss?.emoji || ''}
                         {stickers.map((emoji, si) => (
                           <span key={emoji} style={{ position: 'absolute',
-                            [si === 0 ? 'top' : 'bottom']: -4, right: -4, fontSize: 11 }}>{emoji}</span>
+                            [si === 0 ? 'top' : 'bottom']: -4, right: -4, fontSize: 12 }}>{emoji}</span>
                         ))}
                       </button>
                     );
@@ -4931,7 +4977,7 @@ function StaffScheduleScreen() {
       )}
 
       {/* Legend */}
-      <div style={{ padding: '14px 14px 0', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+      <div style={{ padding: '14px 0 0', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
         {STAFF_STATUSES.map(ss => (
           <span key={ss.id} style={{ fontSize: 11, fontWeight: 600,
             background: SSTAFF_COLOR[ss.id], color: SSTAFF_INK[ss.id],
@@ -4939,6 +4985,14 @@ function StaffScheduleScreen() {
             {ss.emoji} {window.__lang === 'ru' ? ss.ru : ss.en}
           </span>
         ))}
+        <span style={{ fontSize: 11, fontWeight: 600, background: EXTRA_COLOR, color: EXTRA_INK,
+          padding: '3px 8px', borderRadius: 999 }}>
+          🚌 {L('Трансфер', 'Transfer')}
+        </span>
+        <span style={{ fontSize: 11, fontWeight: 600, background: EXTRA_COLOR, color: EXTRA_INK,
+          padding: '3px 8px', borderRadius: 999 }}>
+          ⏰ {L('Переработка', 'Overtime')}
+        </span>
       </div>
 
       {picker && (
@@ -5047,6 +5101,15 @@ function StaffDailyScreen({ params, go }) {
   const [records, setRecords] = React.useState({});
   const [savedRecords, setSavedRecords] = React.useState({});
 
+  // StaffTabBar's "Журнал"/"Календарь" tabs stay on this same screen
+  // (goTab replaces the stack entry in place rather than remounting), so a
+  // tap while already here changes params.date without ever re-running the
+  // useState(initDate) initializer above — sync it explicitly or those
+  // taps would silently do nothing.
+  React.useEffect(() => {
+    if (params && params.date && params.date !== date) setDate(params.date);
+  }, [params && params.date]);
+
   React.useEffect(() => {
     Promise.all([window.loadStaff(), window.getStaffAttendance(date)])
       .then(([s, rec]) => {
@@ -5072,12 +5135,11 @@ function StaffDailyScreen({ params, go }) {
   function setNote(name, note) {
     setRecords(r => ({ ...r, [name]: { ...(r[name] || {}), note } }));
   }
-  // 0 (none) -> 1 (full day) -> 0.5 (half day) -> 0 — matches Ольга's own
-  // "+" / "#" paper tracking for bus transfer duty
-  function cycleTransfer(name) {
-    const cur = (records[name] || {}).transfer || 0;
-    const next = cur === 0 ? 1 : cur === 1 ? 0.5 : 0;
-    setRecords(r => ({ ...r, [name]: { ...(r[name] || {}), transfer: next } }));
+  // Plain on/off — a half-day fork here just added a step nobody used and
+  // made the label read as "Transfer — full day" for the common case.
+  function toggleTransfer(name) {
+    const cur = !!(records[name] || {}).transfer;
+    setRecords(r => ({ ...r, [name]: { ...(r[name] || {}), transfer: cur ? 0 : 1 } }));
   }
   function toggleExtra(name) {
     const cur = !!(records[name] || {}).extra;
@@ -5091,29 +5153,7 @@ function StaffDailyScreen({ params, go }) {
 
   return (
     <div style={{ padding: '4px 20px 28px' }}>
-      {/* Quick links to the rest of the staff module — this screen is now
-          the entry point (see HomeScreen's team tile), cards/schedule/
-          monthly are a tap away instead of the other way around. */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-        <button onClick={() => go('team')} className="bk-press" style={{
-          flex: 1, minWidth: 100, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-          background: '#E8E0D5', color: '#5a4a30', fontSize: 12.5, fontWeight: 800,
-          padding: '11px 10px', borderRadius: 14 }}>
-          🗂️ {L('Сотрудники', 'Staff')}
-        </button>
-        <button onClick={() => go('staff-schedule')} className="bk-press" style={{
-          flex: 1, minWidth: 100, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-          background: '#D4F0DF', color: '#1f7a55', fontSize: 12.5, fontWeight: 800,
-          padding: '11px 10px', borderRadius: 14 }}>
-          📅 {L('Расписание', 'Schedule')}
-        </button>
-        <button onClick={() => go('staff-monthly')} className="bk-press" style={{
-          flex: 1, minWidth: 100, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-          background: '#CDE8FB', color: '#1f5f86', fontSize: 12.5, fontWeight: 800,
-          padding: '11px 10px', borderRadius: 14 }}>
-          📊 {L('Итог за месяц', 'Monthly')}
-        </button>
-      </div>
+      <StaffTabBar go={go} active="staff-daily" />
 
       {/* Date navigation */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
@@ -5143,11 +5183,6 @@ function StaffDailyScreen({ params, go }) {
                 <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--ink)' }}>{s.name}</div>
                 <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{s.position}</div>
               </div>
-              <div style={{ background: SSTAFF_COLOR[status] || '#EDE8E0',
-                color: SSTAFF_INK[status] || '#5a4a30',
-                padding: '4px 11px', borderRadius: 999, fontSize: 12, fontWeight: 800 }}>
-                {STAFF_STATUSES.find(x => x.id === status)?.emoji}
-              </div>
             </div>
             {/* Status pills */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
@@ -5167,23 +5202,19 @@ function StaffDailyScreen({ params, go }) {
                 done either (or both) that same day, it's extra-paid on
                 top of their regular work. */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 8 }}>
-              <button onClick={() => cycleTransfer(s.name)} className="bk-press" style={{
+              <button onClick={() => toggleTransfer(s.name)} className="bk-press" style={{
                 border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700,
                 padding: '6px 12px', borderRadius: 999,
                 background: transfer ? EXTRA_COLOR : '#F0EBE3',
                 color: transfer ? EXTRA_INK : 'var(--ink-soft)',
-                outline: transfer ? `2px solid ${EXTRA_INK}` : 'none',
                 transition: 'all 0.12s' }}>
                 🚌 {L('Трансфер', 'Transfer')}
-                {transfer === 1 && ` — ${L('весь день', 'full day')}`}
-                {transfer === 0.5 && ` — ${L('полдня', 'half day')}`}
               </button>
               <button onClick={() => toggleExtra(s.name)} className="bk-press" style={{
                 border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700,
                 padding: '6px 12px', borderRadius: 999,
                 background: extra ? EXTRA_COLOR : '#F0EBE3',
                 color: extra ? EXTRA_INK : 'var(--ink-soft)',
-                outline: extra ? `2px solid ${EXTRA_INK}` : 'none',
                 transition: 'all 0.12s' }}>
                 ⏰ {L('Переработка', 'Overtime')}
               </button>
@@ -5221,7 +5252,7 @@ function StaffDailyScreen({ params, go }) {
 
 // ── StaffMonthlyScreen ────────────────────────────────────────────────────────
 
-function StaffMonthlyScreen() {
+function StaffMonthlyScreen({ go }) {
   const now = new Date();
   const [month, setMonth] = React.useState(
     `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
@@ -5277,15 +5308,22 @@ function StaffMonthlyScreen() {
 
   return (
     <div style={{ padding: '4px 20px 28px' }}>
-      {/* Month navigation */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, marginBottom: 14 }}>
+      <StaffTabBar go={go} active="staff-monthly" />
+
+      {/* Month navigation — one rounded control instead of 3 loose pieces
+          floating with gaps between them */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        background: '#FBF7F2', borderRadius: 999, padding: '4px 6px', marginBottom: 16,
+        boxShadow: '0 1px 2px rgba(60,40,20,0.05)' }}>
         <button onClick={prevMonth} className="bk-press" style={{
-          border: 'none', background: 'none', cursor: 'pointer', padding: '0 10px' }}><Chevron dir="left" size={18} /></button>
-        <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--ink-soft)', minWidth: 130, textAlign: 'center' }}>
+          border: 'none', background: 'none', cursor: 'pointer', padding: 8,
+          display: 'grid', placeItems: 'center' }}><Chevron dir="left" size={16} /></button>
+        <div style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>
           {monthLabel}
         </div>
         <button onClick={nextMonth} className="bk-press" style={{
-          border: 'none', background: 'none', cursor: 'pointer', padding: '0 10px' }}><Chevron dir="right" size={18} /></button>
+          border: 'none', background: 'none', cursor: 'pointer', padding: 8,
+          display: 'grid', placeItems: 'center' }}><Chevron dir="right" size={16} /></button>
       </div>
 
       {loading && <div style={{ textAlign: 'center', padding: 40, color: 'var(--ink-faint)', fontSize: 13 }}>…</div>}
@@ -5752,6 +5790,20 @@ function App() {
   const top = stack[stack.length - 1];
 
   function go(name, params = {}) { setDir('fwd'); setStack(s => [...s, { name, params }]); }
+  // StaffTabBar renders the same 5 tabs on every one of these 4 screens —
+  // a plain go() from each of them would push a new stack entry per tap,
+  // so hopping between tabs a few times turns "back" into replaying that
+  // whole click history instead of leaving the module in one tap. Swap the
+  // top entry in place while already inside the module; only push like a
+  // normal navigation the first time something outside the module (e.g.
+  // HomeScreen's tile) sends you in.
+  const STAFF_TAB_SCREENS = ['team', 'staff-daily', 'staff-schedule', 'staff-monthly'];
+  function goTab(name, params = {}) {
+    setDir('fwd');
+    setStack(s => (s.length && STAFF_TAB_SCREENS.includes(s[s.length - 1].name))
+      ? [...s.slice(0, -1), { name, params }]
+      : [...s, { name, params }]);
+  }
   function back() { setDir('back'); setStack(s => s.length > 1 ? s.slice(0, -1) : s); }
   function home() { setDir('back'); setStack([{ name: 'home', params: {} }]); }
   function toggleLang() { const n = lang === 'ru' ? 'en' : 'ru'; setLang(n); localStorage.setItem('balu_lang', n); }
@@ -5820,10 +5872,10 @@ function App() {
       case 'summary':       return <SummaryScreen statuses={statuses} go={go} />;
       case 'notifications': return <NotificationsScreen feed={feed} go={go} actions={actions} />;
       case 'compose':       return <ComposeScreen back={back} actions={actions} />;
-      case 'team':           return <TeamScreen go={go} />;
-      case 'staff-schedule': return <StaffScheduleScreen />;
-      case 'staff-daily':    return <StaffDailyScreen params={p} go={go} />;
-      case 'staff-monthly':  return <StaffMonthlyScreen />;
+      case 'team':           return <TeamScreen go={goTab} />;
+      case 'staff-schedule': return <StaffScheduleScreen go={goTab} />;
+      case 'staff-daily':    return <StaffDailyScreen params={p} go={goTab} />;
+      case 'staff-monthly':  return <StaffMonthlyScreen go={goTab} />;
       default:              return null;
     }
   }
