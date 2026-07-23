@@ -3154,6 +3154,14 @@ function AttendanceHistorySheet({ kid, onClose }) {
         d.setDate(d.getDate() + 1);
       }
     });
+    // Same shift as PayRangeSheet's calendar: a carried-over day moves the
+    // paid mark from the missed day it names onto the new day it adds, so
+    // this calendar (opened by tapping a kid straight from the Journal)
+    // doesn't disagree with the one under Payments about which day is paid.
+    entries.forEach(h => {
+      const m = (h.markedBy || '').match(/^Система: перенос пропуска (\d{2}\.\d{2}\.\d{4})/);
+      if (m) set.delete(normDate(m[1]));
+    });
     return set;
   }, [log, kid.paidFrom, kid.paidUntil]);
 
