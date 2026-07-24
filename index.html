@@ -2942,6 +2942,21 @@ function PaidBadge({ muted }) {
   );
 }
 
+// A transient failure (a network blip, a cold connection) on one of these
+// read-only GETs used to leave the calendar/history silently blank forever
+// — nothing re-fetches until the sheet fully unmounts and remounts (closing
+// and reopening the kid), which is the only reason that "fixed" it. Three
+// quick attempts before giving up covers the transient case without the
+// user ever needing to notice.
+async function withRetry(fn, attempts = 3, delayMs = 500) {
+  let lastErr;
+  for (let i = 0; i < attempts; i++) {
+    try { return await fn(); }
+    catch (e) { lastErr = e; if (i < attempts - 1) await new Promise(r => setTimeout(r, delayMs)); }
+  }
+  throw lastErr;
+}
+
 function PayRangeSheet({ kid, tariff, price, loadHistory, loadAttendanceHistory, legacyCoverage, onConfirm, onDelete, onClose }) {
   const today = todayStr();
   const init = new Date(today + 'T12:00:00');
@@ -2963,11 +2978,11 @@ function PayRangeSheet({ kid, tariff, price, loadHistory, loadAttendanceHistory,
   const [visibleCount, setVisibleCount] = React.useState(HISTORY_PAGE_SIZE);
 
   React.useEffect(() => {
-    loadHistory().then(setHistory).catch(() => {});
+    withRetry(loadHistory).then(setHistory).catch(() => {});
     // Garden (no prop passed) shows whether the kid was at the garden;
     // Clubs pass their own loader so the calendar shows whether the kid
     // showed up to THAT club instead — they're different attendance sheets.
-    (loadAttendanceHistory || (() => window.loadAttendanceHistory(kid.id)))()
+    withRetry(loadAttendanceHistory || (() => window.loadAttendanceHistory(kid.id)))
       .then(setAttHistory).catch(() => {});
   }, [kid.id]);
 
@@ -3233,8 +3248,8 @@ function AttendanceHistorySheet({ kid, onClose }) {
 
   React.useEffect(() => {
     Promise.all([
-      window.loadAttendanceHistory(kid.id),
-      window.loadPaymentLog(kid.id).catch(() => []),
+      withRetry(() => window.loadAttendanceHistory(kid.id)),
+      withRetry(() => window.loadPaymentLog(kid.id)).catch(() => []),
     ]).then(([h, l]) => { setHistory(h); setLog(l); }).catch(() => setHistory({}));
   }, [kid.id]);
 
@@ -3392,7 +3407,7 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
   React.useEffect(() => {
     if (isToday) return;
     setLoading(true); setAllMarked(false);
-    window.loadAttendance(selDate)
+    withRetry(() => window.loadAttendance(selDate))
       .then(data => { const m = makeLocal(data); setLocal(m); setSavedLocal(m); })
       .catch(()  => { const m = makeLocal({});   setLocal(m); setSavedLocal(m); })
       .finally(() => setLoading(false));
@@ -3714,7 +3729,7 @@ function WeekChart() {
     });
     Promise.all(days.map(d => d.future
       ? Promise.resolve({})
-      : fetch(`${window.API_BASE}/attendance/${d.iso}`).then(r => r.ok ? r.json() : {}).catch(() => ({}))
+      : withRetry(() => fetch(`${window.API_BASE}/attendance/${d.iso}`).then(r => r.ok ? r.json() : Promise.reject(new Error('bad status')))).catch(() => ({}))
     )).then(results => {
       setData(days.map((d, i) => {
         if (d.future) return { ru: d.ru, en: d.en, v: null };
@@ -3761,7 +3776,7 @@ function fmtFeedTime(iso) {
   return `${pad(d.getDate())}.${pad(d.getMonth() + 1)} ${hm}`;
 }
 
-const TYPE_TINT = { birthday: '#FBD9E1', alert: '#FBE7A8', message: '#CDE8FB', sent: '#D4F0DF', urgent: '#FBD9E1' };
+const TYPE_TINT = { birthday: '#FBD9E1', alert: '#FBE7A8', message: '#CDE8FB', sent: '#D4F0DF', urgent: '#FBD9E1', carryover: '#D4F0DF' };
 
 function LongPressCard({ onDelete, onTap, children, style }) {
   const [confirm, setConfirm] = React.useState(false);
@@ -4226,7 +4241,7 @@ function PaymentsClubsScreen() {
 
   React.useEffect(() => {
     if (!clubId) return;
-    window.loadClubPaymentLog(clubId).then(setLog).catch(() => {});
+    withRetry(() => window.loadClubPaymentLog(clubId)).then(setLog).catch(() => {});
   }, [clubId]);
 
   // a kid can be in more than one club, each with its own paid-through date,
@@ -4365,7 +4380,7 @@ function ClubScreen({ params }) {
   React.useEffect(() => {
     if (!club || tab !== 'attendance') return;
     setAttSaveErr(null);
-    window.loadClubAttendance(club.id, attDate)
+    withRetry(() => window.loadClubAttendance(club.id, attDate))
       .then(d => { setAttLocal(d); setAttSavedLocal(d); })
       .catch(() => { setAttLocal({}); setAttSavedLocal({}); });
   }, [tab, attDate, club?.id]);
@@ -4852,7 +4867,7 @@ function TeamScreen({ go }) {
   const [editMember, setEditMember] = React.useState(null);
 
   function reload() {
-    window.loadStaff().then(setStaff).catch(() => setStaff([]));
+    withRetry(window.loadStaff).then(setStaff).catch(() => setStaff([]));
   }
 
   React.useEffect(reload, []);
@@ -5064,7 +5079,7 @@ function StaffDailyScreen({ params, go }) {
     // (different state, see below) shouldn't leave these cards showing
     // what they had before you flipped over there.
     if (view !== 'day') return;
-    Promise.all([window.loadStaff(), window.getStaffAttendance(date)])
+    Promise.all([withRetry(window.loadStaff), withRetry(() => window.getStaffAttendance(date))])
       .then(([s, rec]) => {
         // Teacher only sees themselves
         const filtered = window.__isTeacher && window.__teacherName
@@ -5144,7 +5159,7 @@ function StaffDailyScreen({ params, go }) {
     // whichever month(s) its 5 days actually fall in and merge them,
     // rather than adding a dedicated date-range endpoint for just this.
     const monthKeys = [...new Set(weekdays.map(d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`))];
-    Promise.all([window.loadStaff(), ...monthKeys.map(mk => window.getStaffMonthly(mk))])
+    Promise.all([withRetry(window.loadStaff), ...monthKeys.map(mk => withRetry(() => window.getStaffMonthly(mk)))])
       .then(([s, ...monthDatas]) => {
         setWeekStaff(s);
         const merged = {};
@@ -5466,7 +5481,7 @@ function StaffMonthlyScreen({ go }) {
 
   React.useEffect(() => {
     setLoading(true);
-    Promise.all([window.loadStaff(), window.getStaffMonthly(month)])
+    Promise.all([withRetry(window.loadStaff), withRetry(() => window.getStaffMonthly(month))])
       .then(([s, d]) => { setStaff(s); setData(d); })
       .catch(() => {})
       .finally(() => setLoading(false));
