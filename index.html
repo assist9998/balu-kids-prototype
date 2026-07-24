@@ -5102,8 +5102,19 @@ function StaffDailyScreen({ params, go }) {
   const [saveErr, setSaveErr] = React.useState(null);
   async function save() {
     setSaveErr(null);
+    // Only who actually changed, not the whole roster — otherwise saving
+    // re-sends everyone else's last-known record too, and the backend
+    // upserting exactly what's in this payload means whoever saves last
+    // would silently overwrite a *different* person's edit made in
+    // between with this saver's own possibly-stale copy of it. Same
+    // reasoning as the garden/club attendance delta-saves.
+    const delta = {};
+    staff.forEach(s => {
+      if (JSON.stringify(records[s.name]) !== JSON.stringify(savedRecords[s.name])) delta[s.name] = records[s.name];
+    });
+    if (Object.keys(delta).length === 0) return;
     try {
-      await window.saveStaffAttendance(date, records);
+      await window.saveStaffAttendance(date, delta);
       setSavedRecords(records);
     } catch (e) {
       setSaveErr(L('Ошибка сохранения', 'Save failed'));
