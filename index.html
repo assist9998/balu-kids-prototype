@@ -199,7 +199,6 @@
     arrivalTime:       { ru: 'Время прихода',   en: 'Arrival time' },
     staffLog:          { ru: 'Журнал',          en: 'Log' },
     staffMonthly:      { ru: 'Месяц',           en: 'Monthly' },
-    staffSchedule:     { ru: 'Расписание',      en: 'Schedule' },
     position:          { ru: 'Должность',       en: 'Position' },
     phone:             { ru: 'Телефон',         en: 'Phone' },
     noStaff:           { ru: 'Сотрудников нет', en: 'No staff' },
@@ -345,11 +344,11 @@ window.API_BASE = "https://rmxois1uv0a24xrbi2dfcfac.95.179.188.141.sslip.io";
     return res.json();
   };
 
-  window.addPaymentLogEntry = async function (kidId, tariff, dateFrom, dateUntil, amount) {
+  window.addPaymentLogEntry = async function (kidId, tariff, dateFrom, dateUntil, amount, idempotencyKey) {
     const res = await fetch(`${window.API_BASE}/payment-log`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kidId, tariff, dateFrom, dateUntil, amount }),
+      body: JSON.stringify({ kidId, tariff, dateFrom, dateUntil, amount, idempotencyKey }),
     });
     if (!res.ok) throw new Error(`POST /payment-log failed: ${res.status}`);
     return res.json();
@@ -357,6 +356,13 @@ window.API_BASE = "https://rmxois1uv0a24xrbi2dfcfac.95.179.188.141.sslip.io";
 
   window.deletePaymentLogEntry = async function (rowId) {
     const res = await fetch(`${window.API_BASE}/payment-log/${rowId}`, { method: 'DELETE' });
+    // 404 here means "already gone" — which is exactly what a delete wants.
+    // Matters once this is queued durably (see makeDurable below): if the
+    // first attempt actually succeeded but its response never made it back
+    // (app backgrounded right then), a retry would otherwise hit 404 on an
+    // already-deleted row forever and sit stuck in the queue permanently
+    // instead of ever being recognized as done.
+    if (res.status === 404) return { paidFrom: '', paidUntil: '' };
     if (!res.ok) throw new Error(`DELETE /payment-log failed: ${res.status}`);
     return res.json();
   };
@@ -543,11 +549,11 @@ window.API_BASE = "https://rmxois1uv0a24xrbi2dfcfac.95.179.188.141.sslip.io";
     return res.json();
   };
 
-  window.addClubPaymentLogEntry = async function (kidId, clubId, dateFrom, dateUntil, amount) {
+  window.addClubPaymentLogEntry = async function (kidId, clubId, dateFrom, dateUntil, amount, idempotencyKey) {
     const res = await fetch(`${window.API_BASE}/club-payment-log`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kidId, clubId, dateFrom, dateUntil, amount }),
+      body: JSON.stringify({ kidId, clubId, dateFrom, dateUntil, amount, idempotencyKey }),
     });
     if (!res.ok) throw new Error(`POST /club-payment-log failed: ${res.status}`);
     return res.json();
@@ -555,6 +561,9 @@ window.API_BASE = "https://rmxois1uv0a24xrbi2dfcfac.95.179.188.141.sslip.io";
 
   window.deleteClubPaymentLogEntry = async function (rowId) {
     const res = await fetch(`${window.API_BASE}/club-payment-log/${rowId}`, { method: 'DELETE' });
+    // See deletePaymentLogEntry — 404 means already gone, treat as done
+    // rather than leaving a durably-queued retry stuck forever.
+    if (res.status === 404) return { paidFrom: '', paidUntil: '' };
     if (!res.ok) throw new Error(`DELETE /club-payment-log failed: ${res.status}`);
     return res.json();
   };
@@ -571,6 +580,94 @@ window.API_BASE = "https://rmxois1uv0a24xrbi2dfcfac.95.179.188.141.sslip.io";
     const kid = window.DATA.CHILDREN.find(k => k.id === childId);
     if (kid) kid.emoji = emoji;
   };
+
+  // ── Durable write queue ───────────────────────────────────────────────
+  // A plain fetch can be silently killed mid-flight if the tab gets
+  // backgrounded/the app gets switched away from right after tapping Save —
+  // the UI already shows it as saved (optimistic local state, or SaveBar's
+  // "Saved ✓") while the server may never have gotten it. Recording the
+  // write in localStorage *before* the fetch starts, and only clearing it
+  // once the server actually confirms, means the same write survives that
+  // and gets retried the next time the app opens instead of just vanishing.
+  //
+  // makeDurable() is for writes that are already safe to blindly repeat if
+  // the first attempt's outcome is unknown — every one of these is an
+  // upsert keyed by (date, person) or (name), so calling it again with the
+  // same data just re-writes the same values. Payment log entries are
+  // different: those are plain appends with no natural dedup key, so
+  // retrying an attempt that actually did succeed the first time would
+  // double it. makeDurableIdempotent() (below) covers those instead — the
+  // queued entry's own id doubles as a one-time idempotency key sent to
+  // the backend, which now has a unique index on it and no-ops an insert
+  // that reuses one (see pg_dual_write.insert_payment_log).
+  const DURABLE_PENDING_KEY = 'balu_pending_writes';
+  const _durableWriters = {};
+  function _loadPendingWrites() {
+    try { return JSON.parse(localStorage.getItem(DURABLE_PENDING_KEY) || '[]'); }
+    catch { return []; }
+  }
+  function _savePendingWrites(list) {
+    localStorage.setItem(DURABLE_PENDING_KEY, JSON.stringify(list));
+  }
+  function makeDurable(kind, fn) {
+    _durableWriters[kind] = fn;
+    return async function (...args) {
+      const entry = { id: `${Date.now()}-${Math.random()}`, kind, args };
+      _savePendingWrites([..._loadPendingWrites(), entry]);
+      const result = await fn(...args);
+      // only reached on success — a thrown error above leaves the entry
+      // queued so flushPendingWrites can retry it later
+      _savePendingWrites(_loadPendingWrites().filter(e => e.id !== entry.id));
+      return result;
+    };
+  }
+  // Same idea, but appends a fresh idempotency key as the call's last
+  // argument — generated once, up front, and stored as part of the queued
+  // entry's own args, so a retry (which just replays those same args)
+  // reuses the exact same key instead of minting a new one. That's what
+  // lets the backend recognize "this is the same attempt again" rather
+  // than "a second payment".
+  function makeDurableIdempotent(kind, fn) {
+    _durableWriters[kind] = fn;
+    return async function (...args) {
+      const idempotencyKey = `${Date.now()}-${Math.random()}`;
+      const fullArgs = [...args, idempotencyKey];
+      const entry = { id: idempotencyKey, kind, args: fullArgs };
+      _savePendingWrites([..._loadPendingWrites(), entry]);
+      const result = await fn(...fullArgs);
+      _savePendingWrites(_loadPendingWrites().filter(e => e.id !== entry.id));
+      return result;
+    };
+  }
+  // Called once on app startup — picks up anything left over from a
+  // previous session that got killed/backgrounded before its write made it
+  // to the server. Order doesn't matter between different kinds, but is
+  // preserved within the same one (queued in the order they happened).
+  window.flushPendingWrites = async function () {
+    for (const entry of _loadPendingWrites()) {
+      const fn = _durableWriters[entry.kind];
+      if (!fn) { _savePendingWrites(_loadPendingWrites().filter(e => e.id !== entry.id)); continue; }
+      try {
+        await fn(...entry.args);
+        _savePendingWrites(_loadPendingWrites().filter(e => e.id !== entry.id));
+      } catch { /* still unreachable — stays queued, try again next launch */ }
+    }
+  };
+
+  window.saveAttendance         = makeDurable('saveAttendance', window.saveAttendance);
+  window.saveClubAttendance     = makeDurable('saveClubAttendance', window.saveClubAttendance);
+  window.saveStaffAttendance    = makeDurable('saveStaffAttendance', window.saveStaffAttendance);
+  window.setStaffDay            = makeDurable('setStaffDay', window.setStaffDay);
+  window.clearStaffDay          = makeDurable('clearStaffDay', window.clearStaffDay);
+  window.addStaff               = makeDurable('addStaff', window.addStaff);
+  window.updateStaff            = makeDurable('updateStaff', window.updateStaff);
+  window.addChild                = makeDurable('addChild', window.addChild);
+  window.updateChild            = makeDurable('updateChild', window.updateChild);
+  window.setChildEmoji          = makeDurable('setChildEmoji', window.setChildEmoji);
+  window.deletePaymentLogEntry     = makeDurable('deletePaymentLogEntry', window.deletePaymentLogEntry);
+  window.deleteClubPaymentLogEntry = makeDurable('deleteClubPaymentLogEntry', window.deleteClubPaymentLogEntry);
+  window.addPaymentLogEntry        = makeDurableIdempotent('addPaymentLogEntry', window.addPaymentLogEntry);
+  window.addClubPaymentLogEntry    = makeDurableIdempotent('addClubPaymentLogEntry', window.addClubPaymentLogEntry);
 })();
 
 </script>
@@ -4039,7 +4136,16 @@ function PaymentsGardenScreen() {
       Object.assign(kid, { paidFrom: res.paidFrom || '', paidUntil: res.paidUntil || '' });
       forceTick();
     } catch (e) {
-      window.showToast(L('Не удалось сохранить оплату: ', 'Failed to save payment: ') + String(e));
+      // addPaymentLogEntry is queued durably (see makeDurableIdempotent) —
+      // it didn't go through just now, but it's saved locally and will
+      // retry on its own with the same idempotency key next time the app
+      // opens or comes back online. Telling the manager to just tap
+      // Confirm again here would risk a second, genuinely different
+      // payment landing once the queued one also goes through.
+      window.showToast(L(
+        'Не удалось отправить сразу — сохранится автоматически, когда появится связь. Не нажимайте ещё раз.',
+        "Couldn't send right now — it's saved and will sync automatically once you're back online. Don't tap Confirm again."
+      ));
       throw e;
     }
   }
@@ -4156,7 +4262,12 @@ function PaymentsClubsScreen() {
       await window.addClubPaymentLogEntry(kid.id, clubId, fromDmy, toDmy, amount);
       await refetchLog();
     } catch (e) {
-      window.showToast(L('Не удалось сохранить оплату: ', 'Failed to save payment: ') + String(e));
+      // See the garden PaymentsGardenScreen.confirmPayment for why this
+      // message specifically discourages tapping Confirm again.
+      window.showToast(L(
+        'Не удалось отправить сразу — сохранится автоматически, когда появится связь. Не нажимайте ещё раз.',
+        "Couldn't send right now — it's saved and will sync automatically once you're back online. Don't tap Confirm again."
+      ));
       throw e;
     }
   }
@@ -4241,14 +4352,25 @@ function ClubScreen({ params }) {
   const [tab, setTab] = React.useState('members');
   const [addOpen, setAddOpen] = React.useState(false);
   const [attDate, setAttDate] = React.useState(todayStr());
-  const [attData, setAttData] = React.useState({});
-  const [attSaving, setAttSaving] = React.useState(false);
+  // Local + savedLocal + explicit Save, same as the garden Journal — was
+  // real-time-per-tap before, which meant (a) no obvious way to tell it
+  // had saved besides a fleeting "..." and (b) every tap fired its own
+  // network request instead of one batched Save, both inconsistent with
+  // how attendance works everywhere else in the app.
+  const [attLocal, setAttLocal] = React.useState({});
+  const [attSavedLocal, setAttSavedLocal] = React.useState({});
+  const [attSaveErr, setAttSaveErr] = React.useState(null);
   const [attCalOpen, setAttCalOpen] = React.useState(false);
 
   React.useEffect(() => {
     if (!club || tab !== 'attendance') return;
-    window.loadClubAttendance(club.id, attDate).then(setAttData).catch(() => setAttData({}));
+    setAttSaveErr(null);
+    window.loadClubAttendance(club.id, attDate)
+      .then(d => { setAttLocal(d); setAttSavedLocal(d); })
+      .catch(() => { setAttLocal({}); setAttSavedLocal({}); });
   }, [tab, attDate, club?.id]);
+
+  const attHasChanges = club ? club.kids.some(id => attLocal[id] !== attSavedLocal[id]) : false;
 
   if (!club) return <div style={{ padding: 20, color: 'var(--ink-faint)', fontSize: 14, textAlign: 'center' }}>—</div>;
 
@@ -4282,17 +4404,27 @@ function ClubScreen({ params }) {
     });
   }
 
-  async function toggleAtt(childId) {
-    const cur = attData[childId] || 'absent';
+  function toggleAtt(childId) {
+    const cur = attLocal[childId] || 'absent';
     const next = cur === 'present' ? 'absent' : 'present';
-    setAttData(prev => ({ ...prev, [childId]: next }));
-    setAttSaving(true);
-    // Only this one child, not the whole roster — otherwise every tap
+    setAttLocal(prev => ({ ...prev, [childId]: next }));
+  }
+
+  async function handleSaveAtt() {
+    setAttSaveErr(null);
+    // Only what actually changed, not the whole roster — otherwise saving
     // re-sends everyone else's last-known status too, which stomps another
-    // staff member's own tap on a different kid with a stale copy (and
-    // wrongly attributes it to whoever tapped last, see Marked by).
-    await window.saveClubAttendance(club.id, attDate, { [childId]: next }).catch(() => {});
-    setAttSaving(false);
+    // staff member's own edit to a different kid with a stale copy (and
+    // wrongly attributes it to whoever saved last, see Marked by).
+    const delta = {};
+    club.kids.forEach(id => { if (attLocal[id] !== attSavedLocal[id]) delta[id] = attLocal[id]; });
+    if (Object.keys(delta).length === 0) return;
+    try {
+      await window.saveClubAttendance(club.id, attDate, delta);
+      setAttSavedLocal({ ...attLocal });
+    } catch (e) {
+      setAttSaveErr(L('Ошибка сохранения', 'Save failed'));
+    }
   }
 
   const tabBtn = (id, label) => (
@@ -4355,7 +4487,6 @@ function ClubScreen({ params }) {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
             <CalendarSquareButton date={attDate} onClick={() => setAttCalOpen(true)} />
-            {attSaving && <span style={{ fontSize: 12, color: 'var(--ink-faint)' }}>...</span>}
           </div>
           {attCalOpen && <Portal><MiniCalendar selected={attDate} onSelect={setAttDate} onClose={() => setAttCalOpen(false)} /></Portal>}
           {kids.length === 0 && (
@@ -4367,7 +4498,7 @@ function ClubScreen({ params }) {
             {kids.map(kid => {
               const grp = DATA.GROUPS.find(g => g.id === kid.group);
               const kidIndex = activeKids().filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
-              const status = attData[kid.id] || 'absent';
+              const status = attLocal[kid.id] || 'absent';
               return (
                 <Card key={kid.id} pad={12} style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2' }}>
                   <Avatar emoji={kid.emoji} color={PALETTE[kidIndex % PALETTE.length]} size={44} />
@@ -4380,6 +4511,8 @@ function ClubScreen({ params }) {
               );
             })}
           </div>
+          {attSaveErr && <div style={{ textAlign: 'center', color: 'var(--no)', fontSize: 13, fontWeight: 600, padding: '6px 0' }}>{attSaveErr}</div>}
+          {kids.length > 0 && <SaveBar hasChanges={attHasChanges} onSave={handleSaveAtt} />}
         </div>
       )}
 
@@ -4670,11 +4803,13 @@ function StaffFormSheet({ member, onClose, onSaved }) {
 // ── TeamScreen ────────────────────────────────────────────────────────────────
 
 // ── StaffTabBar ───────────────────────────────────────────────────────────────
-// Shared across all 4 staff screens (Team/Calendar-picker/Journal/Schedule/
-// Summary) so the same row of tabs stays put no matter which one you're on,
-// instead of each screen inventing its own ad-hoc "jump to the others"
-// buttons that only pointed at the *other* 3 and vanished once you were on
-// one of them.
+// Shared across all 3 staff screens (Team/Journal/Summary, plus the
+// Calendar date-picker) so the same row stays put no matter which one
+// you're on, instead of each screen inventing its own ad-hoc "jump to the
+// others" buttons that only pointed at the *other* ones and vanished once
+// you were on one of them. Schedule used to be a 4th tab here — it's now
+// just the "Неделя" view inside Journal, since a day and a week of the
+// same status grid were really the same screen wearing two shapes.
 function StaffTabBar({ go, active }) {
   const [calOpen, setCalOpen] = React.useState(false);
   const today = todayStr();
@@ -4685,22 +4820,22 @@ function StaffTabBar({ go, active }) {
       onClick: () => setCalOpen(true) },
     { key: 'staff-daily',    emoji: '📋', label: L('Журнал', 'Journal'),
       onClick: () => go('staff-daily', { date: today }) },
-    { key: 'staff-schedule', emoji: '🗓️', label: L('Расписание', 'Schedule'),
-      onClick: () => go('staff-schedule') },
     { key: 'staff-monthly',  emoji: '📊', label: L('Сводка', 'Summary'),
       onClick: () => go('staff-monthly') },
   ];
   return (
     <>
-      <div style={{ display: 'flex', gap: 7, marginBottom: 16, overflowX: 'auto', scrollbarWidth: 'none' }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
         {tabs.map(t => (
           <button key={t.key} onClick={t.onClick} className="bk-press" style={{
-            flexShrink: 0, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-            padding: '8px 13px', borderRadius: 999, fontSize: 12.5, fontWeight: 700,
+            flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+            borderRadius: 14, padding: '10px 2px',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
             background: active === t.key ? '#B07848' : '#FBF7F2',
             color: active === t.key ? '#fff' : 'var(--ink-soft)',
             boxShadow: active === t.key ? '0 6px 14px -6px #B07848' : '0 1px 2px rgba(60,40,20,0.05)' }}>
-            {t.emoji} {t.label}
+            <span style={{ fontSize: 18 }}>{t.emoji}</span>
+            <span style={{ fontSize: 9.5, fontWeight: 700, lineHeight: 1.1, textAlign: 'center' }}>{t.label}</span>
           </button>
         ))}
       </div>
@@ -4790,7 +4925,7 @@ function TeamScreen({ go }) {
   );
 }
 
-// ── StaffScheduleScreen ───────────────────────────────────────────────────────
+// ── week-view helpers (used by StaffDailyScreen's "Неделя" toggle) ────────────
 
 const MONTHS_RU = ['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
 const MONTHS_EN = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -4805,201 +4940,6 @@ function mondayOf(d) {
 }
 function dateKey(d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
-
-function StaffScheduleScreen({ go }) {
-  const [weekStart, setWeekStart] = React.useState(() => mondayOf(new Date()));
-  const [staff,   setStaff]   = React.useState([]);
-  const [data,    setData]    = React.useState({});
-  const [loading, setLoading] = React.useState(true);
-  const [picker,  setPicker]  = React.useState(null);
-
-  // Mon–Fri only — weekends aren't workdays for this staff, so a full
-  // 7-column week would just waste two columns of dead space. A week at a
-  // time (instead of a whole month) means those 5 columns can be wide
-  // enough to actually read comfortably.
-  const weekdays = Array.from({length: 5}, (_, i) => {
-    const d = new Date(weekStart); d.setDate(weekStart.getDate() + i); return d;
-  });
-  const DOW_RU = ['Пн','Вт','Ср','Чт','Пт'], DOW_EN = ['Mon','Tue','Wed','Thu','Fri'];
-
-  React.useEffect(() => {
-    setLoading(true);
-    // A week can straddle two calendar months near the boundary — fetch
-    // whichever month(s) its 5 days actually fall in and merge them,
-    // rather than adding a dedicated date-range endpoint for just this.
-    const monthKeys = [...new Set(weekdays.map(d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`))];
-    Promise.all([window.loadStaff(), ...monthKeys.map(mk => window.getStaffMonthly(mk))])
-      .then(([s, ...monthDatas]) => {
-        setStaff(s);
-        const merged = {};
-        monthDatas.forEach(md => {
-          Object.entries(md).forEach(([name, days]) => {
-            merged[name] = { ...(merged[name] || {}), ...days };
-          });
-        });
-        setData(merged);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [weekStart.getTime()]);
-
-  function prevWeek() { setWeekStart(w => { const d = new Date(w); d.setDate(w.getDate() - 7); return d; }); }
-  function nextWeek() { setWeekStart(w => { const d = new Date(w); d.setDate(w.getDate() + 7); return d; }); }
-
-  function getCell(name, d) {
-    return data[name]?.[dateKey(d)] || null;
-  }
-
-  function openPicker(name, d) {
-    const date = dateKey(d);
-    const rec = data[name]?.[date];
-    setPicker({ name, date, day: d.getDate(), status: rec?.status || null, arrival_time: rec?.arrival_time || '' });
-  }
-
-  async function handlePick(status, arrival_time) {
-    const { name, date } = picker;
-    if (!status) {
-      await window.clearStaffDay(date, name).catch(() => {});
-      setData(prev => {
-        const n = { ...prev, [name]: { ...(prev[name] || {}) } };
-        delete n[name][date];
-        return n;
-      });
-    } else {
-      await window.setStaffDay(date, name, { status, arrival_time: arrival_time || '' }).catch(() => {});
-      setData(prev => ({
-        ...prev,
-        [name]: { ...(prev[name] || {}), [date]: { status, arrival_time: arrival_time || '' } }
-      }));
-    }
-    setPicker(null);
-  }
-
-  const NAME_W = 72;
-  const CELL_W = 58;
-  const CELL_H = 46;
-
-  const weekEnd = weekdays[4];
-  const sameMonth = weekStart.getMonth() === weekEnd.getMonth();
-  const weekLabel = sameMonth
-    ? (window.__lang === 'ru'
-        ? `${weekStart.getDate()}–${weekEnd.getDate()} ${MONTHS_RU[weekEnd.getMonth()]}`
-        : `${MONTHS_EN[weekStart.getMonth()].slice(0,3)} ${weekStart.getDate()}–${weekEnd.getDate()}`)
-    : (window.__lang === 'ru'
-        ? `${weekStart.getDate()} ${MONTHS_RU[weekStart.getMonth()].slice(0,3)} – ${weekEnd.getDate()} ${MONTHS_RU[weekEnd.getMonth()].slice(0,3)}`
-        : `${MONTHS_EN[weekStart.getMonth()].slice(0,3)} ${weekStart.getDate()} – ${MONTHS_EN[weekEnd.getMonth()].slice(0,3)} ${weekEnd.getDate()}`);
-
-  return (
-    <div style={{ padding: '4px 20px 28px' }}>
-      <StaffTabBar go={go} active="staff-schedule" />
-
-      {/* Week nav */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, marginBottom: 14 }}>
-        <button onClick={prevWeek} className="bk-press" style={{
-          border: 'none', background: 'none', cursor: 'pointer', padding: '0 10px' }}><Chevron dir="left" size={18} /></button>
-        <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--ink-soft)', minWidth: 150, textAlign: 'center' }}>
-          {weekLabel} {weekEnd.getFullYear()}
-        </span>
-        <button onClick={nextWeek} className="bk-press" style={{
-          border: 'none', background: 'none', cursor: 'pointer', padding: '0 10px' }}><Chevron dir="right" size={18} /></button>
-      </div>
-
-      {loading && (
-        <div style={{ textAlign: 'center', padding: '32px 20px', color: 'var(--ink-faint)', fontSize: 13 }}>…</div>
-      )}
-      {!loading && staff.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '32px 20px', color: 'var(--ink-soft)', fontSize: 14, fontWeight: 700 }}>
-          {L('Сначала добавьте сотрудников в разделе «Команда»', 'Add staff members in the Team section first')}
-        </div>
-      )}
-
-      {!loading && staff.length > 0 && (
-        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }}>
-          <div style={{ display: 'inline-block',
-            minWidth: NAME_W + weekdays.length * (CELL_W + 4) }}>
-
-            {/* Weekday-name + date header */}
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
-              <div style={{ width: NAME_W, flexShrink: 0 }} />
-              {weekdays.map((d, i) => (
-                <div key={i} style={{ width: CELL_W, flexShrink: 0, marginRight: 4, textAlign: 'center' }}>
-                  <div style={{ fontSize: 11.5, fontWeight: 800, color: 'var(--ink-soft)' }}>
-                    {window.__lang === 'ru' ? DOW_RU[i] : DOW_EN[i]}
-                  </div>
-                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--ink-faint)' }}>{d.getDate()}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Staff rows */}
-            {staff.map(s => {
-              const parts = s.name.split(' ');
-              const firstName = parts[0];
-              const rest = parts.slice(1).join(' ');
-              return (
-                <div key={s.name} style={{ display: 'flex', alignItems: 'center', marginBottom: 5 }}>
-                  <div style={{ width: NAME_W, flexShrink: 0, paddingRight: 5, overflow: 'hidden' }}>
-                    <span style={{ fontSize: 11.5, fontWeight: 800, color: 'var(--ink)',
-                      display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {firstName}
-                    </span>
-                    {rest && <span style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--ink-soft)',
-                      display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{rest}</span>}
-                  </div>
-                  {weekdays.map((d, i) => {
-                    const rec = getCell(s.name, d);
-                    const st  = rec?.status || null;
-                    const ss  = st ? STAFF_STATUSES.find(x => x.id === st) : null;
-                    const bg  = st ? SSTAFF_COLOR[st] : '#F5F3EE';
-                    const stickers = [];
-                    if (rec?.transfer) stickers.push('🚌');
-                    if (rec?.extra) stickers.push('⏰');
-                    return (
-                      <button key={i} onClick={() => openPicker(s.name, d)} className="bk-press"
-                        style={{ position: 'relative', width: CELL_W, height: CELL_H, flexShrink: 0, marginRight: 4,
-                          border: 'none', cursor: 'pointer', borderRadius: 10,
-                          background: bg, fontSize: 19, fontFamily: 'inherit',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {ss?.emoji || ''}
-                        {stickers.map((emoji, si) => (
-                          <span key={emoji} style={{ position: 'absolute',
-                            [si === 0 ? 'top' : 'bottom']: -4, right: -4, fontSize: 12 }}>{emoji}</span>
-                        ))}
-                      </button>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Legend */}
-      <div style={{ padding: '14px 0 0', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-        {STAFF_STATUSES.map(ss => (
-          <span key={ss.id} style={{ fontSize: 11, fontWeight: 600,
-            background: SSTAFF_COLOR[ss.id], color: SSTAFF_INK[ss.id],
-            padding: '3px 8px', borderRadius: 999 }}>
-            {ss.emoji} {window.__lang === 'ru' ? ss.ru : ss.en}
-          </span>
-        ))}
-        <span style={{ fontSize: 11, fontWeight: 600, background: EXTRA_COLOR, color: EXTRA_INK,
-          padding: '3px 8px', borderRadius: 999 }}>
-          🚌 {L('Трансфер', 'Transfer')}
-        </span>
-        <span style={{ fontSize: 11, fontWeight: 600, background: EXTRA_COLOR, color: EXTRA_INK,
-          padding: '3px 8px', borderRadius: 999 }}>
-          ⏰ {L('Переработка', 'Overtime')}
-        </span>
-      </div>
-
-      {picker && (
-        <ScheduleCellPicker picker={picker} onClose={() => setPicker(null)} onPick={handlePick} />
-      )}
-    </div>
-  );
 }
 
 function ScheduleCellPicker({ picker, onClose, onPick }) {
@@ -5094,6 +5034,12 @@ function ScheduleCellPicker({ picker, onClose, onPick }) {
 // ── StaffDailyScreen ──────────────────────────────────────────────────────────
 
 function StaffDailyScreen({ params, go }) {
+  // Day and week were really the same screen (mark a status for a person
+  // on a date) wearing two shapes — a toggle here instead of two separate
+  // screens/tabs.
+  const [view, setView] = React.useState('day'); // 'day' | 'week'
+
+  // ── day view ──────────────────────────────────────────────────────────
   const initDate = (params && params.date) || todayStr();
   const [date, setDate] = React.useState(initDate);
   const [calOpen, setCalOpen] = React.useState(false);
@@ -5105,12 +5051,19 @@ function StaffDailyScreen({ params, go }) {
   // (goTab replaces the stack entry in place rather than remounting), so a
   // tap while already here changes params.date without ever re-running the
   // useState(initDate) initializer above — sync it explicitly or those
-  // taps would silently do nothing.
+  // taps would silently do nothing. Also jumps back to day view — picking
+  // a date from "Календарь" means "show me that one day", even if you'd
+  // been looking at the week grid.
   React.useEffect(() => {
-    if (params && params.date && params.date !== date) setDate(params.date);
+    if (params && params.date && params.date !== date) { setDate(params.date); setView('day'); }
   }, [params && params.date]);
 
   React.useEffect(() => {
+    // Re-fetch on every switch back into day view too, not just on date
+    // change — editing a status for this same date via the week grid
+    // (different state, see below) shouldn't leave these cards showing
+    // what they had before you flipped over there.
+    if (view !== 'day') return;
     Promise.all([window.loadStaff(), window.getStaffAttendance(date)])
       .then(([s, rec]) => {
         // Teacher only sees themselves
@@ -5122,7 +5075,7 @@ function StaffDailyScreen({ params, go }) {
         setSavedRecords(rec);
       })
       .catch(() => {});
-  }, [date]);
+  }, [view, date]);
 
   const hasChanges = JSON.stringify(records) !== JSON.stringify(savedRecords);
 
@@ -5146,15 +5099,140 @@ function StaffDailyScreen({ params, go }) {
     setRecords(r => ({ ...r, [name]: { ...(r[name] || {}), extra: !cur } }));
   }
 
+  const [saveErr, setSaveErr] = React.useState(null);
   async function save() {
-    await window.saveStaffAttendance(date, records).catch(() => {});
-    setSavedRecords(records);
+    setSaveErr(null);
+    try {
+      await window.saveStaffAttendance(date, records);
+      setSavedRecords(records);
+    } catch (e) {
+      setSaveErr(L('Ошибка сохранения', 'Save failed'));
+    }
   }
+
+  // ── week view ─────────────────────────────────────────────────────────
+  const [weekStart, setWeekStart] = React.useState(() => mondayOf(new Date()));
+  const [weekStaff, setWeekStaff] = React.useState([]);
+  const [weekData, setWeekData] = React.useState({});
+  const [weekLoading, setWeekLoading] = React.useState(true);
+  const [picker, setPicker] = React.useState(null);
+
+  // Mon–Fri only — weekends aren't workdays for this staff, so a full
+  // 7-column week would just waste two columns of dead space. A week at a
+  // time (instead of a whole month) means those 5 columns can be wide
+  // enough to actually read comfortably.
+  const weekdays = Array.from({length: 5}, (_, i) => {
+    const d = new Date(weekStart); d.setDate(weekStart.getDate() + i); return d;
+  });
+  const DOW_RU = ['Пн','Вт','Ср','Чт','Пт'], DOW_EN = ['Mon','Tue','Wed','Thu','Fri'];
+
+  React.useEffect(() => {
+    if (view !== 'week') return;
+    setWeekLoading(true);
+    // A week can straddle two calendar months near the boundary — fetch
+    // whichever month(s) its 5 days actually fall in and merge them,
+    // rather than adding a dedicated date-range endpoint for just this.
+    const monthKeys = [...new Set(weekdays.map(d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`))];
+    Promise.all([window.loadStaff(), ...monthKeys.map(mk => window.getStaffMonthly(mk))])
+      .then(([s, ...monthDatas]) => {
+        setWeekStaff(s);
+        const merged = {};
+        monthDatas.forEach(md => {
+          Object.entries(md).forEach(([name, days]) => {
+            merged[name] = { ...(merged[name] || {}), ...days };
+          });
+        });
+        setWeekData(merged);
+      })
+      .catch(() => {})
+      .finally(() => setWeekLoading(false));
+  }, [view, weekStart.getTime()]);
+
+  function prevWeek() { setWeekStart(w => { const d = new Date(w); d.setDate(w.getDate() - 7); return d; }); }
+  function nextWeek() { setWeekStart(w => { const d = new Date(w); d.setDate(w.getDate() + 7); return d; }); }
+
+  function getCell(name, d) {
+    return weekData[name]?.[dateKey(d)] || null;
+  }
+
+  function openPicker(name, d) {
+    const dk = dateKey(d);
+    const rec = weekData[name]?.[dk];
+    setPicker({ name, date: dk, day: d.getDate(), status: rec?.status || null, arrival_time: rec?.arrival_time || '' });
+  }
+
+  async function handlePick(status, arrival_time) {
+    const { name, date: pickedDate } = picker;
+    const prevRec = weekData[name]?.[pickedDate]; // for reverting the optimistic update on failure
+    if (!status) {
+      setWeekData(prev => {
+        const n = { ...prev, [name]: { ...(prev[name] || {}) } };
+        delete n[name][pickedDate];
+        return n;
+      });
+      try {
+        await window.clearStaffDay(pickedDate, name);
+      } catch (e) {
+        setWeekData(prev => ({ ...prev, [name]: { ...(prev[name] || {}), [pickedDate]: prevRec } }));
+        window.showToast(L('Не удалось сохранить: ', 'Failed to save: ') + String(e));
+      }
+    } else {
+      setWeekData(prev => ({
+        ...prev,
+        [name]: { ...(prev[name] || {}), [pickedDate]: { status, arrival_time: arrival_time || '' } }
+      }));
+      try {
+        await window.setStaffDay(pickedDate, name, { status, arrival_time: arrival_time || '' });
+      } catch (e) {
+        setWeekData(prev => {
+          const n = { ...prev, [name]: { ...(prev[name] || {}) } };
+          if (prevRec === undefined) delete n[name][pickedDate]; else n[name][pickedDate] = prevRec;
+          return n;
+        });
+        window.showToast(L('Не удалось сохранить: ', 'Failed to save: ') + String(e));
+      }
+    }
+    setPicker(null);
+  }
+
+  const NAME_W = 72;
+  const CELL_W = 58;
+  const CELL_H = 46;
+
+  const weekEnd = weekdays[4];
+  const sameMonth = weekStart.getMonth() === weekEnd.getMonth();
+  const weekLabel = sameMonth
+    ? (window.__lang === 'ru'
+        ? `${weekStart.getDate()}–${weekEnd.getDate()} ${MONTHS_RU[weekEnd.getMonth()]}`
+        : `${MONTHS_EN[weekStart.getMonth()].slice(0,3)} ${weekStart.getDate()}–${weekEnd.getDate()}`)
+    : (window.__lang === 'ru'
+        ? `${weekStart.getDate()} ${MONTHS_RU[weekStart.getMonth()].slice(0,3)} – ${weekEnd.getDate()} ${MONTHS_RU[weekEnd.getMonth()].slice(0,3)}`
+        : `${MONTHS_EN[weekStart.getMonth()].slice(0,3)} ${weekStart.getDate()} – ${MONTHS_EN[weekEnd.getMonth()].slice(0,3)} ${weekEnd.getDate()}`);
 
   return (
     <div style={{ padding: '4px 20px 28px' }}>
       <StaffTabBar go={go} active="staff-daily" />
 
+      {/* Day / Week toggle */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 16, background: '#FBF7F2', borderRadius: 999, padding: 4 }}>
+        <button onClick={() => setView('day')} className="bk-press" style={{
+          flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 700,
+          padding: '8px 4px', borderRadius: 999,
+          background: view === 'day' ? '#B07848' : 'transparent',
+          color: view === 'day' ? '#fff' : 'var(--ink-soft)' }}>
+          {L('День', 'Day')}
+        </button>
+        <button onClick={() => setView('week')} className="bk-press" style={{
+          flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 700,
+          padding: '8px 4px', borderRadius: 999,
+          background: view === 'week' ? '#B07848' : 'transparent',
+          color: view === 'week' ? '#fff' : 'var(--ink-soft)' }}>
+          {L('Неделя', 'Week')}
+        </button>
+      </div>
+
+      {view === 'day' ? (
+      <>
       {/* Date navigation */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
         <CalendarSquareButton date={date} onClick={() => setCalOpen(true)} />
@@ -5245,7 +5323,117 @@ function StaffDailyScreen({ params, go }) {
       })}
       </div>
 
+      {saveErr && <div style={{ textAlign: 'center', color: 'var(--no)', fontSize: 13, fontWeight: 600, padding: '6px 0' }}>{saveErr}</div>}
       {staff.length > 0 && <SaveBar hasChanges={hasChanges} onSave={save} />}
+      </>
+      ) : (
+      <>
+      {/* Week nav */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, marginBottom: 14 }}>
+        <button onClick={prevWeek} className="bk-press" style={{
+          border: 'none', background: 'none', cursor: 'pointer', padding: '0 10px' }}><Chevron dir="left" size={18} /></button>
+        <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--ink-soft)', minWidth: 150, textAlign: 'center' }}>
+          {weekLabel} {weekEnd.getFullYear()}
+        </span>
+        <button onClick={nextWeek} className="bk-press" style={{
+          border: 'none', background: 'none', cursor: 'pointer', padding: '0 10px' }}><Chevron dir="right" size={18} /></button>
+      </div>
+
+      {weekLoading && (
+        <div style={{ textAlign: 'center', padding: '32px 20px', color: 'var(--ink-faint)', fontSize: 13 }}>…</div>
+      )}
+      {!weekLoading && weekStaff.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '32px 20px', color: 'var(--ink-soft)', fontSize: 14, fontWeight: 700 }}>
+          {L('Сначала добавьте сотрудников в разделе «Команда»', 'Add staff members in the Team section first')}
+        </div>
+      )}
+
+      {!weekLoading && weekStaff.length > 0 && (
+        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }}>
+          <div style={{ display: 'inline-block',
+            minWidth: NAME_W + weekdays.length * (CELL_W + 4) }}>
+
+            {/* Weekday-name + date header */}
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
+              <div style={{ width: NAME_W, flexShrink: 0 }} />
+              {weekdays.map((d, i) => (
+                <div key={i} style={{ width: CELL_W, flexShrink: 0, marginRight: 4, textAlign: 'center' }}>
+                  <div style={{ fontSize: 11.5, fontWeight: 800, color: 'var(--ink-soft)' }}>
+                    {window.__lang === 'ru' ? DOW_RU[i] : DOW_EN[i]}
+                  </div>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--ink-faint)' }}>{d.getDate()}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Staff rows */}
+            {weekStaff.map(s => {
+              const parts = s.name.split(' ');
+              const firstName = parts[0];
+              const rest = parts.slice(1).join(' ');
+              return (
+                <div key={s.name} style={{ display: 'flex', alignItems: 'center', marginBottom: 5 }}>
+                  <div style={{ width: NAME_W, flexShrink: 0, paddingRight: 5, overflow: 'hidden' }}>
+                    <span style={{ fontSize: 11.5, fontWeight: 800, color: 'var(--ink)',
+                      display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {firstName}
+                    </span>
+                    {rest && <span style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--ink-soft)',
+                      display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{rest}</span>}
+                  </div>
+                  {weekdays.map((d, i) => {
+                    const rec = getCell(s.name, d);
+                    const st  = rec?.status || null;
+                    const ss  = st ? STAFF_STATUSES.find(x => x.id === st) : null;
+                    const bg  = st ? SSTAFF_COLOR[st] : '#F5F3EE';
+                    const stickers = [];
+                    if (rec?.transfer) stickers.push('🚌');
+                    if (rec?.extra) stickers.push('⏰');
+                    return (
+                      <button key={i} onClick={() => openPicker(s.name, d)} className="bk-press"
+                        style={{ position: 'relative', width: CELL_W, height: CELL_H, flexShrink: 0, marginRight: 4,
+                          border: 'none', cursor: 'pointer', borderRadius: 10,
+                          background: bg, fontSize: 19, fontFamily: 'inherit',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {ss?.emoji || ''}
+                        {stickers.map((emoji, si) => (
+                          <span key={emoji} style={{ position: 'absolute',
+                            [si === 0 ? 'top' : 'bottom']: -4, right: -4, fontSize: 12 }}>{emoji}</span>
+                        ))}
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Legend */}
+      <div style={{ padding: '14px 0 0', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {STAFF_STATUSES.map(ss => (
+          <span key={ss.id} style={{ fontSize: 11, fontWeight: 600,
+            background: SSTAFF_COLOR[ss.id], color: SSTAFF_INK[ss.id],
+            padding: '3px 8px', borderRadius: 999 }}>
+            {ss.emoji} {window.__lang === 'ru' ? ss.ru : ss.en}
+          </span>
+        ))}
+        <span style={{ fontSize: 11, fontWeight: 600, background: EXTRA_COLOR, color: EXTRA_INK,
+          padding: '3px 8px', borderRadius: 999 }}>
+          🚌 {L('Трансфер', 'Transfer')}
+        </span>
+        <span style={{ fontSize: 11, fontWeight: 600, background: EXTRA_COLOR, color: EXTRA_INK,
+          padding: '3px 8px', borderRadius: 999 }}>
+          ⏰ {L('Переработка', 'Overtime')}
+        </span>
+      </div>
+
+      {picker && (
+        <ScheduleCellPicker picker={picker} onClose={() => setPicker(null)} onPick={handlePick} />
+      )}
+      </>
+      )}
     </div>
   );
 }
@@ -5482,7 +5670,7 @@ const TITLES = {
   home: 'appName', children: 'children', attendance: 'markDay',
   payments: 'payments', 'payments-garden': 'payments', 'payments-clubs': 'payments',
   activities: 'activities', club: 'activities', summary: 'daySummary', notifications: 'notifications', compose: 'compose',
-  team: 'team', 'staff-daily': 'staffLog', 'staff-monthly': 'monthSummary', 'staff-schedule': 'staffSchedule',
+  team: 'team', 'staff-daily': 'staffLog', 'staff-monthly': 'monthSummary',
 };
 
 // Attendance is marked fresh each day; persisted in localStorage so a reload
@@ -5610,6 +5798,12 @@ function App() {
     // after a later successful retry sets childrenReady=true, since the
     // error branch is checked first in the render below.
     setLoadError(null);
+    // Retry any write that got queued (see makeDurable) but never
+    // confirmed — on first launch that's a previous session getting
+    // killed/backgrounded mid-save; on every later "came back to the app"
+    // trigger below, it's also the natural moment to retry one that failed
+    // because the network was briefly gone while backgrounded.
+    window.flushPendingWrites().catch(() => {});
     return Promise.all([
       window.loadChildren(),
       window.loadClubs().catch(() => {}),
@@ -5797,7 +5991,7 @@ function App() {
   // top entry in place while already inside the module; only push like a
   // normal navigation the first time something outside the module (e.g.
   // HomeScreen's tile) sends you in.
-  const STAFF_TAB_SCREENS = ['team', 'staff-daily', 'staff-schedule', 'staff-monthly'];
+  const STAFF_TAB_SCREENS = ['team', 'staff-daily', 'staff-monthly'];
   function goTab(name, params = {}) {
     setDir('fwd');
     setStack(s => (s.length && STAFF_TAB_SCREENS.includes(s[s.length - 1].name))
@@ -5873,7 +6067,6 @@ function App() {
       case 'notifications': return <NotificationsScreen feed={feed} go={go} actions={actions} />;
       case 'compose':       return <ComposeScreen back={back} actions={actions} />;
       case 'team':           return <TeamScreen go={goTab} />;
-      case 'staff-schedule': return <StaffScheduleScreen go={goTab} />;
       case 'staff-daily':    return <StaffDailyScreen params={p} go={goTab} />;
       case 'staff-monthly':  return <StaffMonthlyScreen go={goTab} />;
       default:              return null;
