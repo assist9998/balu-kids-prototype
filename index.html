@@ -4408,7 +4408,7 @@ function ActivitiesScreen({ go }) {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{Lo(club)}</div>
             <div style={{ fontSize: 13, color: 'var(--ink-soft)', fontWeight: 600, marginTop: 2 }}>
-              {Lo(club.days)} · {club.time}
+              {Lo(club.days)}{club.time ? ` · ${club.time}` : ''}
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
@@ -4530,7 +4530,7 @@ function ClubScreen({ params }) {
         <div>
           <div style={{ fontSize: 22, fontWeight: 800, color: club.ink, fontFamily: 'var(--font-display)' }}>{Lo(club)}</div>
           <div style={{ fontSize: 13, color: club.ink, fontWeight: 600, opacity: 0.75, marginTop: 2 }}>
-            {Lo(club.days)} · {club.time} · {kids.length} {L('детей', 'kids')}
+            {Lo(club.days)}{club.time ? ` · ${club.time}` : ''} · {kids.length} {L('детей', 'kids')}
           </div>
         </div>
       </div>
