@@ -207,6 +207,7 @@
     daysSick:          { ru: 'Болезни',         en: 'Sick days' },
     daysDayOff:        { ru: 'Выходные',        en: 'Days off' },
     daysAbsent:        { ru: 'Пропущено',       en: 'Absent days' },
+    staffTasks:        { ru: 'Задачи',          en: 'Tasks' },
   };
 
   let LANG = 'ru';
@@ -401,6 +402,42 @@ window.API_BASE = "https://rmxois1uv0a24xrbi2dfcfac.95.179.188.141.sslip.io";
   window.getStaffMonthly = async function (month) {
     const res = await fetch(`${window.API_BASE}/staff-attendance-month/${encodeURIComponent(month)}`);
     if (!res.ok) throw new Error(`GET /staff-attendance-month failed: ${res.status}`);
+    return res.json();
+  };
+
+  window.loadStaffTasks = async function (staffName, month) {
+    const res = await fetch(`${window.API_BASE}/staff-tasks/${encodeURIComponent(staffName)}?month=${encodeURIComponent(month)}`);
+    if (!res.ok) throw new Error(`GET /staff-tasks failed: ${res.status}`);
+    return res.json();
+  };
+
+  window.createStaffTask = async function (data, idempotencyKey) {
+    const res = await fetch(`${window.API_BASE}/staff-tasks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...data, idempotencyKey }),
+    });
+    if (!res.ok) throw new Error(`POST /staff-tasks failed: ${res.status}`);
+    return res.json();
+  };
+
+  window.archiveStaffTask = async function (taskId) {
+    const res = await fetch(`${window.API_BASE}/staff-tasks/${taskId}`, { method: 'DELETE' });
+    // 404 = already gone, same reasoning as deletePaymentLogEntry — a
+    // durably-queued retry of an already-successful archive must not get
+    // stuck forever waiting for a 200 that will never come again.
+    if (res.status === 404) return { ok: true };
+    if (!res.ok) throw new Error(`DELETE /staff-tasks failed: ${res.status}`);
+    return res.json();
+  };
+
+  window.updateStaffTaskInstance = async function (instanceId, status, cancelReason) {
+    const res = await fetch(`${window.API_BASE}/staff-task-instances/${instanceId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, cancelReason: cancelReason || '' }),
+    });
+    if (!res.ok) throw new Error(`PATCH /staff-task-instances failed: ${res.status}`);
     return res.json();
   };
 
@@ -668,6 +705,9 @@ window.API_BASE = "https://rmxois1uv0a24xrbi2dfcfac.95.179.188.141.sslip.io";
   window.deleteClubPaymentLogEntry = makeDurable('deleteClubPaymentLogEntry', window.deleteClubPaymentLogEntry);
   window.addPaymentLogEntry        = makeDurableIdempotent('addPaymentLogEntry', window.addPaymentLogEntry);
   window.addClubPaymentLogEntry    = makeDurableIdempotent('addClubPaymentLogEntry', window.addClubPaymentLogEntry);
+  window.archiveStaffTask          = makeDurable('archiveStaffTask', window.archiveStaffTask);
+  window.updateStaffTaskInstance   = makeDurable('updateStaffTaskInstance', window.updateStaffTaskInstance);
+  window.createStaffTask           = makeDurableIdempotent('createStaffTask', window.createStaffTask);
 })();
 
 </script>
@@ -2809,7 +2849,7 @@ function Portal({ children }) {
   return ReactDOM.createPortal(children, el);
 }
 
-function MiniCalendar({ selected, onSelect, onClose, disableWeekends = true, disableFuture = true }) {
+function MiniCalendar({ selected, onSelect, onClose, disableWeekends = true, disableFuture = true, allowedWeekdays = null }) {
   const today = todayStr();
   const init = new Date((selected || today) + 'T12:00:00');
   const [viewYear,  setViewYear]  = React.useState(init.getFullYear());
@@ -2870,14 +2910,19 @@ function MiniCalendar({ selected, onSelect, onClose, disableWeekends = true, dis
             const isFuture= dateStr > today;
             const isSel   = dateStr === selected;
             const isTdy   = dateStr === today;
-            const disabled= (disableWeekends && isWknd) || (disableFuture && isFuture);
+            // allowedWeekdays (a club's real meeting days) is the stricter
+            // rule when given — an empty array means "schedule unknown",
+            // which falls back to the plain weekend rule rather than
+            // disabling every single day on the calendar.
+            const notAllowedDay = allowedWeekdays && allowedWeekdays.length > 0 && !allowedWeekdays.includes(wday);
+            const disabled= notAllowedDay || (disableWeekends && isWknd) || (disableFuture && isFuture);
             return (
               <button key={d} disabled={disabled}
                 onClick={() => { if (!disabled) { onSelect(dateStr); onClose(); } }}
                 style={{ border:'none', borderRadius:10, padding:'9px 2px', fontSize:14,
                   fontWeight: isSel||isTdy ? 800 : 500, cursor: disabled ? 'default' : 'pointer',
                   background: isSel ? '#B07848' : isTdy ? '#F0E4D4' : 'transparent',
-                  color: isSel ? '#fff' : (disableWeekends && isWknd) ? '#D4B8B0' : (disableFuture && isFuture) ? 'var(--ink-faint)' : 'var(--ink)',
+                  color: isSel ? '#fff' : disabled ? '#D4B8B0' : 'var(--ink)',
                   opacity: (disableFuture && isFuture) ? 0.35 : 1 }}>
                 {d}
               </button>
@@ -2892,6 +2937,21 @@ function MiniCalendar({ selected, onSelect, onClose, disableWeekends = true, dis
 function dayCount(a, b) {
   const d1 = new Date(a + 'T12:00:00'), d2 = new Date(b + 'T12:00:00');
   return Math.round((d2 - d1) / 86400000) + 1;
+}
+
+const WEEKDAY_ABBR_TO_JS_DAY = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+
+// club.days.en is a comma-separated list like "Wed" or "Mon, Wed" (the
+// Clubs sheet's "Days" column, English half) -> real JS Date.getDay()
+// values (Sun=0..Sat=6) this club actually meets on. Empty array means
+// "unknown schedule" (not entered yet, or couldn't parse) — treated as "no
+// restriction" everywhere this is used, same fail-open reasoning as the
+// backend's _club_scheduled_weekdays.
+function clubWeekdaysJS(club) {
+  const en = (club?.days?.en || '');
+  return en.split(',')
+    .map(s => WEEKDAY_ABBR_TO_JS_DAY[s.trim().toLowerCase().slice(0, 3)])
+    .filter(d => d !== undefined);
 }
 
 // picks whichever log entry covers furthest into the future — mirrors the
@@ -4392,6 +4452,16 @@ function ClubScreen({ params }) {
   const kids = activeKids().filter(k => club.kids.includes(k.id));
   const notInClub = activeKids().filter(k => !club.kids.includes(k.id));
 
+  // Which weekdays this club actually meets on (per the Clubs sheet) — an
+  // empty array means the schedule couldn't be parsed/isn't set, treated
+  // as "no restriction" rather than blocking every day. Ольга: marking
+  // attendance on days a club doesn't even run on was cluttering the
+  // database with meaningless records (every weekday, including weekends,
+  // for clubs that only actually meet once a week).
+  const clubWeekdays = clubWeekdaysJS(club);
+  const attDateWeekday = new Date(attDate + 'T12:00:00').getDay();
+  const isClubDay = clubWeekdays.length === 0 || clubWeekdays.includes(attDateWeekday);
+
   function handleAdd(childId) {
     const kids = [...club.kids, childId];
     const dataClub = DATA.CLUBS.find(c => c.id === club.id);
@@ -4503,31 +4573,39 @@ function ClubScreen({ params }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
             <CalendarSquareButton date={attDate} onClick={() => setAttCalOpen(true)} />
           </div>
-          {attCalOpen && <Portal><MiniCalendar selected={attDate} onSelect={setAttDate} onClose={() => setAttCalOpen(false)} /></Portal>}
-          {kids.length === 0 && (
+          {attCalOpen && <Portal><MiniCalendar selected={attDate} onSelect={setAttDate} onClose={() => setAttCalOpen(false)}
+            allowedWeekdays={clubWeekdays} /></Portal>}
+          {!isClubDay && (
+            <div style={{ textAlign: 'center', color: 'var(--ink-faint)', padding: 32, fontSize: 14 }}>
+              {L(`${Lo(club)} не проходит в этот день`, `${Lo(club)} doesn't meet on this day`)}
+            </div>
+          )}
+          {isClubDay && kids.length === 0 && (
             <div style={{ textAlign: 'center', color: 'var(--ink-faint)', padding: 24, fontSize: 14 }}>
               {L('Нет участников', 'No members')}
             </div>
           )}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-            {kids.map(kid => {
-              const grp = DATA.GROUPS.find(g => g.id === kid.group);
-              const kidIndex = activeKids().filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
-              const status = attLocal[kid.id] || 'absent';
-              return (
-                <Card key={kid.id} pad={12} style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2' }}>
-                  <Avatar emoji={kid.emoji} color={PALETTE[kidIndex % PALETTE.length]} size={44} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}</div>
-                    {grp && <span style={{ background: grp.color, color: grp.ink, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999 }}>{grp.emoji} {Lo(grp)}</span>}
-                  </div>
-                  <StatusChip status={status} onClick={() => toggleAtt(kid.id)} />
-                </Card>
-              );
-            })}
-          </div>
+          {isClubDay && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+              {kids.map(kid => {
+                const grp = DATA.GROUPS.find(g => g.id === kid.group);
+                const kidIndex = activeKids().filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
+                const status = attLocal[kid.id] || 'absent';
+                return (
+                  <Card key={kid.id} pad={12} style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2' }}>
+                    <Avatar emoji={kid.emoji} color={PALETTE[kidIndex % PALETTE.length]} size={44} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}</div>
+                      {grp && <span style={{ background: grp.color, color: grp.ink, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999 }}>{grp.emoji} {Lo(grp)}</span>}
+                    </div>
+                    <StatusChip status={status} onClick={() => toggleAtt(kid.id)} />
+                  </Card>
+                );
+              })}
+            </div>
+          )}
           {attSaveErr && <div style={{ textAlign: 'center', color: 'var(--no)', fontSize: 13, fontWeight: 600, padding: '6px 0' }}>{attSaveErr}</div>}
-          {kids.length > 0 && <SaveBar hasChanges={attHasChanges} onSave={handleSaveAtt} />}
+          {isClubDay && kids.length > 0 && <SaveBar hasChanges={attHasChanges} onSave={handleSaveAtt} />}
         </div>
       )}
 
@@ -4837,6 +4915,8 @@ function StaffTabBar({ go, active }) {
       onClick: () => go('staff-daily', { date: today }) },
     { key: 'staff-monthly',  emoji: '📊', label: L('Сводка', 'Summary'),
       onClick: () => go('staff-monthly') },
+    { key: 'staff-tasks',    emoji: '✅', label: L('Задачи', 'Tasks'),
+      onClick: () => go('staff-tasks') },
   ];
   return (
     <>
@@ -5696,8 +5776,340 @@ const TITLES = {
   home: 'appName', children: 'children', attendance: 'markDay',
   payments: 'payments', 'payments-garden': 'payments', 'payments-clubs': 'payments',
   activities: 'activities', club: 'activities', summary: 'daySummary', notifications: 'notifications', compose: 'compose',
-  team: 'team', 'staff-daily': 'staffLog', 'staff-monthly': 'monthSummary',
+  team: 'team', 'staff-daily': 'staffLog', 'staff-monthly': 'monthSummary', 'staff-tasks': 'staffTasks',
 };
+
+const WEEKDAY_LABELS_RU = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+const WEEKDAY_LABELS_EN = ['Mo','Tu','We','Th','Fr','Sa','Su'];
+
+function taskRecurrenceLabel(t) {
+  if (t.recurrence === 'once') return L('Разово', 'One-time');
+  if (t.recurrence === 'count') return L(`${t.targetCount} раз`, `${t.targetCount}×`);
+  const names = t.weekdays.map(w => window.__lang === 'ru' ? WEEKDAY_LABELS_RU[w] : WEEKDAY_LABELS_EN[w]);
+  return L(`Каждую неделю: ${names.join(', ')}`, `Weekly: ${names.join(', ')}`);
+}
+
+function TaskFormSheet({ staffName, onClose, onSaved }) {
+  const [title,       setTitle]       = React.useState('');
+  const [recurrence,  setRecurrence]  = React.useState('once');
+  const [weekdays,    setWeekdays]    = React.useState([]);
+  const [targetCount, setTargetCount] = React.useState('3');
+  const [startDate,   setStartDate]   = React.useState(todayStr());
+  const [endDate,     setEndDate]     = React.useState('');
+  const [saving,      setSaving]      = React.useState(false);
+  const [error,       setError]       = React.useState(null);
+
+  function toggleWeekday(w) {
+    setWeekdays(ws => ws.includes(w) ? ws.filter(x => x !== w) : [...ws, w].sort());
+  }
+
+  async function handleSave() {
+    if (!title.trim()) { setError(L('Введите текст задачи', 'Enter a task description')); return; }
+    if (recurrence === 'weekly' && weekdays.length === 0) {
+      setError(L('Выберите хотя бы один день недели', 'Pick at least one weekday')); return;
+    }
+    if (recurrence === 'count' && (!targetCount || Number(targetCount) < 1)) {
+      setError(L('Укажите количество раз', 'Enter how many times')); return;
+    }
+    setSaving(true); setError(null);
+    try {
+      await window.createStaffTask({
+        staffName, title: title.trim(), recurrence, weekdays,
+        targetCount: recurrence === 'count' ? Number(targetCount) : null,
+        startDate, endDate: (recurrence === 'weekly' && endDate) ? endDate : null,
+      });
+      onSaved();
+    } catch (e) { setError(e.message); setSaving(false); }
+  }
+
+  const INP = { width: '100%', boxSizing: 'border-box', border: '1.5px solid #DDD8CF', borderRadius: 12,
+    padding: '11px 14px', fontFamily: 'inherit', fontSize: 14, background: '#FBF7F2',
+    color: 'var(--ink)', outline: 'none' };
+  const LBL = { fontSize: 11, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase',
+    color: 'var(--ink-soft)', marginBottom: 5, display: 'block' };
+
+  return (
+    <Portal>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'flex-end',
+      background: 'rgba(0,0,0,0.4)' }} onClick={onClose}>
+      <div style={{ width: '100%', background: 'var(--bg)', borderRadius: '24px 24px 0 0',
+        maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}
+        onClick={e => e.stopPropagation()}>
+
+        <div style={{ flexShrink: 0, padding: '12px 20px 12px', borderBottom: '1px solid rgba(60,40,20,0.07)' }}>
+          <div style={{ width: 40, height: 4, background: 'rgba(60,40,20,0.15)', borderRadius: 2, margin: '0 auto 12px' }} />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>
+              {L('Новая задача', 'New task')} — {staffName}
+            </div>
+            <button onClick={onClose} style={{ border: 'none', background: 'none', fontSize: 24,
+              cursor: 'pointer', color: 'var(--ink-faint)', padding: 4 }}>×</button>
+          </div>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px 8px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <label style={LBL}>{L('Задача', 'Task')}</label>
+              <textarea style={{ ...INP, resize: 'none' }} rows={2} value={title}
+                onChange={e => setTitle(e.target.value)}
+                placeholder={L('Скидывать отчёт о состоянии площадки и склада', 'Send a report on playground/warehouse status')} />
+            </div>
+
+            <div>
+              <label style={LBL}>{L('Периодичность', 'Recurrence')}</label>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {[['once', L('Разово', 'Once')], ['weekly', L('Еженедельно', 'Weekly')], ['count', L('N раз', 'N times')]].map(([id, lbl]) => (
+                  <button key={id} onClick={() => setRecurrence(id)} className="bk-press" style={{
+                    flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                    padding: '9px 4px', borderRadius: 12, fontSize: 12.5, fontWeight: 800,
+                    background: recurrence === id ? '#B07848' : '#FBF7F2',
+                    color: recurrence === id ? '#fff' : 'var(--ink-soft)' }}>
+                    {lbl}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {recurrence === 'weekly' && (
+              <div>
+                <label style={LBL}>{L('Дни недели', 'Weekdays')}</label>
+                <div style={{ display: 'flex', gap: 5 }}>
+                  {(window.__lang === 'ru' ? WEEKDAY_LABELS_RU : WEEKDAY_LABELS_EN).map((lbl, w) => (
+                    <button key={w} onClick={() => toggleWeekday(w)} className="bk-press" style={{
+                      flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                      padding: '8px 2px', borderRadius: 10, fontSize: 12, fontWeight: 800,
+                      background: weekdays.includes(w) ? '#B07848' : '#FBF7F2',
+                      color: weekdays.includes(w) ? '#fff' : 'var(--ink-soft)' }}>
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {recurrence === 'count' && (
+              <div>
+                <label style={LBL}>{L('Сколько раз', 'How many times')}</label>
+                <input style={INP} type="number" inputMode="numeric" min="1" value={targetCount}
+                  onChange={e => setTargetCount(e.target.value)} placeholder="3" />
+              </div>
+            )}
+
+            <div>
+              <label style={LBL}>{recurrence === 'once' ? L('Дата', 'Date') : L('Начиная с', 'Starting')}</label>
+              <input style={INP} type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+            </div>
+
+            {recurrence === 'weekly' && (
+              <div>
+                <label style={LBL}>{L('До какой даты (необязательно)', 'Until (optional)')}</label>
+                <input style={INP} type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
+              </div>
+            )}
+          </div>
+
+          {error && <div style={{ marginTop: 12, fontSize: 13, color: 'var(--no)', fontWeight: 600 }}>{error}</div>}
+
+          <button onClick={handleSave} disabled={saving} className="bk-press" style={{
+            width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-display)',
+            background: '#B07848', color: '#fff', fontSize: 15, fontWeight: 800,
+            padding: 14, borderRadius: 16, margin: '20px 0 24px', opacity: saving ? 0.7 : 1 }}>
+            {saving ? '…' : L('Создать', 'Create')}
+          </button>
+        </div>
+      </div>
+    </div>
+    </Portal>
+  );
+}
+
+function TaskInstanceRow({ instance, onSetStatus }) {
+  const [cancelOpen, setCancelOpen] = React.useState(false);
+  const [reason, setReason] = React.useState('');
+
+  const label = instance.dueDate
+    ? (() => { const [y,m,d] = instance.dueDate.split('-'); return `${d}.${m}.${y}`; })()
+    : L(`Событие ${instance.seq}`, `Event ${instance.seq}`);
+
+  const STATUS_BTN = (id, lbl, activeColor) => (
+    <button key={id} onClick={() => id === 'cancelled' ? setCancelOpen(true) : onSetStatus(instance.id, id)}
+      className="bk-press" style={{
+        border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 11.5, fontWeight: 700,
+        padding: '6px 10px', borderRadius: 999,
+        background: instance.status === id ? activeColor : '#EDE8E0',
+        color: instance.status === id ? '#fff' : 'var(--ink-soft)' }}>
+      {lbl}
+    </button>
+  );
+
+  return (
+    <div style={{ padding: '8px 0', borderTop: '1px solid rgba(60,40,20,0.06)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink)', minWidth: 60 }}>{label}</div>
+        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+          {STATUS_BTN('done', L('Сделано', 'Done'), '#1f7a55')}
+          {STATUS_BTN('postponed', L('Перенос', 'Postponed'), '#B07848')}
+          {STATUS_BTN('cancelled', L('Отмена', 'Cancelled'), '#c0392b')}
+        </div>
+      </div>
+      {instance.status === 'cancelled' && instance.cancelReason && !cancelOpen && (
+        <div style={{ fontSize: 11.5, color: 'var(--ink-faint)', marginTop: 4 }}>
+          {L('Причина', 'Reason')}: {instance.cancelReason}
+        </div>
+      )}
+      {cancelOpen && (
+        <div style={{ marginTop: 8, display: 'flex', gap: 6 }}>
+          <input value={reason} onChange={e => setReason(e.target.value)} autoFocus
+            placeholder={L('Причина отмены…', 'Reason for cancelling…')}
+            style={{ flex: 1, border: '1.5px solid #DDD8CF', borderRadius: 10, padding: '7px 10px',
+              fontFamily: 'inherit', fontSize: 12.5, background: '#FBF7F2', color: 'var(--ink)', outline: 'none' }} />
+          <button onClick={() => { if (reason.trim()) { onSetStatus(instance.id, 'cancelled', reason.trim()); setCancelOpen(false); setReason(''); } }}
+            className="bk-press" style={{ border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+              background: '#c0392b', color: '#fff', fontSize: 12, fontWeight: 700, padding: '7px 14px', borderRadius: 10 }}>
+            {L('OK', 'OK')}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StaffTasksScreen({ go }) {
+  const now = new Date();
+  const [month, setMonth] = React.useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
+  const [staff, setStaff] = React.useState([]);
+  const [personIdx, setPersonIdx] = React.useState(0);
+  const [tasks, setTasks] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [formOpen, setFormOpen] = React.useState(false);
+
+  React.useEffect(() => { withRetry(window.loadStaff).then(setStaff).catch(() => setStaff([])); }, []);
+  React.useEffect(() => { setPersonIdx(i => Math.min(i, Math.max(0, staff.length - 1))); }, [staff]);
+
+  const s = staff[personIdx];
+
+  function reload() {
+    if (!s) return;
+    setLoading(true);
+    withRetry(() => window.loadStaffTasks(s.name, month))
+      .then(setTasks).catch(() => setTasks([])).finally(() => setLoading(false));
+  }
+  React.useEffect(reload, [s && s.name, month]);
+
+  function setInstanceStatus(instanceId, status, cancelReason) {
+    const prevTasks = tasks;
+    setTasks(ts => ts.map(t => ({ ...t, instances: t.instances.map(i =>
+      i.id === instanceId ? { ...i, status, cancelReason: status === 'cancelled' ? (cancelReason || '') : null } : i
+    ) })));
+    window.updateStaffTaskInstance(instanceId, status, cancelReason).catch(() => {
+      setTasks(prevTasks);
+      window.showToast(L('Не удалось сохранить', 'Failed to save'));
+    });
+  }
+
+  function handleArchive(taskId) {
+    setTasks(ts => ts.filter(t => t.id !== taskId));
+    window.archiveStaffTask(taskId).catch(() => {
+      reload();
+      window.showToast(L('Не удалось удалить', 'Failed to delete'));
+    });
+  }
+
+  const RU_MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+  const EN_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const [yr, mo] = month.split('-').map(Number);
+  const monthLabel = window.__lang === 'en' ? `${EN_MONTHS[mo-1]} ${yr}` : `${RU_MONTHS[mo-1]} ${yr}`;
+
+  function prevMonth() { const d = new Date(yr, mo - 2, 1); setMonth(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`); }
+  function nextMonth() { const d = new Date(yr, mo, 1); setMonth(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`); }
+
+  return (
+    <div style={{ padding: '4px 20px 28px' }}>
+      <StaffTabBar go={go} active="staff-tasks" />
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        background: '#FBF7F2', borderRadius: 999, padding: '4px 6px', marginBottom: 16,
+        boxShadow: '0 1px 2px rgba(60,40,20,0.05)' }}>
+        <button onClick={prevMonth} className="bk-press" style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 8, display: 'grid', placeItems: 'center' }}><Chevron dir="left" size={16} /></button>
+        <div style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{monthLabel}</div>
+        <button onClick={nextMonth} className="bk-press" style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 8, display: 'grid', placeItems: 'center' }}><Chevron dir="right" size={16} /></button>
+      </div>
+
+      {staff.length === 0 && (
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--ink-faint)', fontSize: 14 }}>
+          {L('Нет сотрудников', 'No staff')}
+        </div>
+      )}
+
+      {s && (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+            <button onClick={() => setPersonIdx(i => Math.max(0, i - 1))} disabled={personIdx === 0}
+              className="bk-press" style={{ border: 'none', background: 'none', cursor: personIdx === 0 ? 'default' : 'pointer',
+                padding: 6, opacity: personIdx === 0 ? 0.25 : 1 }}><Chevron dir="left" size={22} /></button>
+            <Avatar emoji={positionEmoji(s.position)} color="#EDE8E0" size={44} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 800, fontSize: 15.5, color: 'var(--ink)' }}>{s.name}</div>
+              <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{s.position} · {personIdx + 1}/{staff.length}</div>
+            </div>
+            <button onClick={() => setPersonIdx(i => Math.min(staff.length - 1, i + 1))} disabled={personIdx === staff.length - 1}
+              className="bk-press" style={{ border: 'none', background: 'none', cursor: personIdx === staff.length - 1 ? 'default' : 'pointer',
+                padding: 6, opacity: personIdx === staff.length - 1 ? 0.25 : 1 }}><Chevron dir="right" size={22} /></button>
+          </div>
+
+          {loading && <div style={{ textAlign: 'center', padding: 30, color: 'var(--ink-faint)', fontSize: 13 }}>…</div>}
+
+          {!loading && tasks.length === 0 && (
+            <div style={{ textAlign: 'center', padding: 24, color: 'var(--ink-faint)', fontSize: 13.5 }}>
+              {L('Нет задач', 'No tasks')}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {!loading && tasks.map(t => {
+              const done = t.instances.filter(i => i.status === 'done').length;
+              const postponed = t.instances.filter(i => i.status === 'postponed').length;
+              const cancelled = t.instances.filter(i => i.status === 'cancelled').length;
+              const total = t.instances.length;
+              return (
+                <LongPressCard key={t.id} onTap={() => {}} onDelete={() => handleArchive(t.id)}
+                  style={{ background: '#FBF7F2', borderRadius: 18, padding: 13 }}>
+                  <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--ink)' }}>{t.title}</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--ink-faint)', fontWeight: 600, marginTop: 2 }}>
+                    {taskRecurrenceLabel(t)}
+                  </div>
+                  <div>
+                    {t.instances.map(i => (
+                      <TaskInstanceRow key={i.id} instance={i} onSetStatus={setInstanceStatus} />
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, marginTop: 8, fontSize: 11.5, fontWeight: 700, color: 'var(--ink-soft)' }}>
+                    <span>{L('Сделано', 'Done')}: {done} {L('из', 'of')} {total}</span>
+                    {postponed > 0 && <span>{L('Перенесено', 'Postponed')}: {postponed}</span>}
+                    {cancelled > 0 && <span>{L('Отменено', 'Cancelled')}: {cancelled}</span>}
+                  </div>
+                </LongPressCard>
+              );
+            })}
+          </div>
+
+          <button onClick={() => setFormOpen(true)} className="bk-press" style={{
+            width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+            background: '#EDE8E0', color: 'var(--ink)', fontSize: 13.5, fontWeight: 700,
+            padding: 12, borderRadius: 14, marginTop: 12 }}>
+            + {L('Добавить задачу', 'Add task')}
+          </button>
+        </>
+      )}
+
+      {formOpen && s && (
+        <TaskFormSheet staffName={s.name} onClose={() => setFormOpen(false)}
+          onSaved={() => { setFormOpen(false); reload(); }} />
+      )}
+    </div>
+  );
+}
 
 // Attendance is marked fresh each day; persisted in localStorage so a reload
 // during the same day doesn't lose today's marks (no backend for this yet).
@@ -6017,7 +6429,7 @@ function App() {
   // top entry in place while already inside the module; only push like a
   // normal navigation the first time something outside the module (e.g.
   // HomeScreen's tile) sends you in.
-  const STAFF_TAB_SCREENS = ['team', 'staff-daily', 'staff-monthly'];
+  const STAFF_TAB_SCREENS = ['team', 'staff-daily', 'staff-monthly', 'staff-tasks'];
   function goTab(name, params = {}) {
     setDir('fwd');
     setStack(s => (s.length && STAFF_TAB_SCREENS.includes(s[s.length - 1].name))
@@ -6095,6 +6507,7 @@ function App() {
       case 'team':           return <TeamScreen go={goTab} />;
       case 'staff-daily':    return <StaffDailyScreen params={p} go={goTab} />;
       case 'staff-monthly':  return <StaffMonthlyScreen go={goTab} />;
+      case 'staff-tasks':    return <StaffTasksScreen go={goTab} />;
       default:              return null;
     }
   }
