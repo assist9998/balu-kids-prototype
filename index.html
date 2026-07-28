@@ -405,8 +405,8 @@ window.API_BASE = "https://rmxois1uv0a24xrbi2dfcfac.95.179.188.141.sslip.io";
     return res.json();
   };
 
-  window.loadStaffTasks = async function (staffName, month) {
-    const res = await fetch(`${window.API_BASE}/staff-tasks/${encodeURIComponent(staffName)}?month=${encodeURIComponent(month)}`);
+  window.loadStaffTasks = async function (staffName) {
+    const res = await fetch(`${window.API_BASE}/staff-tasks/${encodeURIComponent(staffName)}`);
     if (!res.ok) throw new Error(`GET /staff-tasks failed: ${res.status}`);
     return res.json();
   };
@@ -5976,26 +5976,41 @@ function TaskInstanceRow({ instance, onSetStatus }) {
 }
 
 function StaffTasksScreen({ go }) {
-  const now = new Date();
-  const [month, setMonth] = React.useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
+  // Ольга: no point splitting this by month/year — just a list of staff,
+  // tap one to see everything they have on their plate right now.
   const [staff, setStaff] = React.useState([]);
-  const [personIdx, setPersonIdx] = React.useState(0);
+  const [taskCounts, setTaskCounts] = React.useState({});
+  const [countsLoading, setCountsLoading] = React.useState(true);
+  const [selectedName, setSelectedName] = React.useState(null);
   const [tasks, setTasks] = React.useState([]);
-  const [loading, setLoading] = React.useState(true);
+  const [tasksLoading, setTasksLoading] = React.useState(false);
   const [formOpen, setFormOpen] = React.useState(false);
 
-  React.useEffect(() => { withRetry(window.loadStaff).then(setStaff).catch(() => setStaff([])); }, []);
-  React.useEffect(() => { setPersonIdx(i => Math.min(i, Math.max(0, staff.length - 1))); }, [staff]);
+  React.useEffect(() => {
+    withRetry(window.loadStaff).then(s => {
+      setStaff(s);
+      // One request per person for the "N задач" badge on their card —
+      // fine at this app's scale (a handful of staff), same tradeoff
+      // TeamScreen already makes for its own per-person data.
+      Promise.all(s.map(m => withRetry(() => window.loadStaffTasks(m.name)).catch(() => [])))
+        .then(results => {
+          const counts = {};
+          s.forEach((m, i) => { counts[m.name] = results[i].length; });
+          setTaskCounts(counts);
+        })
+        .finally(() => setCountsLoading(false));
+    }).catch(() => { setStaff([]); setCountsLoading(false); });
+  }, []);
 
-  const s = staff[personIdx];
-
-  function reload() {
-    if (!s) return;
-    setLoading(true);
-    withRetry(() => window.loadStaffTasks(s.name, month))
-      .then(setTasks).catch(() => setTasks([])).finally(() => setLoading(false));
+  function reloadTasks(name) {
+    if (!name) return;
+    setTasksLoading(true);
+    withRetry(() => window.loadStaffTasks(name))
+      .then(ts => { setTasks(ts); setTaskCounts(c => ({ ...c, [name]: ts.length })); })
+      .catch(() => setTasks([]))
+      .finally(() => setTasksLoading(false));
   }
-  React.useEffect(reload, [s && s.name, month]);
+  React.useEffect(() => { reloadTasks(selectedName); }, [selectedName]);
 
   function setInstanceStatus(instanceId, status, cancelReason) {
     const prevTasks = tasks;
@@ -6010,64 +6025,67 @@ function StaffTasksScreen({ go }) {
 
   function handleArchive(taskId) {
     setTasks(ts => ts.filter(t => t.id !== taskId));
+    setTaskCounts(c => ({ ...c, [selectedName]: Math.max(0, (c[selectedName] || 1) - 1) }));
     window.archiveStaffTask(taskId).catch(() => {
-      reload();
+      reloadTasks(selectedName);
       window.showToast(L('Не удалось удалить', 'Failed to delete'));
     });
   }
 
-  const RU_MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
-  const EN_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  const [yr, mo] = month.split('-').map(Number);
-  const monthLabel = window.__lang === 'en' ? `${EN_MONTHS[mo-1]} ${yr}` : `${RU_MONTHS[mo-1]} ${yr}`;
-
-  function prevMonth() { const d = new Date(yr, mo - 2, 1); setMonth(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`); }
-  function nextMonth() { const d = new Date(yr, mo, 1); setMonth(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`); }
+  const selected = staff.find(s => s.name === selectedName);
 
   return (
     <div style={{ padding: '4px 20px 28px' }}>
       <StaffTabBar go={go} active="staff-tasks" />
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        background: '#FBF7F2', borderRadius: 999, padding: '4px 6px', marginBottom: 16,
-        boxShadow: '0 1px 2px rgba(60,40,20,0.05)' }}>
-        <button onClick={prevMonth} className="bk-press" style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 8, display: 'grid', placeItems: 'center' }}><Chevron dir="left" size={16} /></button>
-        <div style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{monthLabel}</div>
-        <button onClick={nextMonth} className="bk-press" style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 8, display: 'grid', placeItems: 'center' }}><Chevron dir="right" size={16} /></button>
-      </div>
-
-      {staff.length === 0 && (
-        <div style={{ textAlign: 'center', padding: 40, color: 'var(--ink-faint)', fontSize: 14 }}>
-          {L('Нет сотрудников', 'No staff')}
-        </div>
+      {!selectedName && (
+        <>
+          {staff.length === 0 && (
+            <div style={{ textAlign: 'center', padding: 40, color: 'var(--ink-faint)', fontSize: 14 }}>
+              {L('Нет сотрудников', 'No staff')}
+            </div>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {staff.map(s => (
+              <Card key={s.name} pad={12} onClick={() => setSelectedName(s.name)}
+                style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2', cursor: 'pointer' }}>
+                <Avatar emoji={positionEmoji(s.position)} color="#EDE8E0" size={44} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{s.name}</div>
+                  <div style={{ fontSize: 12.5, color: 'var(--ink-soft)', fontWeight: 600, marginTop: 2 }}>{s.position}</div>
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink-faint)' }}>
+                  {countsLoading ? '…' : `${taskCounts[s.name] || 0} ${L('задач', 'tasks')}`}
+                </div>
+                <Chevron dir="right" size={18} />
+              </Card>
+            ))}
+          </div>
+        </>
       )}
 
-      {s && (
+      {selectedName && selected && (
         <>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-            <button onClick={() => setPersonIdx(i => Math.max(0, i - 1))} disabled={personIdx === 0}
-              className="bk-press" style={{ border: 'none', background: 'none', cursor: personIdx === 0 ? 'default' : 'pointer',
-                padding: 6, opacity: personIdx === 0 ? 0.25 : 1 }}><Chevron dir="left" size={22} /></button>
-            <Avatar emoji={positionEmoji(s.position)} color="#EDE8E0" size={44} />
+            <button onClick={() => setSelectedName(null)} className="bk-press" style={{
+              border: 'none', background: 'none', cursor: 'pointer', padding: 6 }}><Chevron dir="left" size={22} /></button>
+            <Avatar emoji={positionEmoji(selected.position)} color="#EDE8E0" size={44} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 800, fontSize: 15.5, color: 'var(--ink)' }}>{s.name}</div>
-              <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{s.position} · {personIdx + 1}/{staff.length}</div>
+              <div style={{ fontWeight: 800, fontSize: 15.5, color: 'var(--ink)' }}>{selected.name}</div>
+              <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{selected.position}</div>
             </div>
-            <button onClick={() => setPersonIdx(i => Math.min(staff.length - 1, i + 1))} disabled={personIdx === staff.length - 1}
-              className="bk-press" style={{ border: 'none', background: 'none', cursor: personIdx === staff.length - 1 ? 'default' : 'pointer',
-                padding: 6, opacity: personIdx === staff.length - 1 ? 0.25 : 1 }}><Chevron dir="right" size={22} /></button>
           </div>
 
-          {loading && <div style={{ textAlign: 'center', padding: 30, color: 'var(--ink-faint)', fontSize: 13 }}>…</div>}
+          {tasksLoading && <div style={{ textAlign: 'center', padding: 30, color: 'var(--ink-faint)', fontSize: 13 }}>…</div>}
 
-          {!loading && tasks.length === 0 && (
+          {!tasksLoading && tasks.length === 0 && (
             <div style={{ textAlign: 'center', padding: 24, color: 'var(--ink-faint)', fontSize: 13.5 }}>
               {L('Нет задач', 'No tasks')}
             </div>
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {!loading && tasks.map(t => {
+            {!tasksLoading && tasks.map(t => {
               const done = t.instances.filter(i => i.status === 'done').length;
               const postponed = t.instances.filter(i => i.status === 'postponed').length;
               const cancelled = t.instances.filter(i => i.status === 'cancelled').length;
@@ -6103,9 +6121,9 @@ function StaffTasksScreen({ go }) {
         </>
       )}
 
-      {formOpen && s && (
-        <TaskFormSheet staffName={s.name} onClose={() => setFormOpen(false)}
-          onSaved={() => { setFormOpen(false); reload(); }} />
+      {formOpen && selectedName && (
+        <TaskFormSheet staffName={selectedName} onClose={() => setFormOpen(false)}
+          onSaved={() => { setFormOpen(false); reloadTasks(selectedName); }} />
       )}
     </div>
   );
