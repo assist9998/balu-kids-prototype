@@ -4948,13 +4948,13 @@ function StaffFormSheet({ member, onClose, onSaved }) {
 // just the "Неделя" view inside Journal, since a day and a week of the
 // same status grid were really the same screen wearing two shapes.
 function StaffTabBar({ go, active }) {
-  const [calOpen, setCalOpen] = React.useState(false);
+  // "Календарь" used to be its own tab that just opened a date picker —
+  // folded into Журнал's own [Дата] toggle button instead (see
+  // StaffDailyScreen), which did the exact same job one tap further in.
   const today = todayStr();
   const tabs = [
     { key: 'team',           emoji: '🗂️', label: L('Сотрудники', 'Staff'),
       onClick: () => go('team') },
-    { key: 'calendar',       emoji: '📅', label: L('Календарь', 'Calendar'),
-      onClick: () => setCalOpen(true) },
     { key: 'staff-daily',    emoji: '📋', label: L('Журнал', 'Journal'),
       onClick: () => go('staff-daily', { date: today }) },
     { key: 'staff-monthly',  emoji: '📊', label: L('Сводка', 'Summary'),
@@ -4963,25 +4963,20 @@ function StaffTabBar({ go, active }) {
       onClick: () => go('staff-tasks') },
   ];
   return (
-    <>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
-        {tabs.map(t => (
-          <button key={t.key} onClick={t.onClick} className="bk-press" style={{
-            flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-            borderRadius: 14, padding: '10px 2px',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-            background: active === t.key ? '#B07848' : '#FBF7F2',
-            color: active === t.key ? '#fff' : 'var(--ink-soft)',
-            boxShadow: active === t.key ? '0 6px 14px -6px #B07848' : '0 1px 2px rgba(60,40,20,0.05)' }}>
-            <span style={{ fontSize: 18 }}>{t.emoji}</span>
-            <span style={{ fontSize: 9.5, fontWeight: 700, lineHeight: 1.1, textAlign: 'center' }}>{t.label}</span>
-          </button>
-        ))}
-      </div>
-      {calOpen && <Portal><MiniCalendar selected={today}
-        onSelect={d => { setCalOpen(false); go('staff-daily', { date: d }); }}
-        onClose={() => setCalOpen(false)} disableWeekends={false} disableFuture={false} /></Portal>}
-    </>
+    <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+      {tabs.map(t => (
+        <button key={t.key} onClick={t.onClick} className="bk-press" style={{
+          flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+          borderRadius: 14, padding: '10px 2px',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+          background: active === t.key ? '#B07848' : '#FBF7F2',
+          color: active === t.key ? '#fff' : 'var(--ink-soft)',
+          boxShadow: active === t.key ? '0 6px 14px -6px #B07848' : '0 1px 2px rgba(60,40,20,0.05)' }}>
+          <span style={{ fontSize: 18 }}>{t.emoji}</span>
+          <span style={{ fontSize: 9.5, fontWeight: 700, lineHeight: 1.1, textAlign: 'center' }}>{t.label}</span>
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -5009,38 +5004,30 @@ function TeamScreen({ go }) {
         </div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* Square cards, 3 per row — was one long rectangular row per person,
+          this scans faster with more than a few staff. Contract-expiry
+          warning collapses to a small corner badge instead of the full
+          "Договор до ..." pill; tap still opens the same edit form, which
+          still shows everything (position, contract date, phone). */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
         {(staff || []).map(s => {
           const days = contractDaysLeft(s.contractEnd);
           const isExpired  = days !== null && days < 0;
           const isExpiring = days !== null && days >= 0 && days <= 30;
           return (
-            <Card key={s.name} pad={12} onClick={() => { setEditMember(s); setFormOpen(true); }}
-              style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2' }}>
-              <Avatar emoji={positionEmoji(s.position)} color="#EDE8E0" size={46} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{s.name}</div>
-                <div style={{ fontSize: 12.5, color: 'var(--ink-soft)', fontWeight: 600, marginTop: 2 }}>{s.position}</div>
-                {s.contractEnd && (
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 5,
-                    background: isExpired ? '#FFE0E0' : isExpiring ? '#FBE7A8' : '#EDE8E0',
-                    color: isExpired ? '#a03030' : isExpiring ? '#8a6410' : '#8a7a60',
-                    padding: '3px 10px', borderRadius: 999, fontSize: 11.5, fontWeight: 700 }}>
-                    {isExpired ? '⚠️' : isExpiring ? '⏳' : '📄'}
-                    {L('Договор до', 'Until')} {s.contractEnd}
-                    {isExpired && ` — ${L('истёк', 'EXPIRED')}`}
-                    {isExpiring && !isExpired && ` (${days} ${L('дн', 'd')})`}
-                  </div>
-                )}
-              </div>
-              {s.phone && (
-                <a href={`tel:${s.phone}`} onClick={e => e.stopPropagation()}
-                  style={{ width: 36, height: 36, borderRadius: '50%', background: '#D4F0DF',
-                    display: 'grid', placeItems: 'center', fontSize: 16, flexShrink: 0,
-                    textDecoration: 'none' }}>📞</a>
+            <button key={s.name} onClick={() => { setEditMember(s); setFormOpen(true); }} className="bk-press" style={{
+              position: 'relative', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center',
+              background: '#FBF7F2', borderRadius: 18, padding: '16px 6px 12px',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+              boxShadow: '0 1px 2px rgba(60,40,20,0.05)' }}>
+              {(isExpired || isExpiring) && (
+                <span style={{ position: 'absolute', top: 8, right: 8, fontSize: 14 }}>
+                  {isExpired ? '⚠️' : '⏳'}
+                </span>
               )}
-              <Chevron />
-            </Card>
+              <Avatar emoji={positionEmoji(s.position)} color="#EDE8E0" size={46} />
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', lineHeight: 1.25 }}>{s.name}</div>
+            </button>
           );
         })}
       </div>
@@ -5186,13 +5173,11 @@ function StaffDailyScreen({ params, go }) {
   const [records, setRecords] = React.useState({});
   const [savedRecords, setSavedRecords] = React.useState({});
 
-  // StaffTabBar's "Журнал"/"Календарь" tabs stay on this same screen
-  // (goTab replaces the stack entry in place rather than remounting), so a
-  // tap while already here changes params.date without ever re-running the
-  // useState(initDate) initializer above — sync it explicitly or those
-  // taps would silently do nothing. Also jumps back to day view — picking
-  // a date from "Календарь" means "show me that one day", even if you'd
-  // been looking at the week grid.
+  // StaffTabBar's "Журнал" tab stays on this same screen (goTab replaces
+  // the stack entry in place rather than remounting), so a tap while
+  // already here changes params.date without ever re-running the
+  // useState(initDate) initializer above — sync it explicitly or that tap
+  // would silently do nothing.
   React.useEffect(() => {
     if (params && params.date && params.date !== date) { setDate(params.date); setView('day'); }
   }, [params && params.date]);
@@ -5363,8 +5348,15 @@ function StaffDailyScreen({ params, go }) {
     <div style={{ padding: '4px 20px 28px' }}>
       <StaffTabBar go={go} active="staff-daily" />
 
-      {/* Day / Week toggle */}
+      {/* Дата / День / Неделя — "Дата" replaces the old separate Календарь
+          tab and the day-view's own calendar-square button (both opened
+          the exact same picker, having both was a plain duplicate). */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 16, background: '#FBF7F2', borderRadius: 999, padding: 4 }}>
+        <button onClick={() => setCalOpen(true)} className="bk-press" style={{
+          flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 700,
+          padding: '8px 4px', borderRadius: 999, background: 'transparent', color: 'var(--ink-soft)' }}>
+          📅 {L('Дата', 'Date')}
+        </button>
         <button onClick={() => setView('day')} className="bk-press" style={{
           flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 700,
           padding: '8px 4px', borderRadius: 999,
@@ -5380,16 +5372,12 @@ function StaffDailyScreen({ params, go }) {
           {L('Неделя', 'Week')}
         </button>
       </div>
+      {calOpen && <Portal><MiniCalendar selected={date}
+        onSelect={d => { setDate(d); setView('day'); setCalOpen(false); }}
+        onClose={() => setCalOpen(false)} disableWeekends={false} disableFuture={false} /></Portal>}
 
       {view === 'day' ? (
       <>
-      {/* Date navigation */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
-        <CalendarSquareButton date={date} onClick={() => setCalOpen(true)} />
-      </div>
-      {calOpen && <Portal><MiniCalendar selected={date} onSelect={setDate} onClose={() => setCalOpen(false)}
-        disableWeekends={false} disableFuture={false} /></Portal>}
-
       {staff.length === 0 && (
         <div style={{ textAlign: 'center', padding: 40, color: 'var(--ink-faint)', fontSize: 13 }}>
           {L('Нет сотрудников', 'No staff')}
@@ -5598,10 +5586,10 @@ function StaffMonthlyScreen({ go }) {
   const [staff, setStaff] = React.useState([]);
   const [data, setData]   = React.useState({});
   const [loading, setLoading] = React.useState(true);
-  // One person at a time, flipped through with the arrows below their name
-  // — a long scrolling list of cards left no room to make any single
-  // person's calendar bigger, this way each one gets the full screen.
-  const [personIdx, setPersonIdx] = React.useState(0);
+  // Was one person at a time, flipped through with arrows — a square-card
+  // grid (same as Team/Tasks) instead, tap a card to see that person's
+  // calendar; null means "show the grid".
+  const [selectedName, setSelectedName] = React.useState(null);
 
   React.useEffect(() => {
     setLoading(true);
@@ -5610,10 +5598,6 @@ function StaffMonthlyScreen({ go }) {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [month]);
-
-  React.useEffect(() => {
-    setPersonIdx(i => Math.min(i, Math.max(0, staff.length - 1)));
-  }, [staff]);
 
   const RU_MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
   const EN_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -5642,7 +5626,7 @@ function StaffMonthlyScreen({ go }) {
     return Object.values(days).reduce((sum, d) => sum + (STAFF_STATUS_WORKED_VALUE[d.status] || 0), 0);
   }
 
-  const s = staff[personIdx];
+  const s = staff.find(x => x.name === selectedName);
 
   return (
     <div style={{ padding: '4px 20px 28px' }}>
@@ -5672,7 +5656,22 @@ function StaffMonthlyScreen({ go }) {
         </div>
       )}
 
-      {!loading && s && (() => {
+      {!loading && !selectedName && staff.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+          {staff.map(person => (
+            <button key={person.name} onClick={() => setSelectedName(person.name)} className="bk-press" style={{
+              border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center',
+              background: '#FBF7F2', borderRadius: 18, padding: '16px 6px 12px',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+              boxShadow: '0 1px 2px rgba(60,40,20,0.05)' }}>
+              <Avatar emoji={positionEmoji(person.position)} color="#EDE8E0" size={46} />
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', lineHeight: 1.25 }}>{person.name}</div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {!loading && selectedName && s && (() => {
         const worked   = workedDays(s.name);
         const halfDays = countStatus(s.name, 'half-day');
         const sick     = countStatus(s.name, 'sick');
@@ -5698,17 +5697,14 @@ function StaffMonthlyScreen({ go }) {
 
         return (
           <>
-            {/* Person navigation — flip through staff one at a time */}
+            {/* Back to the staff grid, instead of flipping to the next/prev person */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-              <button onClick={() => setPersonIdx(i => Math.max(0, i - 1))} disabled={personIdx === 0}
-                className="bk-press" style={{ border: 'none', background: 'none', cursor: personIdx === 0 ? 'default' : 'pointer',
-                  padding: 6, opacity: personIdx === 0 ? 0.25 : 1 }}><Chevron dir="left" size={22} /></button>
+              <button onClick={() => setSelectedName(null)} className="bk-press" style={{
+                border: 'none', background: 'none', cursor: 'pointer', padding: 6 }}><Chevron dir="left" size={22} /></button>
               <Avatar emoji={positionEmoji(s.position)} color="#EDE8E0" size={44} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 800, fontSize: 15.5, color: 'var(--ink)' }}>{s.name}</div>
-                <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>
-                  {s.position} · {personIdx + 1}/{staff.length}
-                </div>
+                <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{s.position}</div>
               </div>
               {salary !== null && (
                 <div style={{ textAlign: 'right' }}>
@@ -5720,9 +5716,6 @@ function StaffMonthlyScreen({ go }) {
                   </div>
                 </div>
               )}
-              <button onClick={() => setPersonIdx(i => Math.min(staff.length - 1, i + 1))} disabled={personIdx === staff.length - 1}
-                className="bk-press" style={{ border: 'none', background: 'none', cursor: personIdx === staff.length - 1 ? 'default' : 'pointer',
-                  padding: 6, opacity: personIdx === staff.length - 1 ? 0.25 : 1 }}><Chevron dir="right" size={22} /></button>
             </div>
 
             <Card pad={14}>
@@ -6089,20 +6082,19 @@ function StaffTasksScreen({ go }) {
               {L('Нет сотрудников', 'No staff')}
             </div>
           )}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
             {staff.map(s => (
-              <Card key={s.name} pad={12} onClick={() => setSelectedName(s.name)}
-                style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2', cursor: 'pointer' }}>
-                <Avatar emoji={positionEmoji(s.position)} color="#EDE8E0" size={44} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{s.name}</div>
-                  <div style={{ fontSize: 12.5, color: 'var(--ink-soft)', fontWeight: 600, marginTop: 2 }}>{s.position}</div>
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink-faint)' }}>
+              <button key={s.name} onClick={() => setSelectedName(s.name)} className="bk-press" style={{
+                border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center',
+                background: '#FBF7F2', borderRadius: 18, padding: '16px 6px 12px',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                boxShadow: '0 1px 2px rgba(60,40,20,0.05)' }}>
+                <Avatar emoji={positionEmoji(s.position)} color="#EDE8E0" size={46} />
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', lineHeight: 1.25 }}>{s.name}</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-faint)' }}>
                   {countsLoading ? '…' : `${taskCounts[s.name] || 0} ${L('задач', 'tasks')}`}
                 </div>
-                <Chevron dir="right" size={18} />
-              </Card>
+              </button>
             ))}
           </div>
         </>
