@@ -345,6 +345,12 @@ window.API_BASE = "https://rmxois1uv0a24xrbi2dfcfac.95.179.188.141.sslip.io";
     return res.json();
   };
 
+  window.loadPaymentLogJournal = async function () {
+    const res = await fetch(`${window.API_BASE}/payment-log-journal`);
+    if (!res.ok) throw new Error(`GET /payment-log-journal failed: ${res.status}`);
+    return res.json();
+  };
+
   window.addPaymentLogEntry = async function (kidId, tariff, dateFrom, dateUntil, amount, idempotencyKey) {
     const res = await fetch(`${window.API_BASE}/payment-log`, {
       method: 'POST',
@@ -4179,6 +4185,17 @@ function PaymentsGardenScreen() {
   // this tick just forces a re-render so the list picks that up immediately.
   const [, forceTick] = React.useReducer(x => x + 1, 0);
 
+  // "Журнал" — a flat, newest-first list of every garden payment ever
+  // logged, across every child — Ольга: same idea as the Payment log
+  // sheet, but visible without opening Sheets.
+  const [journal,        setJournal]        = React.useState([]);
+  const [journalLoading, setJournalLoading] = React.useState(false);
+  React.useEffect(() => {
+    if (tariff !== 'journal') return;
+    setJournalLoading(true);
+    withRetry(window.loadPaymentLogJournal).then(setJournal).catch(() => setJournal([])).finally(() => setJournalLoading(false));
+  }, [tariff]);
+
   const isTour = tariff === 'tourist';
 
   const allKids = activeKids()
@@ -4238,7 +4255,7 @@ function PaymentsGardenScreen() {
 
       {/* tariff toggle */}
       <div style={{ display: 'flex', margin: '0 20px 14px', background: '#FBF7F2', borderRadius: 999, padding: 4, gap: 4 }}>
-        {[['longterm', L('Долгосрочные', 'Long term')], ['tourist', L('Краткосрочные', 'Short term')]].map(([id, label]) => (
+        {[['longterm', L('Долгосрочные', 'Long term')], ['tourist', L('Краткосрочные', 'Short term')], ['journal', L('Журнал', 'Journal')]].map(([id, label]) => (
           <button key={id} onClick={() => { setTariff(id); setGroup('all'); setPayFilter('all'); }} className="bk-press" style={{
             flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
             padding: '9px 4px', borderRadius: 999, fontSize: 13, fontWeight: 800,
@@ -4248,42 +4265,69 @@ function PaymentsGardenScreen() {
           </button>
         ))}
       </div>
-      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '0 20px 14px', scrollbarWidth: 'none' }}>
-        {chips.map(c => (
-          <button key={c.id} onClick={() => setGroup(c.id)} className="bk-press" style={{
-            flexShrink: 0, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-            padding: '7px 12px', borderRadius: 999, fontSize: 13, fontWeight: 700,
-            background: group === c.id ? '#B07848' : '#FBF7F2',
-            color: group === c.id ? '#fff' : 'var(--ink-soft)',
-            boxShadow: group === c.id ? '0 6px 14px -6px #B07848' : '0 1px 2px rgba(60,40,20,0.05)' }}>
-            {c.emoji} {c.label}
-          </button>
-        ))}
-      </div>
 
-      {calOpen && <Portal><MiniCalendar selected={selDate} onSelect={setSelDate} onClose={() => setCalOpen(false)}
-        disableWeekends={false} disableFuture={false} /></Portal>}
+      {tariff === 'journal' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 9, padding: '0 20px 20px' }}>
+          {journalLoading && <div style={{ textAlign: 'center', padding: 30, color: 'var(--ink-faint)', fontSize: 13 }}>…</div>}
+          {!journalLoading && journal.length === 0 && (
+            <div style={{ textAlign: 'center', padding: 24, color: 'var(--ink-faint)', fontSize: 13.5 }}>
+              {L('Нет записей', 'No entries')}
+            </div>
+          )}
+          {!journalLoading && journal.map(e => (
+            <div key={e.id} style={{ background: '#FBF7F2', borderRadius: 14, padding: '10px 14px' }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>{e.child}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-soft)', marginTop: 2 }}>
+                {e.from.split('.').slice(0,2).join('.')}–{e.until} · {fmtMoney(e.amount)}
+              </div>
+              {e.markedBy && (
+                <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--ink-faint)', marginTop: 2 }}>
+                  {formatMarkedBy(e.markedBy)}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <>
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '0 20px 14px', scrollbarWidth: 'none' }}>
+            {chips.map(c => (
+              <button key={c.id} onClick={() => setGroup(c.id)} className="bk-press" style={{
+                flexShrink: 0, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                padding: '7px 12px', borderRadius: 999, fontSize: 13, fontWeight: 700,
+                background: group === c.id ? '#B07848' : '#FBF7F2',
+                color: group === c.id ? '#fff' : 'var(--ink-soft)',
+                boxShadow: group === c.id ? '0 6px 14px -6px #B07848' : '0 1px 2px rgba(60,40,20,0.05)' }}>
+                {c.emoji} {c.label}
+              </button>
+            ))}
+          </div>
 
-      <PayStats cp={countPaid} cu={countUnpaid} total={total} filter={payFilter} onFilter={setPayFilter}
-        dateSquare={<CalendarSquareButton date={selDate} onClick={() => setCalOpen(true)} />} />
+          {calOpen && <Portal><MiniCalendar selected={selDate} onSelect={setSelDate} onClose={() => setCalOpen(false)}
+            disableWeekends={false} disableFuture={false} /></Portal>}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 9, padding: '0 20px' }}>
-        {kids.map(kid => (
-          <KidPayRow key={kid.id} kid={kid} isPaid={isCoveredOn(kid, selDate)}
-            tariff={tariff}
-            legacyCoverage={{
-              // most kids' current paidUntil predates the payment log and
-              // has no matching entry there — without a fallback, opening
-              // their calendar would show nothing highlighted at all even
-              // though they're marked paid. Most also have no paidFrom on
-              // record either, so shade from today rather than guess a
-              // start date we don't actually know.
-              from: kid.paidFrom || todayStr(), until: kid.paidUntil,
-            }}
-            onConfirmPaid={(from, to, amount) => confirmPayment(kid, from, to, amount)}
-            onDeletePaid={(rowId) => deletePayment(kid, rowId)} />
-        ))}
-      </div>
+          <PayStats cp={countPaid} cu={countUnpaid} total={total} filter={payFilter} onFilter={setPayFilter}
+            dateSquare={<CalendarSquareButton date={selDate} onClick={() => setCalOpen(true)} />} />
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 9, padding: '0 20px' }}>
+            {kids.map(kid => (
+              <KidPayRow key={kid.id} kid={kid} isPaid={isCoveredOn(kid, selDate)}
+                tariff={tariff}
+                legacyCoverage={{
+                  // most kids' current paidUntil predates the payment log and
+                  // has no matching entry there — without a fallback, opening
+                  // their calendar would show nothing highlighted at all even
+                  // though they're marked paid. Most also have no paidFrom on
+                  // record either, so shade from today rather than guess a
+                  // start date we don't actually know.
+                  from: kid.paidFrom || todayStr(), until: kid.paidUntil,
+                }}
+                onConfirmPaid={(from, to, amount) => confirmPayment(kid, from, to, amount)}
+                onDeletePaid={(rowId) => deletePayment(kid, rowId)} />
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
