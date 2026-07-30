@@ -4809,7 +4809,7 @@ function RoleTag({ position }) {
   const tone = BADGE_TONES[positionTone(position)];
   return (
     <span style={{ display: 'inline-block', borderRadius: 999, fontWeight: 800,
-      padding: '1px 6px', fontSize: 7.5, letterSpacing: '0.01em',
+      padding: '2px 7px', fontSize: 8.5, letterSpacing: '0.01em',
       background: tone.bg, color: tone.ink }}>
       {position}
     </span>
@@ -5033,40 +5033,41 @@ function TeamScreen({ goTab, go }) {
           same "pick a person" grid — top zone (avatar corner + name/role
           tag opposite it) opens the edit form, two circle buttons below
           jump straight into that person's Сводка or Задачи, no
-          intermediate switcher screen. 3 per row. */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+          intermediate switcher screen. 2 per row — 3 read too small once
+          this layout (avatar+text side by side, not stacked) was in place. */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         {(staff || []).map(s => {
           const days = contractDaysLeft(s.contractEnd);
           const isExpired  = days !== null && days < 0;
           const isExpiring = days !== null && days >= 0 && days <= 30;
           return (
-            <div key={s.name} style={{ background: '#FBF7F2', borderRadius: 18, padding: '12px 10px 10px',
+            <div key={s.name} style={{ background: '#FBF7F2', borderRadius: 18, padding: '13px 12px 11px',
               boxShadow: '0 1px 2px rgba(60,40,20,0.05)', position: 'relative' }}>
               {(isExpired || isExpiring) && (
-                <span style={{ position: 'absolute', top: 8, right: 9, fontSize: 12 }}>
+                <span style={{ position: 'absolute', top: 9, right: 10, fontSize: 13 }}>
                   {isExpired ? '⚠️' : '⏳'}
                 </span>
               )}
               <button onClick={() => { setEditMember(s); setFormOpen(true); }} className="bk-press" style={{
                 border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-                background: 'none', display: 'flex', alignItems: 'flex-start', gap: 8, width: '100%' }}>
-                <Avatar emoji={positionEmoji(s.position)} color="#EDE8E0" size={30} />
+                background: 'none', display: 'flex', alignItems: 'flex-start', gap: 10, width: '100%' }}>
+                <Avatar emoji={positionEmoji(s.position)} color="#EDE8E0" size={38} />
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink)', lineHeight: 1.2, marginTop: 1 }}>{s.name}</div>
-                  <div style={{ marginTop: 3 }}><RoleTag position={s.position} /></div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', lineHeight: 1.2, marginTop: 2 }}>{s.name}</div>
+                  <div style={{ marginTop: 4 }}><RoleTag position={s.position} /></div>
                 </div>
               </button>
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginTop: 12 }}>
                 <button onClick={() => go('staff-monthly', { name: s.name })} className="bk-press" style={{
-                  width: 32, height: 32, border: 'none', cursor: 'pointer', borderRadius: '50%',
-                  background: 'color-mix(in srgb, #B07848 12%, transparent)', fontSize: 14,
-                  display: 'grid', placeItems: 'center' }}>
+                  width: 36, height: 36, border: 'none', cursor: 'pointer', borderRadius: '50%',
+                  background: 'color-mix(in srgb, #B07848 12%, transparent)', fontSize: 16, lineHeight: 1,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   📊
                 </button>
                 <button onClick={() => go('staff-tasks', { name: s.name })} className="bk-press" style={{
-                  width: 32, height: 32, border: 'none', cursor: 'pointer', borderRadius: '50%',
-                  background: 'color-mix(in srgb, #B07848 12%, transparent)', fontSize: 14,
-                  display: 'grid', placeItems: 'center' }}>
+                  width: 36, height: 36, border: 'none', cursor: 'pointer', borderRadius: '50%',
+                  background: 'color-mix(in srgb, #B07848 12%, transparent)', fontSize: 16, lineHeight: 1,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   ✅
                 </button>
               </div>
@@ -5079,7 +5080,7 @@ function TeamScreen({ goTab, go }) {
         <button onClick={() => { setEditMember(null); setFormOpen(true); }} className="bk-press" style={{
           border: '2px dashed #C8BEB0', cursor: 'pointer', fontFamily: 'inherit',
           background: 'none', color: 'var(--ink-soft)', fontSize: 24, fontWeight: 700,
-          borderRadius: 18, display: 'grid', placeItems: 'center', minHeight: 94 }}>
+          borderRadius: 18, display: 'grid', placeItems: 'center', minHeight: 104 }}>
           +
         </button>
       </div>
