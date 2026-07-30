@@ -427,6 +427,16 @@ window.API_BASE = "https://rmxois1uv0a24xrbi2dfcfac.95.179.188.141.sslip.io";
     return res.json();
   };
 
+  window.updateStaffTask = async function (taskId, data) {
+    const res = await fetch(`${window.API_BASE}/staff-tasks/${taskId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error(`PATCH /staff-tasks failed: ${res.status}`);
+    return res.json();
+  };
+
   window.archiveStaffTask = async function (taskId) {
     const res = await fetch(`${window.API_BASE}/staff-tasks/${taskId}`, { method: 'DELETE' });
     // 404 = already gone, same reasoning as deletePaymentLogEntry — a
@@ -713,6 +723,7 @@ window.API_BASE = "https://rmxois1uv0a24xrbi2dfcfac.95.179.188.141.sslip.io";
   window.addClubPaymentLogEntry    = makeDurableIdempotent('addClubPaymentLogEntry', window.addClubPaymentLogEntry);
   window.archiveStaffTask          = makeDurable('archiveStaffTask', window.archiveStaffTask);
   window.updateStaffTaskInstance   = makeDurable('updateStaffTaskInstance', window.updateStaffTaskInstance);
+  window.updateStaffTask           = makeDurable('updateStaffTask', window.updateStaffTask);
   window.createStaffTask           = makeDurableIdempotent('createStaffTask', window.createStaffTask);
 })();
 
@@ -5631,21 +5642,25 @@ function StaffMonthlyScreen({ go, staff }) {
   }
 
   const s = staffList.find(x => x.name === selectedName);
-  const stillLoading = loading || !staffReady;
 
   return (
     <div style={{ padding: '4px 20px 28px' }}>
       <StaffTabBar go={go} active="staff-monthly" />
 
-      {stillLoading && <div style={{ textAlign: 'center', padding: 40, color: 'var(--ink-faint)', fontSize: 13 }}>…</div>}
+      {/* The grid only needs the (already-shared, instantly-ready) staff
+          list — it doesn't wait on this month's attendance data, so
+          tabbing in here no longer flashes a loading state the roster
+          grid itself never actually needed. Only the per-person detail
+          below needs `loading` (see there). */}
+      {!staffReady && <div style={{ textAlign: 'center', padding: 40, color: 'var(--ink-faint)', fontSize: 13 }}>…</div>}
 
-      {!stillLoading && staffList.length === 0 && (
+      {staffReady && staffList.length === 0 && (
         <div style={{ textAlign: 'center', padding: 40, color: 'var(--ink-faint)', fontSize: 14 }}>
           {L('Нет сотрудников', 'No staff')}
         </div>
       )}
 
-      {!stillLoading && !selectedName && staffList.length > 0 && (
+      {staffReady && !selectedName && staffList.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
           {staffList.map(person => (
             <button key={person.name} onClick={() => setSelectedName(person.name)} className="bk-press" style={{
@@ -5660,7 +5675,11 @@ function StaffMonthlyScreen({ go, staff }) {
         </div>
       )}
 
-      {!stillLoading && selectedName && s && (() => {
+      {selectedName && loading && (
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--ink-faint)', fontSize: 13 }}>…</div>
+      )}
+
+      {!loading && selectedName && s && (() => {
         const worked   = workedDays(s.name);
         const halfDays = countStatus(s.name, 'half-day');
         const sick     = countStatus(s.name, 'sick');
@@ -5967,6 +5986,93 @@ function TaskFormSheet({ staffName, onClose, onSaved }) {
   );
 }
 
+function TaskEditSheet({ task, onClose, onSaved }) {
+  // Deliberately scoped to just text + deadline, not a full reconfigure of
+  // the recurrence pattern (weekdays/count) — changing those after
+  // instances already exist would mean reconciling already-answered ones
+  // against a new schedule, a bigger feature than what was asked for.
+  const [title, setTitle] = React.useState(task.title);
+  const [startDate, setStartDate] = React.useState(task.startDate || '');
+  const [endDate, setEndDate] = React.useState(task.endDate || '');
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState(null);
+
+  async function handleSave() {
+    if (!title.trim()) { setError(L('Введите текст задачи', 'Enter a task description')); return; }
+    setSaving(true); setError(null);
+    try {
+      await window.updateStaffTask(task.id, {
+        title: title.trim(),
+        startDate: task.recurrence === 'once' ? startDate : null,
+        endDate: task.recurrence === 'weekly' ? (endDate || null) : null,
+      });
+      onSaved();
+    } catch (e) { setError(e.message); setSaving(false); }
+  }
+
+  const INP = { width: '100%', boxSizing: 'border-box', border: '1.5px solid #DDD8CF', borderRadius: 12,
+    padding: '11px 14px', fontFamily: 'inherit', fontSize: 14, background: '#FBF7F2',
+    color: 'var(--ink)', outline: 'none' };
+  const LBL = { fontSize: 11, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase',
+    color: 'var(--ink-soft)', marginBottom: 5, display: 'block' };
+
+  return (
+    <Portal>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'flex-end',
+      background: 'rgba(0,0,0,0.4)' }} onClick={onClose}>
+      <div style={{ width: '100%', background: 'var(--bg)', borderRadius: '24px 24px 0 0',
+        maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}
+        onClick={e => e.stopPropagation()}>
+
+        <div style={{ flexShrink: 0, padding: '12px 20px 12px', borderBottom: '1px solid rgba(60,40,20,0.07)' }}>
+          <div style={{ width: 40, height: 4, background: 'rgba(60,40,20,0.15)', borderRadius: 2, margin: '0 auto 12px' }} />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>
+              {L('Изменить задачу', 'Edit task')}
+            </div>
+            <button onClick={onClose} style={{ border: 'none', background: 'none', fontSize: 24,
+              cursor: 'pointer', color: 'var(--ink-faint)', padding: 4 }}>×</button>
+          </div>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px 8px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <label style={LBL}>{L('Задача', 'Task')}</label>
+              <textarea style={{ ...INP, resize: 'none' }} rows={2} value={title}
+                onChange={e => setTitle(e.target.value)} autoFocus />
+            </div>
+
+            {task.recurrence === 'once' && (
+              <div>
+                <label style={LBL}>{L('Дата', 'Date')}</label>
+                <input style={INP} type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+              </div>
+            )}
+
+            {task.recurrence === 'weekly' && (
+              <div>
+                <label style={LBL}>{L('До какой даты (необязательно)', 'Until (optional)')}</label>
+                <input style={INP} type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
+              </div>
+            )}
+          </div>
+
+          {error && <div style={{ marginTop: 12, fontSize: 13, color: 'var(--no)', fontWeight: 600 }}>{error}</div>}
+
+          <button onClick={handleSave} disabled={saving} className="bk-press" style={{
+            width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-display)',
+            background: '#B07848', color: '#fff', fontSize: 15, fontWeight: 800,
+            padding: 14, borderRadius: 16, margin: '20px 0 24px', opacity: saving ? 0.7 : 1 }}>
+            {saving ? '…' : L('Сохранить', 'Save')}
+          </button>
+        </div>
+      </div>
+    </div>
+    </Portal>
+  );
+}
+
 function TaskInstanceRow({ instance, onSetStatus }) {
   const [cancelOpen, setCancelOpen] = React.useState(false);
   const [reason, setReason] = React.useState('');
@@ -5987,7 +6093,11 @@ function TaskInstanceRow({ instance, onSetStatus }) {
   );
 
   return (
-    <div style={{ padding: '8px 0', borderTop: '1px solid rgba(60,40,20,0.06)' }}>
+    // Stops a tap anywhere in here (a status button, the cancel-reason
+    // input/OK button) from bubbling up into the task card's own onTap,
+    // which now opens the edit sheet — marking a status shouldn't also
+    // pop that open.
+    <div onClick={e => e.stopPropagation()} style={{ padding: '8px 0', borderTop: '1px solid rgba(60,40,20,0.06)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink)', minWidth: 60 }}>{label}</div>
         <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
@@ -6026,6 +6136,7 @@ function StaffTasksScreen({ go, staff }) {
   const [tasks, setTasks] = React.useState([]);
   const [tasksLoading, setTasksLoading] = React.useState(false);
   const [formOpen, setFormOpen] = React.useState(false);
+  const [editingTask, setEditingTask] = React.useState(null);
   const staffList = staff || [];
 
   function reloadTasks(name) {
@@ -6078,7 +6189,7 @@ function StaffTasksScreen({ go, staff }) {
               <button key={s.name} onClick={() => setSelectedName(s.name)} className="bk-press" style={{
                 border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center',
                 background: '#FBF7F2', borderRadius: 18, padding: '16px 6px 12px',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
                 boxShadow: '0 1px 2px rgba(60,40,20,0.05)' }}>
                 <Avatar emoji={positionEmoji(s.position)} color="#EDE8E0" size={46} />
                 <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', lineHeight: 1.25 }}>{s.name}</div>
@@ -6115,7 +6226,7 @@ function StaffTasksScreen({ go, staff }) {
               const cancelled = t.instances.filter(i => i.status === 'cancelled').length;
               const total = t.instances.length;
               return (
-                <LongPressCard key={t.id} onTap={() => {}} onDelete={() => handleArchive(t.id)}
+                <LongPressCard key={t.id} onTap={() => setEditingTask(t)} onDelete={() => handleArchive(t.id)}
                   style={{ background: '#FBF7F2', borderRadius: 18, padding: 13 }}>
                   <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--ink)' }}>{t.title}</div>
                   <div style={{ fontSize: 11.5, color: 'var(--ink-faint)', fontWeight: 600, marginTop: 2 }}>
@@ -6148,6 +6259,11 @@ function StaffTasksScreen({ go, staff }) {
       {formOpen && selectedName && (
         <TaskFormSheet staffName={selectedName} onClose={() => setFormOpen(false)}
           onSaved={() => { setFormOpen(false); reloadTasks(selectedName); }} />
+      )}
+
+      {editingTask && (
+        <TaskEditSheet task={editingTask} onClose={() => setEditingTask(null)}
+          onSaved={() => { setEditingTask(null); reloadTasks(selectedName); }} />
       )}
     </div>
   );
@@ -6481,8 +6597,15 @@ function App() {
   // HomeScreen's tile) sends you in.
   const STAFF_TAB_SCREENS = ['team', 'staff-daily', 'staff-monthly', 'staff-tasks'];
   function goTab(name, params = {}) {
-    setDir('fwd');
-    setStack(s => (s.length && STAFF_TAB_SCREENS.includes(s[s.length - 1].name))
+    // Swapping between the module's own tabs used to still play the full
+    // slide+fade push animation every tap (same as a real go()) — for
+    // sibling tabs that's just a flash/flicker, not a navigation, so skip
+    // the animation entirely when it's an in-place swap. Only a genuine
+    // first entry into the module (array actually grows) gets the normal
+    // forward animation.
+    const isTabSwitch = stack.length > 0 && STAFF_TAB_SCREENS.includes(stack[stack.length - 1].name);
+    setDir(isTabSwitch ? 'none' : 'fwd');
+    setStack(s => isTabSwitch
       ? [...s.slice(0, -1), { name, params }]
       : [...s, { name, params }]);
   }
@@ -6700,7 +6823,7 @@ function App() {
             </g>
           ))}
         </svg>
-        <div key={top.name + stack.length} className={dir === 'fwd' ? 'scr-fwd' : 'scr-back'}
+        <div key={top.name + stack.length} className={dir === 'fwd' ? 'scr-fwd' : dir === 'back' ? 'scr-back' : ''}
           style={{ minHeight: '100%', position: 'relative', zIndex: 1,
             transform: `translateY(${pullRefreshing ? PULL_TRIGGER : pullY}px)`,
             transition: pullStartYRef.current == null ? 'transform 0.15s ease' : 'none' }}>
