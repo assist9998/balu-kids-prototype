@@ -4792,6 +4792,30 @@ function positionEmoji(pos) {
   return '👩‍🏫';
 }
 
+// Same category split as positionEmoji, mapped onto the kid badges' own
+// tone palette (BADGE_TONES) instead of inventing separate colors — the
+// position tag on a staff card and a kid's group pill should read as the
+// same visual language.
+function positionTone(pos) {
+  const p = (pos || '').toLowerCase();
+  if (p.includes('логопед') || p.includes('психолог') || p.includes('музык') || p.includes('music')) return 'special';
+  if (p.includes('повар') || p.includes('cook')) return 'amenity';
+  if (p.includes('охран') || p.includes('security')) return 'neutral';
+  if (p.includes('медик') || p.includes('nurse') || p.includes('врач') || p.includes('физ') || p.includes('sport') || p.includes('gym')) return 'ok';
+  return 'info';
+}
+
+function RoleTag({ position }) {
+  const tone = BADGE_TONES[positionTone(position)];
+  return (
+    <span style={{ display: 'inline-block', borderRadius: 999, fontWeight: 800,
+      padding: '1px 6px', fontSize: 7.5, letterSpacing: '0.01em',
+      background: tone.bg, color: tone.ink }}>
+      {position}
+    </span>
+  );
+}
+
 // ── StaffFormSheet ────────────────────────────────────────────────────────────
 
 function StaffFormSheet({ member, onClose, onSaved }) {
@@ -5006,45 +5030,44 @@ function TeamScreen({ goTab, go }) {
 
       {/* One combined card per person instead of three separate screens
           (Сотрудники/Сводка/Задачи) that all used to start with the exact
-          same "pick a person" grid — top half (avatar + name/position)
-          opens the edit form, bottom half is two buttons that jump
-          straight into that person's Сводка or Задачи, no intermediate
-          switcher screen. 2 per row (not 3) since there's more packed into
-          each card now. */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          same "pick a person" grid — top zone (avatar + name + role tag)
+          opens the edit form, two badge buttons below jump straight into
+          that person's Сводка or Задачи, no intermediate switcher screen.
+          3 per row, everything centered — avatar+name side by side didn't
+          fit once the role tag and badge buttons were added below. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
         {(staff || []).map(s => {
           const days = contractDaysLeft(s.contractEnd);
           const isExpired  = days !== null && days < 0;
           const isExpiring = days !== null && days >= 0 && days <= 30;
           return (
-            <div key={s.name} style={{ background: '#FBF7F2', borderRadius: 18, overflow: 'hidden',
-              boxShadow: '0 1px 2px rgba(60,40,20,0.05)' }}>
+            <div key={s.name} style={{ background: '#FBF7F2', borderRadius: 20, padding: '14px 6px 10px',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 2,
+              boxShadow: '0 1px 2px rgba(60,40,20,0.05)', position: 'relative' }}>
+              {(isExpired || isExpiring) && (
+                <span style={{ position: 'absolute', top: 8, right: 10, fontSize: 12 }}>
+                  {isExpired ? '⚠️' : '⏳'}
+                </span>
+              )}
               <button onClick={() => { setEditMember(s); setFormOpen(true); }} className="bk-press" style={{
-                position: 'relative', width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-                background: 'none', padding: '12px 10px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                {(isExpired || isExpiring) && (
-                  <span style={{ position: 'absolute', top: 8, right: 8, fontSize: 13 }}>
-                    {isExpired ? '⚠️' : '⏳'}
-                  </span>
-                )}
-                <Avatar emoji={positionEmoji(s.position)} color="#EDE8E0" size={40} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--ink)', lineHeight: 1.25 }}>{s.name}</div>
-                  <div style={{ fontSize: 11, color: 'var(--ink-soft)', fontWeight: 600, marginTop: 1 }}>{s.position}</div>
-                </div>
+                border: 'none', cursor: 'pointer', fontFamily: 'inherit', background: 'none',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, width: '100%' }}>
+                <Avatar emoji={positionEmoji(s.position)} color="#EDE8E0" size={42} />
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink)', lineHeight: 1.2, marginTop: 4 }}>{s.name}</div>
+                <div style={{ marginTop: 4 }}><RoleTag position={s.position} /></div>
               </button>
-              <div style={{ display: 'flex', borderTop: '1px solid rgba(60,40,20,0.07)' }}>
+              <div style={{ display: 'flex', gap: 6, marginTop: 9 }}>
                 <button onClick={() => go('staff-monthly', { name: s.name })} className="bk-press" style={{
-                  flex: 1, border: 'none', borderRight: '1px solid rgba(60,40,20,0.07)', cursor: 'pointer', fontFamily: 'inherit',
-                  background: 'none', color: 'var(--ink-soft)', fontSize: 11, fontWeight: 700,
-                  padding: '9px 2px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                  <span style={{ fontSize: 15 }}>📊</span>{L('Сводка', 'Summary')}
+                  border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 800,
+                  padding: '5px 10px', fontSize: 10, borderRadius: 999,
+                  background: '#EDE8E0', color: 'var(--ink-soft)' }}>
+                  {L('Сводка', 'Summary')}
                 </button>
                 <button onClick={() => go('staff-tasks', { name: s.name })} className="bk-press" style={{
-                  flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-                  background: 'none', color: 'var(--ink-soft)', fontSize: 11, fontWeight: 700,
-                  padding: '9px 2px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                  <span style={{ fontSize: 15 }}>✅</span>{L('Задачи', 'Tasks')}
+                  border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 800,
+                  padding: '5px 10px', fontSize: 10, borderRadius: 999,
+                  background: '#EDE8E0', color: 'var(--ink-soft)' }}>
+                  {L('Задачи', 'Tasks')}
                 </button>
               </div>
             </div>
@@ -5055,8 +5078,8 @@ function TeamScreen({ goTab, go }) {
             separate full-width dashed button below everything. */}
         <button onClick={() => { setEditMember(null); setFormOpen(true); }} className="bk-press" style={{
           border: '2px dashed #C8BEB0', cursor: 'pointer', fontFamily: 'inherit',
-          background: 'none', color: 'var(--ink-soft)', fontSize: 28, fontWeight: 700,
-          borderRadius: 18, display: 'grid', placeItems: 'center', minHeight: 88 }}>
+          background: 'none', color: 'var(--ink-soft)', fontSize: 24, fontWeight: 700,
+          borderRadius: 20, display: 'grid', placeItems: 'center', minHeight: 108 }}>
           +
         </button>
       </div>
