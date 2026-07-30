@@ -5986,7 +5986,7 @@ function TaskFormSheet({ staffName, onClose, onSaved }) {
   );
 }
 
-function TaskEditSheet({ task, onClose, onSaved }) {
+function TaskEditSheet({ task, onClose, onSaved, onDelete }) {
   // Deliberately scoped to just text + deadline, not a full reconfigure of
   // the recurrence pattern (weekdays/count) — changing those after
   // instances already exist would mean reconciling already-answered ones
@@ -5996,6 +5996,10 @@ function TaskEditSheet({ task, onClose, onSaved }) {
   const [endDate, setEndDate] = React.useState(task.endDate || '');
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState(null);
+  // Same two-step confirm as deleting a staff member (see StaffFormSheet) —
+  // replaces the long-press-to-delete gesture this used to rely on, which
+  // wasn't how deletion works anywhere else in the app.
+  const [deleteConfirm, setDeleteConfirm] = React.useState(false);
 
   async function handleSave() {
     if (!title.trim()) { setError(L('Введите текст задачи', 'Enter a task description')); return; }
@@ -6063,9 +6067,38 @@ function TaskEditSheet({ task, onClose, onSaved }) {
           <button onClick={handleSave} disabled={saving} className="bk-press" style={{
             width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-display)',
             background: '#B07848', color: '#fff', fontSize: 15, fontWeight: 800,
-            padding: 14, borderRadius: 16, margin: '20px 0 24px', opacity: saving ? 0.7 : 1 }}>
+            padding: 14, borderRadius: 16, marginTop: 20, opacity: saving ? 0.7 : 1 }}>
             {saving ? '…' : L('Сохранить', 'Save')}
           </button>
+
+          {!deleteConfirm && (
+            <button onClick={() => setDeleteConfirm(true)} className="bk-press" style={{
+              width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+              background: 'none', color: '#E05555', fontSize: 14, fontWeight: 700,
+              padding: '14px 0 4px' }}>
+              🗑️ {L('Удалить задачу', 'Delete task')}
+            </button>
+          )}
+          {deleteConfirm && (
+            <div style={{ marginTop: 12, background: '#FFF0F0', borderRadius: 14, padding: 16 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#a03030', marginBottom: 12 }}>
+                {L('Удалить задачу?', 'Delete task?')}
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button onClick={() => setDeleteConfirm(false)} className="bk-press" style={{
+                  flex: 1, border: 'none', cursor: 'pointer', background: '#EDE8E0',
+                  borderRadius: 12, padding: 11, fontFamily: 'inherit', fontSize: 14, fontWeight: 800 }}>
+                  {L('Отмена', 'Cancel')}
+                </button>
+                <button onClick={onDelete} className="bk-press" style={{
+                  flex: 1, border: 'none', cursor: 'pointer', background: '#E05555',
+                  borderRadius: 12, padding: 11, fontFamily: 'inherit', fontSize: 14, fontWeight: 800, color: '#fff' }}>
+                  {L('Удалить', 'Delete')}
+                </button>
+              </div>
+            </div>
+          )}
+          <div style={{ height: 24 }} />
         </div>
       </div>
     </div>
@@ -6226,8 +6259,11 @@ function StaffTasksScreen({ go, staff }) {
               const cancelled = t.instances.filter(i => i.status === 'cancelled').length;
               const total = t.instances.length;
               return (
-                <LongPressCard key={t.id} onTap={() => setEditingTask(t)} onDelete={() => handleArchive(t.id)}
-                  style={{ background: '#FBF7F2', borderRadius: 18, padding: 13 }}>
+                // Tap opens the edit sheet, which has its own Удалить button
+                // now — no more long-press-to-delete (inconsistent with how
+                // deletion works anywhere else in the app).
+                <div key={t.id} onClick={() => setEditingTask(t)}
+                  style={{ background: '#FBF7F2', borderRadius: 18, padding: 13, cursor: 'pointer' }}>
                   <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--ink)' }}>{t.title}</div>
                   <div style={{ fontSize: 11.5, color: 'var(--ink-faint)', fontWeight: 600, marginTop: 2 }}>
                     {taskRecurrenceLabel(t)}
@@ -6242,7 +6278,7 @@ function StaffTasksScreen({ go, staff }) {
                     {postponed > 0 && <span>{L('Перенесено', 'Postponed')}: {postponed}</span>}
                     {cancelled > 0 && <span>{L('Отменено', 'Cancelled')}: {cancelled}</span>}
                   </div>
-                </LongPressCard>
+                </div>
               );
             })}
           </div>
@@ -6263,7 +6299,8 @@ function StaffTasksScreen({ go, staff }) {
 
       {editingTask && (
         <TaskEditSheet task={editingTask} onClose={() => setEditingTask(null)}
-          onSaved={() => { setEditingTask(null); reloadTasks(selectedName); }} />
+          onSaved={() => { setEditingTask(null); reloadTasks(selectedName); }}
+          onDelete={() => { handleArchive(editingTask.id); setEditingTask(null); }} />
       )}
     </div>
   );
