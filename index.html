@@ -4980,16 +4980,14 @@ function StaffTabBar({ go, active }) {
   );
 }
 
-function TeamScreen({ go }) {
-  const [staff,     setStaff]     = React.useState(null);
+function TeamScreen({ go, staff, reloadStaff }) {
+  // Staff list itself now lives in App() (loaded once, alongside children/
+  // clubs/feed) and is passed down as a prop — Сотрудники/Сводка/Задачи all
+  // show the same roster, so switching between them used to re-fetch and
+  // flash a loading state on every tab, for data that hadn't actually
+  // changed. Only re-fetches after actually adding/editing someone here.
   const [formOpen,  setFormOpen]  = React.useState(false);
   const [editMember, setEditMember] = React.useState(null);
-
-  function reload() {
-    withRetry(window.loadStaff).then(setStaff).catch(() => setStaff([]));
-  }
-
-  React.useEffect(reload, []);
 
   return (
     <div style={{ padding: '4px 20px 28px' }}>
@@ -5044,7 +5042,7 @@ function TeamScreen({ go }) {
         <StaffFormSheet
           member={editMember}
           onClose={() => setFormOpen(false)}
-          onSaved={() => { setFormOpen(false); reload(); }}
+          onSaved={() => { setFormOpen(false); reloadStaff(); }}
         />
       )}
     </div>
@@ -5578,12 +5576,15 @@ function StaffDailyScreen({ params, go }) {
 
 // ── StaffMonthlyScreen ────────────────────────────────────────────────────────
 
-function StaffMonthlyScreen({ go }) {
+function StaffMonthlyScreen({ go, staff }) {
+  // staff (the roster) comes from App() now, shared with Сотрудники/Задачи
+  // so switching tabs doesn't re-fetch and flash a loading state for data
+  // that's already there — only the month's attendance data below is
+  // actually specific to this screen.
   const now = new Date();
   const [month, setMonth] = React.useState(
     `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   );
-  const [staff, setStaff] = React.useState([]);
   const [data, setData]   = React.useState({});
   const [loading, setLoading] = React.useState(true);
   // Was one person at a time, flipped through with arrows — a square-card
@@ -5593,11 +5594,14 @@ function StaffMonthlyScreen({ go }) {
 
   React.useEffect(() => {
     setLoading(true);
-    Promise.all([withRetry(window.loadStaff), withRetry(() => window.getStaffMonthly(month))])
-      .then(([s, d]) => { setStaff(s); setData(d); })
+    withRetry(() => window.getStaffMonthly(month))
+      .then(setData)
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [month]);
+
+  const staffReady = staff !== null;
+  const staffList = staff || [];
 
   const RU_MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
   const EN_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -5626,23 +5630,24 @@ function StaffMonthlyScreen({ go }) {
     return Object.values(days).reduce((sum, d) => sum + (STAFF_STATUS_WORKED_VALUE[d.status] || 0), 0);
   }
 
-  const s = staff.find(x => x.name === selectedName);
+  const s = staffList.find(x => x.name === selectedName);
+  const stillLoading = loading || !staffReady;
 
   return (
     <div style={{ padding: '4px 20px 28px' }}>
       <StaffTabBar go={go} active="staff-monthly" />
 
-      {loading && <div style={{ textAlign: 'center', padding: 40, color: 'var(--ink-faint)', fontSize: 13 }}>…</div>}
+      {stillLoading && <div style={{ textAlign: 'center', padding: 40, color: 'var(--ink-faint)', fontSize: 13 }}>…</div>}
 
-      {!loading && staff.length === 0 && (
+      {!stillLoading && staffList.length === 0 && (
         <div style={{ textAlign: 'center', padding: 40, color: 'var(--ink-faint)', fontSize: 14 }}>
           {L('Нет сотрудников', 'No staff')}
         </div>
       )}
 
-      {!loading && !selectedName && staff.length > 0 && (
+      {!stillLoading && !selectedName && staffList.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-          {staff.map(person => (
+          {staffList.map(person => (
             <button key={person.name} onClick={() => setSelectedName(person.name)} className="bk-press" style={{
               border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center',
               background: '#FBF7F2', borderRadius: 18, padding: '16px 6px 12px',
@@ -5655,7 +5660,7 @@ function StaffMonthlyScreen({ go }) {
         </div>
       )}
 
-      {!loading && selectedName && s && (() => {
+      {!stillLoading && selectedName && s && (() => {
         const worked   = workedDays(s.name);
         const halfDays = countStatus(s.name, 'half-day');
         const sick     = countStatus(s.name, 'sick');
@@ -6013,18 +6018,15 @@ function TaskInstanceRow({ instance, onSetStatus }) {
   );
 }
 
-function StaffTasksScreen({ go }) {
-  // Ольга: no point splitting this by month/year — just a list of staff,
-  // tap one to see everything they have on their plate right now.
-  const [staff, setStaff] = React.useState([]);
+function StaffTasksScreen({ go, staff }) {
+  // staff (the roster) comes from App() now, shared with Сотрудники/Сводка —
+  // same reasoning as StaffMonthlyScreen, this screen only owns the
+  // selected person's task list, not the roster itself.
   const [selectedName, setSelectedName] = React.useState(null);
   const [tasks, setTasks] = React.useState([]);
   const [tasksLoading, setTasksLoading] = React.useState(false);
   const [formOpen, setFormOpen] = React.useState(false);
-
-  React.useEffect(() => {
-    withRetry(window.loadStaff).then(setStaff).catch(() => setStaff([]));
-  }, []);
+  const staffList = staff || [];
 
   function reloadTasks(name) {
     if (!name) return;
@@ -6055,7 +6057,7 @@ function StaffTasksScreen({ go }) {
     });
   }
 
-  const selected = staff.find(s => s.name === selectedName);
+  const selected = staffList.find(s => s.name === selectedName);
 
   return (
     <div style={{ padding: '4px 20px 28px' }}>
@@ -6063,13 +6065,16 @@ function StaffTasksScreen({ go }) {
 
       {!selectedName && (
         <>
-          {staff.length === 0 && (
+          {staff === null && (
+            <div style={{ textAlign: 'center', padding: 40, color: 'var(--ink-faint)', fontSize: 13 }}>…</div>
+          )}
+          {staff !== null && staffList.length === 0 && (
             <div style={{ textAlign: 'center', padding: 40, color: 'var(--ink-faint)', fontSize: 14 }}>
               {L('Нет сотрудников', 'No staff')}
             </div>
           )}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-            {staff.map(s => (
+            {staffList.map(s => (
               <button key={s.name} onClick={() => setSelectedName(s.name)} className="bk-press" style={{
                 border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center',
                 background: '#FBF7F2', borderRadius: 18, padding: '16px 6px 12px',
@@ -6256,6 +6261,13 @@ function App() {
   const [loadError, setLoadError] = React.useState(null);
   const [statuses, setStatuses] = React.useState({});
   const [feed, setFeed] = React.useState([]);
+  // Shared across Сотрудники/Сводка/Задачи (see StaffMonthlyScreen/
+  // StaffTasksScreen) so switching between them doesn't re-fetch and flash
+  // a loading state for the same roster each time. null = not loaded yet.
+  const [staff, setStaff] = React.useState(null);
+  const reloadStaff = React.useCallback(() => {
+    withRetry(window.loadStaff).then(setStaff).catch(() => {});
+  }, []);
   const [attSelDate, setAttSelDate] = React.useState(todayStr);
   const [attCalOpen, setAttCalOpen] = React.useState(false);
   const [toast, setToast] = React.useState(null);
@@ -6283,6 +6295,7 @@ function App() {
       window.loadChildren(),
       window.loadClubs().catch(() => {}),
       window.loadFeed().then(() => setFeed(DATA.FEED.map(f => ({ ...f })))).catch(() => {}),
+      withRetry(window.loadStaff).then(setStaff).catch(() => {}),
     ])
       .then(() => window.loadAttendance(todayStr()).catch(() => loadStoredAttendance() || {}))
       .then(remote => {
@@ -6541,10 +6554,10 @@ function App() {
       case 'summary':       return <SummaryScreen statuses={statuses} go={go} />;
       case 'notifications': return <NotificationsScreen feed={feed} go={go} actions={actions} />;
       case 'compose':       return <ComposeScreen back={back} actions={actions} />;
-      case 'team':           return <TeamScreen go={goTab} />;
+      case 'team':           return <TeamScreen go={goTab} staff={staff} reloadStaff={reloadStaff} />;
       case 'staff-daily':    return <StaffDailyScreen params={p} go={goTab} />;
-      case 'staff-monthly':  return <StaffMonthlyScreen go={goTab} />;
-      case 'staff-tasks':    return <StaffTasksScreen go={goTab} />;
+      case 'staff-monthly':  return <StaffMonthlyScreen go={goTab} staff={staff} />;
+      case 'staff-tasks':    return <StaffTasksScreen go={goTab} staff={staff} />;
       default:              return null;
     }
   }
