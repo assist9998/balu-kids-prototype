@@ -4953,14 +4953,14 @@ function StaffTabBar({ go, active }) {
   // StaffDailyScreen), which did the exact same job one tap further in.
   const today = todayStr();
   const tabs = [
-    { key: 'team',           emoji: '🗂️', label: L('Сотрудники', 'Staff'),
-      onClick: () => go('team') },
     { key: 'staff-daily',    emoji: '📋', label: L('Журнал', 'Journal'),
       onClick: () => go('staff-daily', { date: today }) },
-    { key: 'staff-monthly',  emoji: '📊', label: L('Сводка', 'Summary'),
-      onClick: () => go('staff-monthly') },
     { key: 'staff-tasks',    emoji: '✅', label: L('Задачи', 'Tasks'),
       onClick: () => go('staff-tasks') },
+    { key: 'staff-monthly',  emoji: '📊', label: L('Сводка', 'Summary'),
+      onClick: () => go('staff-monthly') },
+    { key: 'team',           emoji: '🗂️', label: L('Сотрудники', 'Staff'),
+      onClick: () => go('team') },
   ];
   return (
     <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
@@ -5632,22 +5632,6 @@ function StaffMonthlyScreen({ go }) {
     <div style={{ padding: '4px 20px 28px' }}>
       <StaffTabBar go={go} active="staff-monthly" />
 
-      {/* Month navigation — one rounded control instead of 3 loose pieces
-          floating with gaps between them */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        background: '#FBF7F2', borderRadius: 999, padding: '4px 6px', marginBottom: 16,
-        boxShadow: '0 1px 2px rgba(60,40,20,0.05)' }}>
-        <button onClick={prevMonth} className="bk-press" style={{
-          border: 'none', background: 'none', cursor: 'pointer', padding: 8,
-          display: 'grid', placeItems: 'center' }}><Chevron dir="left" size={16} /></button>
-        <div style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>
-          {monthLabel}
-        </div>
-        <button onClick={nextMonth} className="bk-press" style={{
-          border: 'none', background: 'none', cursor: 'pointer', padding: 8,
-          display: 'grid', placeItems: 'center' }}><Chevron dir="right" size={16} /></button>
-      </div>
-
       {loading && <div style={{ textAlign: 'center', padding: 40, color: 'var(--ink-faint)', fontSize: 13 }}>…</div>}
 
       {!loading && staff.length === 0 && (
@@ -5716,6 +5700,23 @@ function StaffMonthlyScreen({ go }) {
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Month navigation — only shown once a person is picked, so
+                flipping through months always means flipping through this
+                one person's calendar, not affecting the grid behind it. */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              background: '#FBF7F2', borderRadius: 999, padding: '4px 6px', marginBottom: 16,
+              boxShadow: '0 1px 2px rgba(60,40,20,0.05)' }}>
+              <button onClick={prevMonth} className="bk-press" style={{
+                border: 'none', background: 'none', cursor: 'pointer', padding: 8,
+                display: 'grid', placeItems: 'center' }}><Chevron dir="left" size={16} /></button>
+              <div style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>
+                {monthLabel}
+              </div>
+              <button onClick={nextMonth} className="bk-press" style={{
+                border: 'none', background: 'none', cursor: 'pointer', padding: 8,
+                display: 'grid', placeItems: 'center' }}><Chevron dir="right" size={16} /></button>
             </div>
 
             <Card pad={14}>
@@ -6016,34 +6017,20 @@ function StaffTasksScreen({ go }) {
   // Ольга: no point splitting this by month/year — just a list of staff,
   // tap one to see everything they have on their plate right now.
   const [staff, setStaff] = React.useState([]);
-  const [taskCounts, setTaskCounts] = React.useState({});
-  const [countsLoading, setCountsLoading] = React.useState(true);
   const [selectedName, setSelectedName] = React.useState(null);
   const [tasks, setTasks] = React.useState([]);
   const [tasksLoading, setTasksLoading] = React.useState(false);
   const [formOpen, setFormOpen] = React.useState(false);
 
   React.useEffect(() => {
-    withRetry(window.loadStaff).then(s => {
-      setStaff(s);
-      // One request per person for the "N задач" badge on their card —
-      // fine at this app's scale (a handful of staff), same tradeoff
-      // TeamScreen already makes for its own per-person data.
-      Promise.all(s.map(m => withRetry(() => window.loadStaffTasks(m.name)).catch(() => [])))
-        .then(results => {
-          const counts = {};
-          s.forEach((m, i) => { counts[m.name] = results[i].length; });
-          setTaskCounts(counts);
-        })
-        .finally(() => setCountsLoading(false));
-    }).catch(() => { setStaff([]); setCountsLoading(false); });
+    withRetry(window.loadStaff).then(setStaff).catch(() => setStaff([]));
   }, []);
 
   function reloadTasks(name) {
     if (!name) return;
     setTasksLoading(true);
     withRetry(() => window.loadStaffTasks(name))
-      .then(ts => { setTasks(ts); setTaskCounts(c => ({ ...c, [name]: ts.length })); })
+      .then(setTasks)
       .catch(() => setTasks([]))
       .finally(() => setTasksLoading(false));
   }
@@ -6062,7 +6049,6 @@ function StaffTasksScreen({ go }) {
 
   function handleArchive(taskId) {
     setTasks(ts => ts.filter(t => t.id !== taskId));
-    setTaskCounts(c => ({ ...c, [selectedName]: Math.max(0, (c[selectedName] || 1) - 1) }));
     window.archiveStaffTask(taskId).catch(() => {
       reloadTasks(selectedName);
       window.showToast(L('Не удалось удалить', 'Failed to delete'));
@@ -6091,9 +6077,6 @@ function StaffTasksScreen({ go }) {
                 boxShadow: '0 1px 2px rgba(60,40,20,0.05)' }}>
                 <Avatar emoji={positionEmoji(s.position)} color="#EDE8E0" size={46} />
                 <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', lineHeight: 1.25 }}>{s.name}</div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-faint)' }}>
-                  {countsLoading ? '…' : `${taskCounts[s.name] || 0} ${L('задач', 'tasks')}`}
-                </div>
               </button>
             ))}
           </div>
