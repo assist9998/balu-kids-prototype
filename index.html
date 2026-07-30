@@ -6580,7 +6580,15 @@ function App() {
   React.useEffect(() => {
     if (!childrenReady) return;
     const today = todayStr();
-    const overdue = activeKids().filter(k => k.paidUntil && normDate(k.paidUntil) < today);
+    // Ольга: trial-period enrollments (пробное) left a lot of kids with old
+    // paidUntil dates that aren't real unpaid debts — a one-time cutover
+    // (not meant to be revisited later) so overdue notifications only fire
+    // for payments actually due from here on, instead of flooding the feed
+    // with stale trial-era ones every session.
+    const OVERDUE_NOTIFY_SINCE = '2026-08-01';
+    const overdue = activeKids().filter(k =>
+      k.paidUntil && normDate(k.paidUntil) < today && normDate(k.paidUntil) >= OVERDUE_NOTIFY_SINCE
+    );
     setFeed(f => {
       const manual = f.filter(x => !x.auto);
       const autoItems = overdue.map(k => {
