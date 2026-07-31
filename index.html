@@ -2992,14 +2992,18 @@ function bestCoverage(entries) {
 // mean anything for those days), pink = weekend, brown = actively picking
 // a new payment range (Payments calendar only, takes priority over green
 // since it's the thing being actively edited).
-function calendarCellVisual({ isEdge, inRange, isWknd, isPresent, isTdy }) {
+function calendarCellVisual({ isEdge, inRange, isWknd, isPresent, isTdy, notAllowedDay }) {
   // the exact start/end of a range you're picking gets a beige mark so you
   // can see your two taps; everything between them stays plain — the
   // sticker preview (rendered separately, see isPicking) carries that
   // signal instead of a solid fill, and weekends keep looking like
-  // weekends throughout instead of getting swallowed by range shading
+  // weekends throughout instead of getting swallowed by range shading.
+  // notAllowedDay (a club's non-meeting days, in between two real session
+  // dates you tapped) never shows as part of the range, even though it
+  // falls chronologically inside it — only real session days count.
   if (isEdge)     return { background: '#F0E4D4', color: 'var(--ink)' };
   if (isWknd)     return { background: '#FBD9E1', color: 'var(--ink)' };
+  if (notAllowedDay) return { background: 'transparent', color: '#D4B8B0' };
   if (inRange)    return { background: 'transparent', color: 'var(--ink)' };
   if (isPresent)  return { background: '#8FCB9E', color: '#1a4a2c' };
   if (isTdy)      return { background: '#F7EFE4', color: 'var(--ink)' };
@@ -3036,7 +3040,7 @@ async function withRetry(fn, attempts = 3, delayMs = 500) {
   throw lastErr;
 }
 
-function PayRangeSheet({ kid, tariff, price, loadHistory, loadAttendanceHistory, legacyCoverage, onConfirm, onDelete, onClose }) {
+function PayRangeSheet({ kid, tariff, price, loadHistory, loadAttendanceHistory, legacyCoverage, onConfirm, onDelete, onClose, allowedWeekdays }) {
   const today = todayStr();
   const init = new Date(today + 'T12:00:00');
   const [viewYear,  setViewYear]  = React.useState(init.getFullYear());
@@ -3081,7 +3085,18 @@ function PayRangeSheet({ kid, tariff, price, loadHistory, loadAttendanceHistory,
       let d = new Date(from + 'T12:00:00');
       const end = new Date(until + 'T12:00:00');
       while (d <= end) {
-        set.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+        const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        // A club payment range only ever actually covers the club's real
+        // meeting weekday(s) — a "1–31 August" entry for a Tuesday-only
+        // club means every Tuesday in it, not all 31 days. Attendance
+        // marked present on an off-schedule day (see the "Перенос занятия"
+        // override) counts too — that's the de facto proof a session
+        // genuinely happened that day, e.g. Tuesday's class rained out and
+        // moved to Wednesday.
+        if (!allowedWeekdays || allowedWeekdays.length === 0 || allowedWeekdays.includes(d.getDay())
+            || attHistory[key] === 'present') {
+          set.add(key);
+        }
         d.setDate(d.getDate() + 1);
       }
     });
@@ -3096,7 +3111,7 @@ function PayRangeSheet({ kid, tariff, price, loadHistory, loadAttendanceHistory,
       if (m) set.delete(normDate(m[1]));
     });
     return set;
-  }, [history, legacyCoverage]);
+  }, [history, legacyCoverage, attHistory, allowedWeekdays]);
 
   React.useEffect(() => {
     if (amountTouched || !rangeFrom || !rangeTo) return;
@@ -3228,20 +3243,30 @@ function PayRangeSheet({ kid, tariff, price, loadHistory, loadAttendanceHistory,
             const dateStr = ds(d);
             const dow     = new Date(dateStr + 'T12:00:00').getDay();
             const isWknd  = dow === 0 || dow === 6;
+            const isPresent = attHistory[dateStr] === 'present';
+            // A club's non-meeting days — never tappable, never part of a
+            // picked range, no matter where they fall between two real
+            // session dates. null/empty allowedWeekdays (garden, or a club
+            // with no schedule on record) means no restriction at all.
+            // Attendance marked present here is an exception, not a rule —
+            // a rescheduled session (see ClubScreen's "Перенос занятия")
+            // genuinely happened on this off-schedule day, so it should be
+            // pickable/payable too.
+            const notAllowedDay = allowedWeekdays && allowedWeekdays.length > 0
+              && !allowedWeekdays.includes(dow) && !isPresent;
             const isEdge  = dateStr === rangeFrom || dateStr === rangeTo;
-            const inRange = rangeFrom && rangeTo && dateStr > rangeFrom && dateStr < rangeTo;
+            const inRange = rangeFrom && rangeTo && dateStr > rangeFrom && dateStr < rangeTo && !notAllowedDay;
             const isPaidDay = paidDays.has(dateStr);
             const isTdy   = dateStr === today;
-            const isPresent = attHistory[dateStr] === 'present';
-            const { background, color } = calendarCellVisual({ isEdge, inRange, isWknd, isPresent, isTdy });
+            const { background, color } = calendarCellVisual({ isEdge, inRange, isWknd, isPresent, isTdy, notAllowedDay });
             // the range you're actively picking previews as a dim sticker —
             // "this is about to be marked paid" — then brightens for a beat
             // once Confirm actually saves it, instead of just vanishing
             const isPicking = (isEdge || inRange) && !isWknd && !isPaidDay;
             return (
-              <button key={d} onClick={() => handlePick(dateStr)}
+              <button key={d} disabled={notAllowedDay} onClick={() => { if (!notAllowedDay) handlePick(dateStr); }}
                 style={{ position: 'relative', border:'none', borderRadius: 10, padding:'9px 2px', fontSize:14,
-                  fontWeight: isEdge||isTdy ? 800 : 500, cursor: 'pointer',
+                  fontWeight: isEdge||isTdy ? 800 : 500, cursor: notAllowedDay ? 'default' : 'pointer',
                   background, color }}>
                 {d}
                 {isPaidDay && !isWknd && <PaidBadge />}
@@ -4089,7 +4114,7 @@ function fmtTourDate(iso) {
   return L(`${d.getDate()} ${mRu[d.getMonth()]}`, `${mEn[d.getMonth()]} ${d.getDate()}`);
 }
 
-function KidPayRow({ kid, isPaid, onToggle, onConfirmPaid, onDeletePaid, tariff, price, loadHistory, loadAttendanceHistory, legacyCoverage }) {
+function KidPayRow({ kid, isPaid, onToggle, onConfirmPaid, onDeletePaid, tariff, price, loadHistory, loadAttendanceHistory, legacyCoverage, allowedWeekdays }) {
   const [showRange, setShowRange] = React.useState(false);
   const grp = DATA.GROUPS.find(g => g.id === kid.group);
   const kidIndex = activeKids().filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
@@ -4124,6 +4149,7 @@ function KidPayRow({ kid, isPaid, onToggle, onConfirmPaid, onDeletePaid, tariff,
           <PayRangeSheet kid={kid} tariff={tariff} price={price} legacyCoverage={legacyCoverage}
             loadHistory={loadHistory || (() => window.loadPaymentLog(kid.id))}
             loadAttendanceHistory={loadAttendanceHistory}
+            allowedWeekdays={allowedWeekdays}
             onConfirm={(from, to, amount) => onConfirmPaid(from, to, amount)}
             onDelete={onDeletePaid}
             onClose={() => setShowRange(false)} />
@@ -4355,6 +4381,9 @@ function PaymentsClubsScreen() {
   const activeClub = DATA.CLUBS.find(c => c.id === clubId);
   const allKids    = activeClub ? activeKids().filter(k => activeClub.kids.includes(k.id)) : [];
   const price      = activeClub?.price ?? null;
+  // Same schedule restriction the attendance calendar already enforces —
+  // a payment range should only ever be able to cover real session days.
+  const allowedWeekdays = React.useMemo(() => clubWeekdaysJS(activeClub), [activeClub]);
 
   React.useEffect(() => {
     if (!clubId) return;
@@ -4442,7 +4471,7 @@ function PaymentsClubsScreen() {
         )}
         {kids.map(kid => (
           <KidPayRow key={kid.id} kid={kid} isPaid={isCovered(kid, selDate)}
-            tariff="club" price={price}
+            tariff="club" price={price} allowedWeekdays={allowedWeekdays}
             loadHistory={() => window.loadClubPaymentLog(clubId).then(l => l.filter(e => e.child === kid.id))}
             loadAttendanceHistory={() => window.loadClubAttendanceHistory(clubId, kid.id)}
             onConfirmPaid={(from, to, amount) => confirmPayment(kid, from, to, amount)}
@@ -4493,6 +4522,12 @@ function ClubScreen({ params }) {
   const [attSavedLocal, setAttSavedLocal] = React.useState({});
   const [attSaveErr, setAttSaveErr] = React.useState(null);
   const [attCalOpen, setAttCalOpen] = React.useState(false);
+  // Manual, one-off override for a rained-out/rescheduled session (Ольга:
+  // Tuesday's swim class actually happened Wednesday) — just lets this one
+  // day be marked regardless of the club's usual schedule, no separate
+  // "why" record. Resets on its own when you leave the tab.
+  const [overrideDay, setOverrideDay] = React.useState(false);
+  React.useEffect(() => { if (tab !== 'attendance') setOverrideDay(false); }, [tab]);
 
   React.useEffect(() => {
     if (!club || tab !== 'attendance') return;
@@ -4517,7 +4552,7 @@ function ClubScreen({ params }) {
   // for clubs that only actually meet once a week).
   const clubWeekdays = clubWeekdaysJS(club);
   const attDateWeekday = new Date(attDate + 'T12:00:00').getDay();
-  const isClubDay = clubWeekdays.length === 0 || clubWeekdays.includes(attDateWeekday);
+  const isClubDay = overrideDay || clubWeekdays.length === 0 || clubWeekdays.includes(attDateWeekday);
 
   function handleAdd(childId) {
     const kids = [...club.kids, childId];
@@ -4629,9 +4664,20 @@ function ClubScreen({ params }) {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
             <CalendarSquareButton date={attDate} onClick={() => setAttCalOpen(true)} />
+            {/* Rescheduled-session override — lets the calendar open to any
+                day (not just this club's usual weekday) and marks attendance
+                there like normal, for the rare "rained out, moved to
+                Wednesday" case. */}
+            <button onClick={() => setOverrideDay(v => !v)} className="bk-press" style={{
+              border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700,
+              padding: '9px 13px', borderRadius: 999,
+              background: overrideDay ? club.ink : '#FBF7F2',
+              color: overrideDay ? '#fff' : 'var(--ink-soft)' }}>
+              🔄 {L('Перенос занятия', 'Rescheduled')}
+            </button>
           </div>
           {attCalOpen && <Portal><MiniCalendar selected={attDate} onSelect={setAttDate} onClose={() => setAttCalOpen(false)}
-            allowedWeekdays={clubWeekdays} /></Portal>}
+            allowedWeekdays={overrideDay ? null : clubWeekdays} /></Portal>}
           {!isClubDay && (
             <div style={{ textAlign: 'center', color: 'var(--ink-faint)', padding: 32, fontSize: 14 }}>
               {L(`${Lo(club)} не проходит в этот день`, `${Lo(club)} doesn't meet on this day`)}
