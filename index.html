@@ -1929,11 +1929,11 @@ function HomeScreen({ go, statuses, feed, homeStyle }) {
       badge: `${rate}%` },
     { key: 'notifications', emoji: '⭐', color: '#FBD9E1', colorLight: '#FDF0F3', colorDark: '#C9ADBA', ink: '#a8456a', go: 'notifications',
       badge: unread ? `${unread} ${t('unread')}` : null, dot: unread > 0, count: unread },
-    // director-only (Ольга + Alex) — staff module, not for teachers.
-    // Opens straight into today's Journal (marking who's in/out) rather
-    // than the staff-cards list — that's the thing actually used day to
-    // day, cards are one tap away from there instead.
-    ...(window.__isDirector ? [
+    // Director always; Rema also, by name (see window.__staffModuleAccess) —
+    // not for teachers generally. Opens straight into today's Journal
+    // (marking who's in/out) rather than the staff-cards list — that's the
+    // thing actually used day to day, cards are one tap away from there.
+    ...(window.__staffModuleAccess ? [
       { key: 'team', emoji: '👩‍🏫', color: '#E8E0D5', colorLight: '#F2EDE8', colorDark: '#C0B5A8', ink: '#5a4a30', go: 'staff-daily',
         badge: null },
     ] : []),
@@ -5199,8 +5199,10 @@ function StaffDailyScreen({ params, go }) {
     if (view !== 'day') return;
     Promise.all([withRetry(window.loadStaff), withRetry(() => window.getStaffAttendance(date))])
       .then(([s, rec]) => {
-        // Teacher only sees themselves
-        const filtered = window.__isTeacher && window.__teacherName
+        // Teacher only sees themselves — except someone with Персонал
+        // module access (director, or Rema), who's here to manage
+        // everyone's attendance, not just mark their own.
+        const filtered = window.__isTeacher && window.__teacherName && !window.__staffModuleAccess
           ? s.filter(x => x.name === window.__teacherName)
           : s;
         setStaff(filtered);
@@ -6623,6 +6625,11 @@ function App() {
   window.__isDirector  = role === 'director';
   window.__isTeacher   = role === 'teacher';
   window.__teacherName = teacherName;
+  // Ольга: Rema specifically also gets the Персонал module (everyone else's
+  // access stays exactly as it was) — there's no per-person permission
+  // system to hang this on, so it's a named exception rather than a new
+  // role, until more than one person needs it.
+  window.__staffModuleAccess = window.__isDirector || teacherName === 'Rema';
 
   // The very first loadAllData() (from the mount effect below) fires before
   // any login and now always 401s, since the API requires a token — retry
