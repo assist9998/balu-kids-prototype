@@ -3045,7 +3045,7 @@ async function withRetry(fn, attempts = 3, delayMs = 500) {
   throw lastErr;
 }
 
-function PayRangeSheet({ kid, tariff, price, loadHistory, loadAttendanceHistory, legacyCoverage, onConfirm, onDelete, onClose, allowedWeekdays }) {
+function PayRangeSheet({ kid, tariff, price, loadHistory, loadAttendanceHistory, legacyCoverage, onConfirm, onDelete, onClose, allowedWeekdays, readOnly = false }) {
   const today = todayStr();
   const init = new Date(today + 'T12:00:00');
   const [viewYear,  setViewYear]  = React.useState(init.getFullYear());
@@ -3153,7 +3153,7 @@ function PayRangeSheet({ kid, tariff, price, loadHistory, loadAttendanceHistory,
 
   // first tap starts a fresh range; second tap closes it (swapping if picked before the start)
   function handlePick(dateStr) {
-    if (saving || justConfirmed) return;
+    if (saving || justConfirmed || readOnly) return;
     if (!rangeFrom || rangeTo) { setRangeFrom(dateStr); setRangeTo(null); }
     else if (dateStr < rangeFrom) { setRangeTo(rangeFrom); setRangeFrom(dateStr); }
     else { setRangeTo(dateStr); }
@@ -3210,6 +3210,7 @@ function PayRangeSheet({ kid, tariff, price, loadHistory, loadAttendanceHistory,
         <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink-soft)', textAlign: 'center', marginBottom: 12 }}>
           {Lo(kid)}
         </div>
+        {!readOnly && (
         <div style={{ display: 'flex', justifyContent: 'center', gap: 20, marginBottom: 16, flexWrap: 'wrap' }}>
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-faint)', marginBottom: 2 }}>{L('Оплачено с', 'Paid from')}</div>
@@ -3231,6 +3232,7 @@ function PayRangeSheet({ kid, tariff, price, loadHistory, loadAttendanceHistory,
                 outline: 'none', padding: '0 4px 2px' }} />
           </div>
         </div>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
           <button onClick={prevMonth} style={{ border:'none', background:'none', fontSize:24, cursor:'pointer', color:'var(--ink)', padding:'0 10px' }}>‹</button>
           <div style={{ fontSize:16, fontWeight:800, color:'var(--ink)', fontFamily:'var(--font-display)' }}>
@@ -3317,14 +3319,20 @@ function PayRangeSheet({ kid, tariff, price, loadHistory, loadAttendanceHistory,
                       </div>
                     )}
                   </span>
-                  <button onClick={() => handleDelete(h.id)} disabled={deletingId === h.id}
-                    style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 16,
-                      color: '#c0392b', padding: 4, opacity: deletingId === h.id ? 0.4 : 1 }}>✕</button>
+                  {!readOnly && (
+                    <button onClick={() => handleDelete(h.id)} disabled={deletingId === h.id}
+                      style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 16,
+                        color: '#c0392b', padding: 4, opacity: deletingId === h.id ? 0.4 : 1 }}>✕</button>
+                  )}
                 </div>
               ))}
             </div>
           </div>
         )}
+        {/* Кружки → Участники opens this read-only — actually logging or
+            deleting a payment only happens through the Оплаты block, this
+            view is just for checking paid/attendance status at a glance. */}
+        {!readOnly && (
         <button onClick={handleConfirm} disabled={!canConfirm} className="bk-press"
           style={{ width: '100%', border: 'none', cursor: canConfirm ? 'pointer' : 'default',
             fontFamily: 'var(--font-display)',
@@ -3334,6 +3342,7 @@ function PayRangeSheet({ kid, tariff, price, loadHistory, loadAttendanceHistory,
             boxShadow: justConfirmed ? '0 10px 24px -8px #F2A81D' : canConfirm ? '0 10px 24px -8px #B07848' : 'none' }}>
           {justConfirmed ? L('Сохранено ✓', 'Saved ✓') : saving ? L('Сохраняю…', 'Saving…') : L('Подтвердить оплату', 'Confirm payment')}
         </button>
+        )}
       </div>
     </div>
   );
@@ -4543,9 +4552,10 @@ function ClubScreen({ params }) {
   }, [tab, attDate, club?.id]);
 
   // Members tab: tapping a kid opens the same combined attendance+payment
-  // calendar as Оплаты → Кружки (PayRangeSheet) — same reasoning as the
-  // garden, where that's already how you check "how much did they come,
-  // is it paid" without a separate trip through Payments.
+  // calendar as Оплаты → Кружки (PayRangeSheet), read-only — this is just
+  // for checking "how much did they come, is it paid" at a glance. Actually
+  // logging or deleting a payment only ever happens through the separate
+  // Оплаты block, never from here.
   const [payLog,      setPayLog]      = React.useState([]);
   const [selectedKid, setSelectedKid] = React.useState(null);
 
@@ -4565,30 +4575,6 @@ function ClubScreen({ params }) {
     if (!c || !c.until || normDate(c.until) < date) return false;
     if (c.from && normDate(c.from) > date) return false;
     return true;
-  }
-
-  function refetchPayLog() {
-    return window.loadClubPaymentLog(club.id).then(setPayLog);
-  }
-
-  async function confirmClubPayment(kid, from, to, amount) {
-    const fromDmy = from.split('-').reverse().join('.');
-    const toDmy = to.split('-').reverse().join('.');
-    try {
-      await window.addClubPaymentLogEntry(kid.id, club.id, fromDmy, toDmy, amount);
-      await refetchPayLog();
-    } catch (e) {
-      window.showToast(L(
-        'Не удалось отправить сразу — сохранится автоматически, когда появится связь. Не нажимайте ещё раз.',
-        "Couldn't send right now — it's saved and will sync automatically once you're back online. Don't tap Confirm again."
-      ));
-      throw e;
-    }
-  }
-
-  async function deleteClubPayment(rowId) {
-    await window.deleteClubPaymentLogEntry(rowId);
-    await refetchPayLog();
   }
 
   const attHasChanges = club ? club.kids.some(id => attLocal[id] !== attSavedLocal[id]) : false;
@@ -4725,10 +4711,9 @@ function ClubScreen({ params }) {
           {selectedKid && (
             <Portal>
               <PayRangeSheet kid={selectedKid} tariff="club" price={club.price} allowedWeekdays={clubWeekdays}
+                readOnly
                 loadHistory={() => window.loadClubPaymentLog(club.id).then(l => l.filter(e => e.child === selectedKid.id))}
                 loadAttendanceHistory={() => window.loadClubAttendanceHistory(club.id, selectedKid.id)}
-                onConfirm={(from, to, amount) => confirmClubPayment(selectedKid, from, to, amount)}
-                onDelete={deleteClubPayment}
                 onClose={() => setSelectedKid(null)} />
             </Portal>
           )}
