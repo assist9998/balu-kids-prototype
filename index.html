@@ -4696,10 +4696,14 @@ function ClubScreen({ params }) {
                   <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}</div>
                   {grp && <span style={{ background: grp.color, color: grp.ink, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999 }}>{grp.emoji} {Lo(grp)}</span>}
                 </div>
-                <span style={{ fontSize: 11.5, fontWeight: 700, padding: '3px 9px', borderRadius: 999,
-                  background: paid ? '#E6F7EE' : '#FEF0ED', color: paid ? '#1f7a55' : '#c0392b' }}>
-                  {paid ? L('Оплачено', 'Paid') : L('Не оплачено', 'Unpaid')}
-                </span>
+                {/* No price on record means this club isn't actually being
+                    charged for — a Paid/Unpaid badge would just be noise. */}
+                {club.price != null && (
+                  <span style={{ fontSize: 11.5, fontWeight: 700, padding: '3px 9px', borderRadius: 999,
+                    background: paid ? '#E6F7EE' : '#FEF0ED', color: paid ? '#1f7a55' : '#c0392b' }}>
+                    {paid ? L('Оплачено', 'Paid') : L('Не оплачено', 'Unpaid')}
+                  </span>
+                )}
                 <button onClick={(e) => { e.stopPropagation(); handleRemove(kid.id); }} className="bk-press" style={{
                   border: 'none', background: '#FBE8E8', color: '#C04040', borderRadius: 10,
                   padding: '6px 10px', fontSize: 15, cursor: 'pointer',
@@ -4730,23 +4734,26 @@ function ClubScreen({ params }) {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
             <CalendarSquareButton date={attDate} onClick={() => setAttCalOpen(true)} />
-            {/* Rescheduled-session override — lets the calendar open to any
-                day (not just this club's usual weekday) and marks attendance
-                there like normal, for the rare "rained out, moved to
-                Wednesday" case. */}
-            <button onClick={() => setOverrideDay(v => !v)} className="bk-press" style={{
-              border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700,
-              padding: '9px 13px', borderRadius: 999,
-              background: overrideDay ? club.ink : '#FBF7F2',
-              color: overrideDay ? '#fff' : 'var(--ink-soft)' }}>
-              🔄 {L('Перенос занятия', 'Rescheduled')}
-            </button>
           </div>
+          {/* The date picker itself is never restricted to the club's usual
+              weekday — otherwise there'd be no way to even land on an
+              off-schedule day to reschedule it in the first place. Whether
+              that day's roster shows is entirely gated by isClubDay/
+              overrideDay below. */}
           {attCalOpen && <Portal><MiniCalendar selected={attDate} onSelect={setAttDate} onClose={() => setAttCalOpen(false)}
-            allowedWeekdays={overrideDay ? null : clubWeekdays} /></Portal>}
+            allowedWeekdays={null} /></Portal>}
           {!isClubDay && (
-            <div style={{ textAlign: 'center', color: 'var(--ink-faint)', padding: 32, fontSize: 14 }}>
-              {L(`${Lo(club)} не проходит в этот день`, `${Lo(club)} doesn't meet on this day`)}
+            <div style={{ textAlign: 'center', padding: 32 }}>
+              <div style={{ color: 'var(--ink-faint)', fontSize: 14, marginBottom: 14 }}>
+                {L(`${Lo(club)} не проходит в этот день`, `${Lo(club)} doesn't meet on this day`)}
+              </div>
+              {/* Rescheduled-session override — for the rare "rained out,
+                  moved to Wednesday" case, marks attendance here anyway. */}
+              <button onClick={() => setOverrideDay(true)} className="bk-press" style={{
+                border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 700,
+                padding: '10px 16px', borderRadius: 999, background: '#FBF7F2', color: 'var(--ink-soft)' }}>
+                🔄 {L('Перенос занятия', 'Rescheduled')}
+              </button>
             </div>
           )}
           {isClubDay && kids.length === 0 && (
