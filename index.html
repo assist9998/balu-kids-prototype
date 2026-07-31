@@ -1917,9 +1917,11 @@ function HomeScreen({ go, statuses, feed, homeStyle }) {
       badge: `${kids.length} ${t('kids')}` },
     { key: 'attendance',    emoji: '📋', color: '#CDE8FB', colorLight: '#E8F4FD', colorDark: '#A4BCE9', ink: '#1f5f86', go: 'attendance',
       badge: `${present}/${kids.length}` },
-    // teachers don't handle money — director/staff only, see also the
-    // route guard in App() that catches direct navigation there too
-    ...(window.__isTeacher ? [] : [
+    // teachers don't handle money — director/staff only. Managers don't
+    // either, for now — whether they should is still an open question
+    // (Ольга), so left off until that's decided. See also the route guard
+    // in App() that catches direct navigation there too.
+    ...((window.__isTeacher || window.__isManager) ? [] : [
       { key: 'payments', emoji: '💰', color: '#FBE0C0', colorLight: '#FDF4EA', colorDark: '#C9A882', ink: '#8a5010', go: 'payments',
         badge: null },
     ]),
@@ -1929,10 +1931,10 @@ function HomeScreen({ go, statuses, feed, homeStyle }) {
       badge: `${rate}%` },
     { key: 'notifications', emoji: '⭐', color: '#FBD9E1', colorLight: '#FDF0F3', colorDark: '#C9ADBA', ink: '#a8456a', go: 'notifications',
       badge: unread ? `${unread} ${t('unread')}` : null, dot: unread > 0, count: unread },
-    // Director always; Rema also, by name (see window.__staffModuleAccess) —
-    // not for teachers generally. Opens straight into today's Journal
-    // (marking who's in/out) rather than the staff-cards list — that's the
-    // thing actually used day to day, cards are one tap away from there.
+    // Director and managers (see window.__staffModuleAccess) — not for
+    // teachers generally. Opens straight into today's Journal (marking
+    // who's in/out) rather than the staff-cards list — that's the thing
+    // actually used day to day, cards are one tap away from there.
     ...(window.__staffModuleAccess ? [
       { key: 'team', emoji: '👩‍🏫', color: '#E8E0D5', colorLight: '#F2EDE8', colorDark: '#C0B5A8', ink: '#5a4a30', go: 'staff-daily',
         badge: null },
@@ -1942,7 +1944,7 @@ function HomeScreen({ go, statuses, feed, homeStyle }) {
   const hour = new Date().getHours();
   const greet = hour < 12 ? t('greetingAM') : t('greetingPM');
   const greetName = window.__isDirector ? L('Ольга', 'Olga')
-    : ((window.__isTeacher || window.__isStaff) && window.__teacherName) ? window.__teacherName
+    : ((window.__isTeacher || window.__isStaff || window.__isManager) && window.__teacherName) ? window.__teacherName
     : L('Команда', 'Team');
 
   return (
@@ -6615,7 +6617,7 @@ function App() {
   // instant role flips (login/logout), which blanks the whole app.
   React.useEffect(() => {
     const t = stack[stack.length - 1];
-    if (role === 'teacher' && t.name.startsWith('payments')) { setDir('back'); setStack([{ name: 'home', params: {} }]); }
+    if ((role === 'teacher' || role === 'manager') && t.name.startsWith('payments')) { setDir('back'); setStack([{ name: 'home', params: {} }]); }
   }, [role, stack]);
 
   // keep i18n + global lang in sync BEFORE children render
@@ -6624,12 +6626,15 @@ function App() {
   window.__isStaff     = role === 'staff';
   window.__isDirector  = role === 'director';
   window.__isTeacher   = role === 'teacher';
+  window.__isManager   = role === 'manager';
   window.__teacherName = teacherName;
-  // Ольга: Rema specifically also gets the Персонал module (everyone else's
-  // access stays exactly as it was) — there's no per-person permission
-  // system to hang this on, so it's a named exception rather than a new
-  // role, until more than one person needs it.
-  window.__staffModuleAccess = window.__isDirector || teacherName === 'Rema';
+  // A real role now (position "Manager" on the staff record → role
+  // "manager" at login, see _STAFF_POSITION_ROLE in main.py), not a named
+  // exception — Rema is just the first person given it. Managers get the
+  // Персонал module; whether they also get Payments is still an open
+  // question (Ольга), so that stays off for now (see the payments tile
+  // gate below, which now excludes managers too).
+  window.__staffModuleAccess = window.__isDirector || window.__isManager;
 
   // The very first loadAllData() (from the mount effect below) fires before
   // any login and now always 401s, since the API requires a token — retry
