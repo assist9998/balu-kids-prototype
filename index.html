@@ -4537,6 +4537,55 @@ function ClubScreen({ params }) {
       .catch(() => { setAttLocal({}); setAttSavedLocal({}); });
   }, [tab, attDate, club?.id]);
 
+  // Members tab: tapping a kid opens the same combined attendance+payment
+  // calendar as Оплаты → Кружки (PayRangeSheet) — same reasoning as the
+  // garden, where that's already how you check "how much did they come,
+  // is it paid" without a separate trip through Payments.
+  const [payLog,      setPayLog]      = React.useState([]);
+  const [selectedKid, setSelectedKid] = React.useState(null);
+
+  React.useEffect(() => {
+    if (!club) return;
+    withRetry(() => window.loadClubPaymentLog(club.id)).then(setPayLog).catch(() => {});
+  }, [club?.id]);
+
+  const payCoverage = React.useMemo(() => {
+    const map = {};
+    (club ? club.kids : []).forEach(kidId => { map[kidId] = bestCoverage(payLog.filter(e => e.child === kidId)); });
+    return map;
+  }, [payLog, club]);
+
+  function isPayCovered(kidId, date) {
+    const c = payCoverage[kidId];
+    if (!c || !c.until || normDate(c.until) < date) return false;
+    if (c.from && normDate(c.from) > date) return false;
+    return true;
+  }
+
+  function refetchPayLog() {
+    return window.loadClubPaymentLog(club.id).then(setPayLog);
+  }
+
+  async function confirmClubPayment(kid, from, to, amount) {
+    const fromDmy = from.split('-').reverse().join('.');
+    const toDmy = to.split('-').reverse().join('.');
+    try {
+      await window.addClubPaymentLogEntry(kid.id, club.id, fromDmy, toDmy, amount);
+      await refetchPayLog();
+    } catch (e) {
+      window.showToast(L(
+        'Не удалось отправить сразу — сохранится автоматически, когда появится связь. Не нажимайте ещё раз.',
+        "Couldn't send right now — it's saved and will sync automatically once you're back online. Don't tap Confirm again."
+      ));
+      throw e;
+    }
+  }
+
+  async function deleteClubPayment(rowId) {
+    await window.deleteClubPaymentLogEntry(rowId);
+    await refetchPayLog();
+  }
+
   const attHasChanges = club ? club.kids.some(id => attLocal[id] !== attSavedLocal[id]) : false;
 
   if (!club) return <div style={{ padding: 20, color: 'var(--ink-faint)', fontSize: 14, textAlign: 'center' }}>—</div>;
@@ -4638,14 +4687,20 @@ function ClubScreen({ params }) {
           {kids.map(kid => {
             const grp = DATA.GROUPS.find(g => g.id === kid.group);
             const kidIndex = activeKids().filter(k => k.group === kid.group).findIndex(k => k.id === kid.id);
+            const paid = isPayCovered(kid.id, todayStr());
             return (
-              <Card key={kid.id} pad={12} style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2' }}>
+              <Card key={kid.id} pad={12} onClick={() => setSelectedKid(kid)}
+                style={{ display: 'flex', alignItems: 'center', gap: 13, background: '#FBF7F2' }}>
                 <Avatar emoji={kid.emoji} color={PALETTE[kidIndex % PALETTE.length]} size={44} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}</div>
                   {grp && <span style={{ background: grp.color, color: grp.ink, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999 }}>{grp.emoji} {Lo(grp)}</span>}
                 </div>
-                <button onClick={() => handleRemove(kid.id)} className="bk-press" style={{
+                <span style={{ fontSize: 11.5, fontWeight: 700, padding: '3px 9px', borderRadius: 999,
+                  background: paid ? '#E6F7EE' : '#FEF0ED', color: paid ? '#1f7a55' : '#c0392b' }}>
+                  {paid ? L('Оплачено', 'Paid') : L('Не оплачено', 'Unpaid')}
+                </span>
+                <button onClick={(e) => { e.stopPropagation(); handleRemove(kid.id); }} className="bk-press" style={{
                   border: 'none', background: '#FBE8E8', color: '#C04040', borderRadius: 10,
                   padding: '6px 10px', fontSize: 15, cursor: 'pointer',
                 }}>✕</button>
@@ -4657,6 +4712,17 @@ function ClubScreen({ params }) {
             borderRadius: 16, padding: 14, fontSize: 14, fontWeight: 700,
             color: 'var(--ink-soft)', cursor: 'pointer', fontFamily: 'inherit',
           }}>+ {L('Добавить ребёнка', 'Add child')}</button>
+
+          {selectedKid && (
+            <Portal>
+              <PayRangeSheet kid={selectedKid} tariff="club" price={club.price} allowedWeekdays={clubWeekdays}
+                loadHistory={() => window.loadClubPaymentLog(club.id).then(l => l.filter(e => e.child === selectedKid.id))}
+                loadAttendanceHistory={() => window.loadClubAttendanceHistory(club.id, selectedKid.id)}
+                onConfirm={(from, to, amount) => confirmClubPayment(selectedKid, from, to, amount)}
+                onDelete={deleteClubPayment}
+                onClose={() => setSelectedKid(null)} />
+            </Portal>
+          )}
         </div>
       )}
 
