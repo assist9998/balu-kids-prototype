@@ -1915,17 +1915,32 @@ function HomeScreen({ go, statuses, feed, homeStyle }) {
 
   // "Мои задачи" strip — anyone logged in under their own staff name (not
   // just teachers; a manager/director with a task of their own gets it
-  // too, same mechanism either way) sees what's still pending today, right
-  // in the greeting card. Hidden entirely once nothing's left to do.
-  const [myTasksToday, setMyTasksToday] = React.useState(null); // { count, nextTitle } | null
+  // too, same mechanism either way) sees today's AND the next work day's
+  // tasks a day ahead of time (Friday shows Monday's — weekends aren't
+  // workdays, same as garden/club attendance). Stays visible once
+  // everything's done instead of disappearing — the dot just turns green.
+  const [myTasksToday, setMyTasksToday] = React.useState(null);
+  // null = nothing due in this window at all; otherwise
+  // { allDone } or { allDone: false, count, title, isNextDay }
   React.useEffect(() => {
     if (!window.__teacherName) return;
     const today = todayStr();
+    const d = new Date(today + 'T12:00:00');
+    d.setDate(d.getDate() + 1);
+    while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+    const nextWorkDay = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     withRetry(() => window.loadStaffTasks(window.__teacherName)).then(tasks => {
-      const pending = tasks.flatMap(t => t.instances
-        .filter(inst => inst.dueDate === today && inst.status === 'pending')
-        .map(() => t.title));
-      setMyTasksToday(pending.length ? { count: pending.length, nextTitle: pending[0] } : null);
+      const windowInstances = tasks.flatMap(t => t.instances
+        .filter(inst => inst.dueDate === today || inst.dueDate === nextWorkDay)
+        .map(inst => ({ ...inst, title: taskTitleLo(t) })));
+      if (windowInstances.length === 0) { setMyTasksToday(null); return; }
+      const needsAction = windowInstances
+        .filter(i => i.status === 'pending' || i.status === 'postponed')
+        .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+      setMyTasksToday(needsAction.length === 0 ? { allDone: true } : {
+        allDone: false, count: needsAction.length,
+        title: needsAction[0].title, isNextDay: needsAction[0].dueDate === nextWorkDay,
+      });
     }).catch(() => {});
   }, []);
 
@@ -1997,12 +2012,19 @@ function HomeScreen({ go, statuses, feed, homeStyle }) {
             display: 'flex', alignItems: 'center', gap: 10, width: '100%', marginTop: 8,
             border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
             background: '#FBD9E1', borderRadius: 16, padding: '10px 12px' }}>
-            <span style={{ fontSize: 16, flexShrink: 0 }}>✅</span>
+            {/* Dot, not a checkmark icon — amber while something still needs
+                doing, green once it's all done (see StaffTasksScreen's grid
+                badge for the same color language). */}
+            <span style={{ width: 11, height: 11, borderRadius: '50%', flexShrink: 0,
+              background: myTasksToday.allDone ? '#1f7a55' : '#F2A81D' }} />
             <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, color: '#7a2a4a',
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              <b style={{ fontWeight: 800 }}>
-                {myTasksToday.count} {L('задачи', 'tasks')}
-              </b> {L('на сегодня', 'today')} — {myTasksToday.nextTitle}
+              {myTasksToday.allDone ? L('Все задачи выполнены', 'All tasks done') : (
+                <>
+                  <b style={{ fontWeight: 800 }}>{myTasksToday.count} {L('задачи', 'tasks')}</b>{' '}
+                  {myTasksToday.isNextDay ? L('на завтра', 'coming up') : L('на сегодня', 'today')} — {myTasksToday.title}
+                </>
+              )}
             </span>
             <span style={{ color: '#a8456a', opacity: 0.6, flexShrink: 0 }}>›</span>
           </button>
@@ -5993,6 +6015,14 @@ const TITLES = {
 const WEEKDAY_LABELS_RU = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
 const WEEKDAY_LABELS_EN = ['Mo','Tu','We','Th','Fr','Sa','Su'];
 
+// Same idea as Lo(), for a task's title specifically — titleEn is only
+// ever set once Ольга actually taps translate (see TaskFormSheet/
+// TaskEditSheet), so an untranslated task correctly still shows its
+// Russian text even when the viewer's app is set to English.
+function taskTitleLo(t) {
+  return (window.__lang === 'en' && t.titleEn) ? t.titleEn : t.title;
+}
+
 function taskRecurrenceLabel(t) {
   if (t.recurrence === 'once') return L('Разово', 'One-time');
   if (t.recurrence === 'count') return L(`${t.targetCount} раз`, `${t.targetCount}×`);
@@ -6002,6 +6032,11 @@ function taskRecurrenceLabel(t) {
 
 function TaskFormSheet({ staffName, onClose, onSaved }) {
   const [title,       setTitle]       = React.useState('');
+  // Same one-tap RU->EN helper as Уведомления (see ComposeScreen.translate)
+  // — tapping the flag replaces the visible text with its English
+  // translation and keeps the original Russian here, so Save can send both.
+  const [titleRu,      setTitleRu]      = React.useState('');
+  const [translating,  setTranslating]  = React.useState(false);
   const [recurrence,  setRecurrence]  = React.useState('once');
   const [weekdays,    setWeekdays]    = React.useState([]);
   const [targetCount, setTargetCount] = React.useState('3');
@@ -6012,6 +6047,18 @@ function TaskFormSheet({ staffName, onClose, onSaved }) {
 
   function toggleWeekday(w) {
     setWeekdays(ws => ws.includes(w) ? ws.filter(x => x !== w) : [...ws, w].sort());
+  }
+
+  async function translateTitle() {
+    if (!title.trim()) return;
+    setTranslating(true);
+    try {
+      const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(title.trim())}&langpair=ru|en`);
+      const data = await res.json();
+      const en = data.responseData?.translatedText;
+      if (en) { setTitleRu(title); setTitle(en); }
+    } catch {}
+    finally { setTranslating(false); }
   }
 
   async function handleSave() {
@@ -6025,7 +6072,7 @@ function TaskFormSheet({ staffName, onClose, onSaved }) {
     setSaving(true); setError(null);
     try {
       await window.createStaffTask({
-        staffName, title: title.trim(), recurrence, weekdays,
+        staffName, title: (titleRu || title).trim(), titleEn: titleRu ? title.trim() : null, recurrence, weekdays,
         targetCount: recurrence === 'count' ? Number(targetCount) : null,
         startDate, endDate: (recurrence === 'weekly' && endDate) ? endDate : null,
       });
@@ -6062,9 +6109,20 @@ function TaskFormSheet({ staffName, onClose, onSaved }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div>
               <label style={LBL}>{L('Задача', 'Task')}</label>
-              <textarea style={{ ...INP, resize: 'none' }} rows={2} value={title}
-                onChange={e => setTitle(e.target.value)}
-                placeholder={L('Скидывать отчёт о состоянии площадки и склада', 'Send a report on playground/warehouse status')} />
+              <div style={{ position: 'relative' }}>
+                <textarea style={{ ...INP, resize: 'none', paddingBottom: 38 }} rows={2} value={title}
+                  onChange={e => { setTitle(e.target.value); setTitleRu(''); }}
+                  placeholder={L('Скидывать отчёт о состоянии площадки и склада', 'Send a report on playground/warehouse status')} />
+                <button onClick={translateTitle} disabled={!title.trim() || translating} className="bk-press"
+                  title={L('Перевести на английский', 'Translate to English')} style={{
+                  position: 'absolute', bottom: 8, right: 8,
+                  border: 'none', cursor: title.trim() && !translating ? 'pointer' : 'default',
+                  fontSize: 18, lineHeight: 1, padding: '4px 8px', borderRadius: 10,
+                  background: 'rgba(255,255,255,0.7)', opacity: translating ? 0.4 : title.trim() ? 1 : 0.3,
+                  transition: 'opacity .2s', boxShadow: '0 1px 4px rgba(60,40,20,0.1)' }}>
+                  🇬🇧
+                </button>
+              </div>
             </div>
 
             <div>
@@ -6141,6 +6199,12 @@ function TaskEditSheet({ task, onClose, onSaved, onDelete }) {
   // instances already exist would mean reconciling already-answered ones
   // against a new schedule, a bigger feature than what was asked for.
   const [title, setTitle] = React.useState(task.title);
+  // Same one-tap RU->EN helper as Уведомления (see ComposeScreen.translate).
+  // If she doesn't touch it, whatever translation already existed carries
+  // over unchanged (see handleSave) — editing the date shouldn't silently
+  // wipe out a translation she made earlier.
+  const [titleRu,     setTitleRu]     = React.useState('');
+  const [translating, setTranslating] = React.useState(false);
   const [startDate, setStartDate] = React.useState(task.startDate || '');
   const [endDate, setEndDate] = React.useState(task.endDate || '');
   const [saving, setSaving] = React.useState(false);
@@ -6150,12 +6214,32 @@ function TaskEditSheet({ task, onClose, onSaved, onDelete }) {
   // wasn't how deletion works anywhere else in the app.
   const [deleteConfirm, setDeleteConfirm] = React.useState(false);
 
+  async function translateTitle() {
+    if (!title.trim()) return;
+    setTranslating(true);
+    try {
+      const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(title.trim())}&langpair=ru|en`);
+      const data = await res.json();
+      const en = data.responseData?.translatedText;
+      if (en) { setTitleRu(title); setTitle(en); }
+    } catch {}
+    finally { setTranslating(false); }
+  }
+
   async function handleSave() {
     if (!title.trim()) { setError(L('Введите текст задачи', 'Enter a task description')); return; }
     setSaving(true); setError(null);
+    // Re-translated just now -> use it. Otherwise, if the Russian text
+    // itself is unchanged, keep whatever translation already existed;
+    // if she edited it without re-translating, the old one's stale, so
+    // it's cleared rather than silently showing a mismatched English text.
+    const titleEnToSend = titleRu
+      ? title.trim()
+      : (title.trim() === task.title ? (task.titleEn || null) : null);
     try {
       await window.updateStaffTask(task.id, {
-        title: title.trim(),
+        title: (titleRu || title).trim(),
+        titleEn: titleEnToSend,
         startDate: task.recurrence === 'once' ? startDate : null,
         endDate: task.recurrence === 'weekly' ? (endDate || null) : null,
       });
@@ -6192,8 +6276,19 @@ function TaskEditSheet({ task, onClose, onSaved, onDelete }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div>
               <label style={LBL}>{L('Задача', 'Task')}</label>
-              <textarea style={{ ...INP, resize: 'none' }} rows={2} value={title}
-                onChange={e => setTitle(e.target.value)} autoFocus />
+              <div style={{ position: 'relative' }}>
+                <textarea style={{ ...INP, resize: 'none', paddingBottom: 38 }} rows={2} value={title}
+                  onChange={e => { setTitle(e.target.value); setTitleRu(''); }} autoFocus />
+                <button onClick={translateTitle} disabled={!title.trim() || translating} className="bk-press"
+                  title={L('Перевести на английский', 'Translate to English')} style={{
+                  position: 'absolute', bottom: 8, right: 8,
+                  border: 'none', cursor: title.trim() && !translating ? 'pointer' : 'default',
+                  fontSize: 18, lineHeight: 1, padding: '4px 8px', borderRadius: 10,
+                  background: 'rgba(255,255,255,0.7)', opacity: translating ? 0.4 : title.trim() ? 1 : 0.3,
+                  transition: 'opacity .2s', boxShadow: '0 1px 4px rgba(60,40,20,0.1)' }}>
+                  🇬🇧
+                </button>
+              </div>
             </div>
 
             {task.recurrence === 'once' && (
@@ -6354,7 +6449,7 @@ function MyTasksScreen() {
           const total = t.instances.length;
           return (
             <div key={t.id} style={{ background: '#FBF7F2', borderRadius: 18, padding: 13 }}>
-              <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--ink)' }}>{t.title}</div>
+              <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--ink)' }}>{taskTitleLo(t)}</div>
               <div style={{ fontSize: 11.5, color: 'var(--ink-faint)', fontWeight: 600, marginTop: 2 }}>
                 {taskRecurrenceLabel(t)}
               </div>
@@ -6524,7 +6619,7 @@ function StaffTasksScreen({ go, staff }) {
                 // deletion works anywhere else in the app).
                 <div key={t.id} onClick={() => setEditingTask(t)}
                   style={{ background: '#FBF7F2', borderRadius: 18, padding: 13, cursor: 'pointer' }}>
-                  <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--ink)' }}>{t.title}</div>
+                  <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--ink)' }}>{taskTitleLo(t)}</div>
                   <div style={{ fontSize: 11.5, color: 'var(--ink-faint)', fontWeight: 600, marginTop: 2 }}>
                     {taskRecurrenceLabel(t)}
                   </div>
