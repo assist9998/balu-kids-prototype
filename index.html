@@ -1921,7 +1921,10 @@ function HomeScreen({ go, statuses, feed, homeStyle }) {
   // everything's done instead of disappearing — the dot just turns green.
   const [myTasksToday, setMyTasksToday] = React.useState(null);
   // null = nothing due in this window at all; otherwise
-  // { allDone } or { allDone: false, count, title, isNextDay }
+  // { allDone } or { allDone: false, count, title, isNextDay, extraNextDay }
+  // count/title always describe TODAY's tasks specifically once there are
+  // any — next-work-day ones only ever fold into the count once today's
+  // are all clear, never mixed together into one misleading number.
   React.useEffect(() => {
     if (!window.__teacherName) return;
     const today = todayStr();
@@ -1934,13 +1937,18 @@ function HomeScreen({ go, statuses, feed, homeStyle }) {
         .filter(inst => inst.dueDate === today || inst.dueDate === nextWorkDay)
         .map(inst => ({ ...inst, title: taskTitleLo(t) })));
       if (windowInstances.length === 0) { setMyTasksToday(null); return; }
-      const needsAction = windowInstances
-        .filter(i => i.status === 'pending' || i.status === 'postponed')
-        .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
-      setMyTasksToday(needsAction.length === 0 ? { allDone: true } : {
-        allDone: false, count: needsAction.length,
-        title: needsAction[0].title, isNextDay: needsAction[0].dueDate === nextWorkDay,
-      });
+      const needsAction = i => i.status === 'pending' || i.status === 'postponed';
+      const todayList = windowInstances.filter(i => i.dueDate === today && needsAction(i));
+      const nextList   = windowInstances.filter(i => i.dueDate === nextWorkDay && needsAction(i));
+      if (todayList.length === 0 && nextList.length === 0) {
+        setMyTasksToday({ allDone: true });
+      } else if (todayList.length > 0) {
+        setMyTasksToday({ allDone: false, count: todayList.length, title: todayList[0].title,
+          isNextDay: false, extraNextDay: nextList.length });
+      } else {
+        setMyTasksToday({ allDone: false, count: nextList.length, title: nextList[0].title,
+          isNextDay: true, extraNextDay: 0 });
+      }
     }).catch(() => {});
   }, []);
 
@@ -2023,6 +2031,8 @@ function HomeScreen({ go, statuses, feed, homeStyle }) {
                 <>
                   <b style={{ fontWeight: 800 }}>{myTasksToday.count} {L('задачи', 'tasks')}</b>{' '}
                   {myTasksToday.isNextDay ? L('на завтра', 'coming up') : L('на сегодня', 'today')} — {myTasksToday.title}
+                  {myTasksToday.extraNextDay > 0 &&
+                    ` · +${myTasksToday.extraNextDay} ${L('завтра', 'tomorrow')}`}
                 </>
               )}
             </span>
