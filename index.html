@@ -208,6 +208,7 @@
     daysDayOff:        { ru: 'Выходные',        en: 'Days off' },
     daysAbsent:        { ru: 'Пропущено',       en: 'Absent days' },
     staffTasks:        { ru: 'Задачи',          en: 'Tasks' },
+    myTasks:           { ru: 'Мои задачи',      en: 'My tasks' },
   };
 
   let LANG = 'ru';
@@ -1912,6 +1913,22 @@ function HomeScreen({ go, statuses, feed, homeStyle }) {
   const rate = Math.round((kids.filter(k => statuses[k.id] === 'present').length) / kids.length * 100);
   const unread = feed.filter(f => f.unread).length;
 
+  // "Мои задачи" strip — anyone logged in under their own staff name (not
+  // just teachers; a manager/director with a task of their own gets it
+  // too, same mechanism either way) sees what's still pending today, right
+  // in the greeting card. Hidden entirely once nothing's left to do.
+  const [myTasksToday, setMyTasksToday] = React.useState(null); // { count, nextTitle } | null
+  React.useEffect(() => {
+    if (!window.__teacherName) return;
+    const today = todayStr();
+    withRetry(() => window.loadStaffTasks(window.__teacherName)).then(tasks => {
+      const pending = tasks.flatMap(t => t.instances
+        .filter(inst => inst.dueDate === today && inst.status === 'pending')
+        .map(() => t.title));
+      setMyTasksToday(pending.length ? { count: pending.length, nextTitle: pending[0] } : null);
+    }).catch(() => {});
+  }, []);
+
   const TILES = [
     { key: 'children',      emoji: '👦🏼', color: '#D4F0DF', colorLight: '#EAF8F0', colorDark: '#A9C8B2', ink: '#1f7a55', go: 'children',
       badge: `${kids.length} ${t('kids')}` },
@@ -1974,6 +1991,22 @@ function HomeScreen({ go, statuses, feed, homeStyle }) {
             <b style={{ fontWeight: 800 }}>{present}/{kids.length}</b> {L('детей в саду', 'kids present')}
           </span>
         </div>
+
+        {myTasksToday && (
+          <button onClick={() => go('my-tasks')} className="bk-press" style={{
+            display: 'flex', alignItems: 'center', gap: 10, width: '100%', marginTop: 8,
+            border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+            background: '#FBD9E1', borderRadius: 16, padding: '10px 12px' }}>
+            <span style={{ fontSize: 16, flexShrink: 0 }}>✅</span>
+            <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, color: '#7a2a4a',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <b style={{ fontWeight: 800 }}>
+                {myTasksToday.count} {L('задачи', 'tasks')}
+              </b> {L('на сегодня', 'today')} — {myTasksToday.nextTitle}
+            </span>
+            <span style={{ color: '#a8456a', opacity: 0.6, flexShrink: 0 }}>›</span>
+          </button>
+        )}
       </div>
 
       {homeStyle === 'list'   && <HomeList   tiles={TILES} go={go} />}
@@ -5954,6 +5987,7 @@ const TITLES = {
   payments: 'payments', 'payments-garden': 'payments', 'payments-clubs': 'payments',
   activities: 'activities', club: 'activities', summary: 'daySummary', notifications: 'notifications', compose: 'compose',
   team: 'team', 'staff-daily': 'staffLog', 'staff-monthly': 'monthSummary', 'staff-tasks': 'staffTasks',
+  'my-tasks': 'myTasks',
 };
 
 const WEEKDAY_LABELS_RU = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
@@ -6272,6 +6306,72 @@ function TaskInstanceRow({ instance, onSetStatus }) {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+function MyTasksScreen() {
+  // Personal view for whoever's logged in — sees only their own tasks,
+  // can mark status, but can't add/edit/delete a task (that stays with
+  // whoever assigns them — Ольга or a manager, in Персонал → Задачи).
+  const name = window.__teacherName;
+  const [tasks, setTasks] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+
+  function reload() {
+    if (!name) return;
+    setLoading(true);
+    withRetry(() => window.loadStaffTasks(name)).then(setTasks).catch(() => setTasks([])).finally(() => setLoading(false));
+  }
+  React.useEffect(reload, [name]);
+
+  function setInstanceStatus(instanceId, status, cancelReason) {
+    const prevTasks = tasks;
+    setTasks(ts => ts.map(t => ({ ...t, instances: t.instances.map(i =>
+      i.id === instanceId ? { ...i, status, cancelReason: status === 'cancelled' ? (cancelReason || '') : null } : i
+    ) })));
+    window.updateStaffTaskInstance(instanceId, status, cancelReason).catch(() => {
+      setTasks(prevTasks);
+      window.showToast(L('Не удалось сохранить', 'Failed to save'));
+    });
+  }
+
+  return (
+    <div style={{ padding: '4px 20px 28px' }}>
+      {loading && <div style={{ textAlign: 'center', padding: 40, color: 'var(--ink-faint)', fontSize: 13 }}>…</div>}
+
+      {!loading && tasks.length === 0 && (
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--ink-faint)', fontSize: 14 }}>
+          {L('Нет задач', 'No tasks')}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {!loading && tasks.map(t => {
+          const done = t.instances.filter(i => i.status === 'done').length;
+          const postponed = t.instances.filter(i => i.status === 'postponed').length;
+          const cancelled = t.instances.filter(i => i.status === 'cancelled').length;
+          const total = t.instances.length;
+          return (
+            <div key={t.id} style={{ background: '#FBF7F2', borderRadius: 18, padding: 13 }}>
+              <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--ink)' }}>{t.title}</div>
+              <div style={{ fontSize: 11.5, color: 'var(--ink-faint)', fontWeight: 600, marginTop: 2 }}>
+                {taskRecurrenceLabel(t)}
+              </div>
+              <div>
+                {t.instances.map(i => (
+                  <TaskInstanceRow key={i.id} instance={i} onSetStatus={setInstanceStatus} />
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 8, fontSize: 11.5, fontWeight: 700, color: 'var(--ink-soft)' }}>
+                <span>{L('Сделано', 'Done')}: {done} {L('из', 'of')} {total}</span>
+                {postponed > 0 && <span>{L('Перенесено', 'Postponed')}: {postponed}</span>}
+                {cancelled > 0 && <span>{L('Отменено', 'Cancelled')}: {cancelled}</span>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -6894,6 +6994,7 @@ function App() {
       case 'staff-daily':    return <StaffDailyScreen params={p} go={goTab} />;
       case 'staff-monthly':  return <StaffMonthlyScreen go={goTab} staff={staff} />;
       case 'staff-tasks':    return <StaffTasksScreen go={goTab} staff={staff} />;
+      case 'my-tasks':       return <MyTasksScreen />;
       default:              return null;
     }
   }
