@@ -209,6 +209,7 @@
     daysAbsent:        { ru: 'Пропущено',       en: 'Absent days' },
     staffTasks:        { ru: 'Задачи',          en: 'Tasks' },
     myTasks:           { ru: 'Мои задачи',      en: 'My tasks' },
+    mySchedule:        { ru: 'Мой график',      en: 'My schedule' },
   };
 
   let LANG = 'ru';
@@ -1952,6 +1953,37 @@ function HomeScreen({ go, statuses, feed, homeStyle }) {
     }).catch(() => {});
   }, []);
 
+  // "Мой график" strip — same idea as "Мои задачи" above, but surfaces the
+  // nearest upcoming day that's already been recorded/planned for me
+  // (day off, sick, absent) instead of a task. Purely informational —
+  // "меня поставили", not "я отгулился" — and deliberately never a money
+  // figure (see MyScheduleScreen). Looks at today plus the rest of this
+  // month and, close to month-end, next month too, and picks the earliest
+  // notable date from today onward; hidden entirely if nothing's marked.
+  const [myScheduleNext, setMyScheduleNext] = React.useState(null);
+  // null = nothing notable coming up; otherwise { status, date, isToday }
+  React.useEffect(() => {
+    if (!window.__teacherName) return;
+    const today = todayStr();
+    const [ty, tm] = today.split('-').map(Number);
+    const thisMonth = `${ty}-${String(tm).padStart(2, '0')}`;
+    const d = new Date(ty, tm, 1); // first of next month
+    const nextMonth = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const NOTABLE = ['day-off', 'sick', 'absent'];
+    Promise.all([
+      withRetry(() => window.getStaffMonthly(thisMonth)).catch(() => ({})),
+      withRetry(() => window.getStaffMonthly(nextMonth)).catch(() => ({})),
+    ]).then(([curData, nextData]) => {
+      const allDays = { ...(curData[window.__teacherName] || {}), ...(nextData[window.__teacherName] || {}) };
+      const upcoming = Object.entries(allDays)
+        .filter(([date, rec]) => date >= today && NOTABLE.includes(rec.status))
+        .sort(([a], [b]) => a < b ? -1 : 1);
+      if (upcoming.length === 0) { setMyScheduleNext(null); return; }
+      const [date, rec] = upcoming[0];
+      setMyScheduleNext({ status: rec.status, date, isToday: date === today });
+    }).catch(() => {});
+  }, []);
+
   const TILES = [
     { key: 'children',      emoji: '👦🏼', color: '#D4F0DF', colorLight: '#EAF8F0', colorDark: '#A9C8B2', ink: '#1f7a55', go: 'children',
       badge: `${kids.length} ${t('kids')}` },
@@ -2039,6 +2071,31 @@ function HomeScreen({ go, statuses, feed, homeStyle }) {
             <span style={{ color: '#a8456a', opacity: 0.6, flexShrink: 0 }}>›</span>
           </button>
         )}
+
+        {myScheduleNext && (() => {
+          const bg = SSTAFF_COLOR[myScheduleNext.status] || '#E8D5FB';
+          const ink = SSTAFF_INK[myScheduleNext.status] || '#5a2a86';
+          const SHORT_RU = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+          const SHORT_EN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+          const [, dm, dd] = myScheduleNext.date.split('-').map(Number);
+          const dateLabel = L(`${dd} ${SHORT_RU[dm-1]}`, `${SHORT_EN[dm-1]} ${dd}`);
+          const label = staffStatusLabel(myScheduleNext.status);
+          return (
+            <button onClick={() => go('my-schedule')} className="bk-press" style={{
+              display: 'flex', alignItems: 'center', gap: 10, width: '100%', marginTop: 8,
+              border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+              background: bg, borderRadius: 16, padding: '10px 12px' }}>
+              <span style={{ width: 11, height: 11, borderRadius: '50%', flexShrink: 0, background: ink }} />
+              <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, color: ink,
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {myScheduleNext.isToday
+                  ? <>{L('Сегодня', 'Today')}: <b style={{ fontWeight: 800 }}>{label}</b></>
+                  : <><b style={{ fontWeight: 800 }}>{label}</b> — {dateLabel}</>}
+              </span>
+              <span style={{ color: ink, opacity: 0.6, flexShrink: 0 }}>›</span>
+            </button>
+          );
+        })()}
       </div>
 
       {homeStyle === 'list'   && <HomeList   tiles={TILES} go={go} />}
@@ -4931,10 +4988,9 @@ const STAFF_STATUSES = [
   { id: 'day-off',  emoji: '🏖️', ru: 'Выходной',   en: 'Day off'      },
 ];
 
-// How much of a full day's pay each status is worth — everything not
-// listed (absent/sick/day-off) is 0. Used by StaffMonthlyScreen's salary
-// and "worked" total instead of a flat count, so a half day genuinely
-// counts as half instead of showing up as a full paid day.
+// How much of a full day each status counts as — everything not listed
+// (absent/sick/day-off) is 0. Used by StaffMonthlyScreen's "worked" total,
+// so a half day genuinely counts as half instead of a full day attended.
 const STAFF_STATUS_WORKED_VALUE = { present: 1, 'half-day': 0.5, late: 1 };
 
 const SSTAFF_COLOR = {
@@ -5767,6 +5823,11 @@ function StaffDailyScreen({ params, go }) {
 
 // ── StaffMonthlyScreen ────────────────────────────────────────────────────────
 
+// Shared by StaffMonthlyScreen and MyScheduleScreen — both render a month
+// label from a "YYYY-MM" key.
+const RU_MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+const EN_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
 function StaffMonthlyScreen({ go, staff }) {
   // staff (the roster) comes from App() now, shared with Сотрудники/Задачи
   // so switching tabs doesn't re-fetch and flash a loading state for data
@@ -5794,8 +5855,6 @@ function StaffMonthlyScreen({ go, staff }) {
   const staffReady = staff !== null;
   const staffList = staff || [];
 
-  const RU_MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
-  const EN_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   const [yr, mo] = month.split('-').map(Number);
   const monthLabel = window.__lang === 'en' ? `${EN_MONTHS[mo-1]} ${yr}` : `${RU_MONTHS[mo-1]} ${yr}`;
   const daysInMonth = new Date(yr, mo, 0).getDate();
@@ -5814,8 +5873,8 @@ function StaffMonthlyScreen({ go, staff }) {
     return Object.values(days).filter(d => d.status === statusId).length;
   }
   // Sums each day's worked fraction (half day counts as 0.5) instead of
-  // just counting days, so salary reflects a genuine half day worked
-  // instead of paying it as a full one.
+  // just counting days, so the "worked" total reflects a genuine half day
+  // instead of counting it as a full one.
   function workedDays(name) {
     const days = data[name] || {};
     return Object.values(days).reduce((sum, d) => sum + (STAFF_STATUS_WORKED_VALUE[d.status] || 0), 0);
@@ -5866,8 +5925,6 @@ function StaffMonthlyScreen({ go, staff }) {
         const dayOff   = countStatus(s.name, 'day-off');
         const absent   = countStatus(s.name, 'absent');
         const allDays  = data[s.name] || {};
-        const rate     = parseFloat(s.rate) || 0;
-        const salary   = rate > 0 ? worked * rate : null;
         // Transfer and overtime are both "extras" — independent of the
         // day's status, someone can be "present" and still have done
         // either (or both) that same day — so both get the same treatment:
@@ -5894,16 +5951,6 @@ function StaffMonthlyScreen({ go, staff }) {
                 <div style={{ fontWeight: 800, fontSize: 15.5, color: 'var(--ink)' }}>{s.name}</div>
                 <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{s.position}</div>
               </div>
-              {salary !== null && (
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 17, fontWeight: 800, color: '#1f7a55' }}>
-                    {salary.toLocaleString()}
-                  </div>
-                  <div style={{ fontSize: 10.5, color: 'var(--ink-faint)', fontWeight: 600 }}>
-                    {rate.toLocaleString()} × {worked % 1 === 0 ? worked : worked.toFixed(1)}
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Month navigation — only shown once a person is picked, so
@@ -6019,7 +6066,7 @@ const TITLES = {
   payments: 'payments', 'payments-garden': 'payments', 'payments-clubs': 'payments',
   activities: 'activities', club: 'activities', summary: 'daySummary', notifications: 'notifications', compose: 'compose',
   team: 'team', 'staff-daily': 'staffLog', 'staff-monthly': 'monthSummary', 'staff-tasks': 'staffTasks',
-  'my-tasks': 'myTasks',
+  'my-tasks': 'myTasks', 'my-schedule': 'mySchedule',
 };
 
 const WEEKDAY_LABELS_RU = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
@@ -6477,6 +6524,169 @@ function MyTasksScreen() {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function MyScheduleScreen() {
+  // Read-only self-view for whoever's logged in — same calendar rendering
+  // as StaffMonthlyScreen's per-person detail, but scoped to
+  // window.__teacherName with no picker (there's only ever "me" to show)
+  // and no editing (that stays director/manager-only, in Персонал →
+  // Сводка). Purely informational — what's already recorded/planned for
+  // me, today and in advance ("меня поставили", not "я отгулился") —
+  // never a money figure (salary was explicitly cut from this module's
+  // scope, see StaffMonthlyScreen's history).
+  const name = window.__teacherName;
+  const now = new Date();
+  const [month, setMonth] = React.useState(
+    `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  );
+  const [data, setData] = React.useState({});
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    if (!name) { setLoading(false); return; }
+    setLoading(true);
+    withRetry(() => window.getStaffMonthly(month))
+      .then(setData)
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [month, name]);
+
+  const [yr, mo] = month.split('-').map(Number);
+  const monthLabel = window.__lang === 'en' ? `${EN_MONTHS[mo-1]} ${yr}` : `${RU_MONTHS[mo-1]} ${yr}`;
+  const daysInMonth = new Date(yr, mo, 0).getDate();
+
+  function prevMonth() {
+    const d = new Date(yr, mo - 2, 1);
+    setMonth(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+  }
+  function nextMonth() {
+    const d = new Date(yr, mo, 1);
+    setMonth(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+  }
+
+  const allDays = data[name] || {};
+  function countStatus(statusId) {
+    return Object.values(allDays).filter(d => d.status === statusId).length;
+  }
+  const worked   = Object.values(allDays).reduce((sum, d) => sum + (STAFF_STATUS_WORKED_VALUE[d.status] || 0), 0);
+  const halfDays = countStatus('half-day');
+  const sick     = countStatus('sick');
+  const dayOff   = countStatus('day-off');
+  const absent   = countStatus('absent');
+
+  const transferEntries = Object.entries(allDays)
+    .filter(([, rec]) => rec.transfer)
+    .map(([date, rec]) => ({ day: Number(date.slice(-2)), half: rec.transfer === 0.5 }))
+    .sort((a, b) => a.day - b.day);
+  const transferTotal = transferEntries.reduce((sum, e) => sum + (e.half ? 0.5 : 1), 0);
+  const extraDays = Object.entries(allDays)
+    .filter(([, rec]) => rec.extra)
+    .map(([date]) => Number(date.slice(-2)))
+    .sort((a, b) => a - b);
+
+  return (
+    <div style={{ padding: '4px 20px 28px' }}>
+      {!name && (
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--ink-faint)', fontSize: 14 }}>
+          {L('Недоступно', 'Not available')}
+        </div>
+      )}
+
+      {name && (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            background: '#FBF7F2', borderRadius: 999, padding: '4px 6px', marginBottom: 16,
+            boxShadow: '0 1px 2px rgba(60,40,20,0.05)' }}>
+            <button onClick={prevMonth} className="bk-press" style={{
+              border: 'none', background: 'none', cursor: 'pointer', padding: 8,
+              display: 'grid', placeItems: 'center' }}><Chevron dir="left" size={16} /></button>
+            <div style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>
+              {monthLabel}
+            </div>
+            <button onClick={nextMonth} className="bk-press" style={{
+              border: 'none', background: 'none', cursor: 'pointer', padding: 8,
+              display: 'grid', placeItems: 'center' }}><Chevron dir="right" size={16} /></button>
+          </div>
+
+          {loading && <div style={{ textAlign: 'center', padding: 40, color: 'var(--ink-faint)', fontSize: 13 }}>…</div>}
+
+          {!loading && (
+            <Card pad={14}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, marginBottom: 14 }}>
+                {Array.from({ length: daysInMonth }, (_, i) => {
+                  const d = String(i + 1).padStart(2, '0');
+                  const key = `${month}-${d}`;
+                  const rec = allDays[key];
+                  const st = rec?.status;
+                  const time = st === 'late' && rec?.arrival_time ? rec.arrival_time : null;
+                  const stickers = [];
+                  if (rec?.transfer) stickers.push('🚌');
+                  if (rec?.extra) stickers.push('⏰');
+                  return (
+                    <div key={d} style={{
+                      position: 'relative', borderRadius: 11, fontSize: 16, fontWeight: 800,
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                      padding: '10px 2px',
+                      background: st ? (SSTAFF_COLOR[st] || '#EDE8E0') : '#F5F2EE',
+                      color: st ? (SSTAFF_INK[st] || '#5a4a30') : '#C8BEB0' }}>
+                      <span>{i + 1}</span>
+                      {time && <span style={{ fontSize: 11, lineHeight: 1.2, opacity: 0.85 }}>{time.slice(0,5)}</span>}
+                      {stickers.map((emoji, si) => (
+                        <span key={emoji} style={{ position: 'absolute',
+                          [si === 0 ? 'top' : 'bottom']: -5, right: -5, fontSize: 12 }}>{emoji}</span>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+                <span style={{ background: '#D4F0DF', color: '#1f7a55', padding: '4px 11px', borderRadius: 999, fontSize: 12, fontWeight: 700 }}>
+                  ✅ {worked % 1 === 0 ? worked : worked.toFixed(1)} {L('дн', 'd')}
+                </span>
+                {halfDays > 0 && <span style={{ background: SSTAFF_COLOR['half-day'], color: SSTAFF_INK['half-day'], padding: '4px 11px', borderRadius: 999, fontSize: 12, fontWeight: 700 }}>
+                  🌗 {halfDays}
+                </span>}
+                {sick > 0 && <span style={{ background: '#FBD9E1', color: '#a8456a', padding: '4px 11px', borderRadius: 999, fontSize: 12, fontWeight: 700 }}>
+                  🤒 {sick}
+                </span>}
+                {dayOff > 0 && <span style={{ background: '#E8D5FB', color: '#5a2a86', padding: '4px 11px', borderRadius: 999, fontSize: 12, fontWeight: 700 }}>
+                  🏖️ {dayOff}
+                </span>}
+                {absent > 0 && <span style={{ background: '#FFE0E0', color: '#a03030', padding: '4px 11px', borderRadius: 999, fontSize: 12, fontWeight: 700 }}>
+                  ❌ {absent}
+                </span>}
+              </div>
+
+              {transferEntries.length > 0 && (
+                <div style={{ marginTop: 8, background: '#EAF4FD', borderRadius: 12, padding: '8px 11px',
+                  display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: '#1f5f86' }}>
+                    🚌 {L('Трансфер', 'Transfer')}: {transferTotal % 1 === 0 ? transferTotal : `${Math.floor(transferTotal)}.5`} {L('дн', 'd')}
+                  </span>
+                  <span style={{ fontSize: 11.5, color: '#1f5f86', opacity: 0.85 }}>
+                    ({transferEntries.map(e => e.half ? `${e.day}½` : `${e.day}`).join(', ')})
+                  </span>
+                </div>
+              )}
+              {extraDays.length > 0 && (
+                <div style={{ marginTop: 8, background: '#EAF4FD', borderRadius: 12, padding: '8px 11px',
+                  display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: '#1f5f86' }}>
+                    ⏰ {L('Переработка', 'Overtime')}: {extraDays.length} {L('дн', 'd')}
+                  </span>
+                  <span style={{ fontSize: 11.5, color: '#1f5f86', opacity: 0.85 }}>
+                    ({extraDays.join(', ')})
+                  </span>
+                </div>
+              )}
+            </Card>
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -7100,6 +7310,7 @@ function App() {
       case 'staff-monthly':  return <StaffMonthlyScreen go={goTab} staff={staff} />;
       case 'staff-tasks':    return <StaffTasksScreen go={goTab} staff={staff} />;
       case 'my-tasks':       return <MyTasksScreen />;
+      case 'my-schedule':    return <MyScheduleScreen />;
       default:              return null;
     }
   }
