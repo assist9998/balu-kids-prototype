@@ -4314,6 +4314,16 @@ function SaveBar({ hasChanges, onSave }) {
   );
 }
 
+// Shared by PaymentsGardenScreen and UnpaidTodayAlert — both need to know
+// whether a garden kid's paidFrom/paidUntil range actually covers a given
+// date (both bounds matter: paid ahead for a period that hasn't started yet
+// isn't covered *today* just because paidUntil is comfortably far off).
+function isPaidCoveredOn(kid, date) {
+  if (!kid.paidUntil || normDate(kid.paidUntil) < date) return false;
+  if (kid.paidFrom && normDate(kid.paidFrom) > date) return false;
+  return true;
+}
+
 function PaymentsScreen({ go }) {
   // "X детей" used to filter out tourist kids for no real reason (a
   // leftover from before short-term kids shared the same payments flow),
@@ -4377,23 +4387,14 @@ function PaymentsGardenScreen() {
     .filter(k => isTour ? k.contract === 'tourist' : k.contract !== 'tourist')
     .filter(k => group === 'all' || k.group === group);
 
-  function isCoveredOn(kid, date) {
-    // both bounds matter — a kid paid ahead for a period that hasn't
-    // started yet (paidFrom in the future) isn't covered *today* just
-    // because paidUntil is comfortably far off
-    if (!kid.paidUntil || normDate(kid.paidUntil) < date) return false;
-    if (kid.paidFrom && normDate(kid.paidFrom) > date) return false;
-    return true;
-  }
-
   // the "Оплачено" badge, the stats, and the filter all check the same
   // selected date (defaults to today) — previously the badge was always
   // pinned to today while a separate line of text respected the picked
   // date, so the two could visibly disagree with each other
-  const countPaid   = allKids.filter(k => isCoveredOn(k, selDate)).length;
+  const countPaid   = allKids.filter(k => isPaidCoveredOn(k, selDate)).length;
   const countUnpaid = allKids.length - countPaid;
-  const total       = allKids.filter(k => isCoveredOn(k, selDate)).reduce((s, k) => s + (Number(k.price) || 0), 0);
-  const kids        = allKids.filter(k => payFilter === 'paid' ? isCoveredOn(k, selDate) : payFilter === 'unpaid' ? !isCoveredOn(k, selDate) : true);
+  const total       = allKids.filter(k => isPaidCoveredOn(k, selDate)).reduce((s, k) => s + (Number(k.price) || 0), 0);
+  const kids        = allKids.filter(k => payFilter === 'paid' ? isPaidCoveredOn(k, selDate) : payFilter === 'unpaid' ? !isPaidCoveredOn(k, selDate) : true);
 
   async function confirmPayment(kid, from, to, amount) {
     const fromDmy = from.split('-').reverse().join('.');
@@ -4486,7 +4487,7 @@ function PaymentsGardenScreen() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 9, padding: '0 20px' }}>
             {kids.map(kid => (
-              <KidPayRow key={kid.id} kid={kid} isPaid={isCoveredOn(kid, selDate)}
+              <KidPayRow key={kid.id} kid={kid} isPaid={isPaidCoveredOn(kid, selDate)}
                 tariff={tariff}
                 legacyCoverage={{
                   // most kids' current paidUntil predates the payment log and
@@ -4534,7 +4535,7 @@ function PaymentsClubsScreen() {
     return map;
   }, [log, allKids.length]);
 
-  // same both-bounds check as Garden's isCoveredOn, and same "check any
+  // same both-bounds check as Garden's isPaidCoveredOn, and same "check any
   // date, not just today" square date-picker next to the stats
   function isCovered(kid, date) {
     const c = coverage[kid.id];
@@ -4615,6 +4616,112 @@ function PaymentsClubsScreen() {
         ))}
       </div>
     </div>
+  );
+}
+
+// Ольга and Rema ("manager" role — see window.__isManager's history) are
+// the only two who actually handle money; everyone else just marks
+// attendance. So this doesn't live inside AttendanceScreen or the bottom
+// notification feed (which any staff member sees) — it's a separate overlay,
+// mounted once at App level, that only ever shows itself to those two roles,
+// listing kids marked "in sad" today with no active payment coverage, so
+// entering the missing payment is one tap away instead of something you'd
+// have to remember to go check in Оплаты → Садик → Не оплачено.
+function UnpaidTodayAlert({ statuses }) {
+  const canSeePayments = window.__isDirector || window.__isManager;
+  const today = todayStr();
+  const unpaidKids = canSeePayments
+    ? activeKids().filter(k => statuses[k.id] === 'present' && !isPaidCoveredOn(k, today))
+    : [];
+
+  const [dismissed, setDismissed] = React.useState(false);
+  const [payKid,    setPayKid]    = React.useState(null);
+
+  // A newly-unpaid kid (someone else just marked them present) should
+  // re-open the alert even if it was dismissed earlier — keyed off the
+  // actual set of ids, not just its length, so it also re-opens if the set
+  // changes composition without changing size.
+  const idsKey = unpaidKids.map(k => k.id).sort().join(',');
+  React.useEffect(() => { setDismissed(false); }, [idsKey]);
+
+  if (!canSeePayments || unpaidKids.length === 0 || dismissed) return null;
+
+  async function confirmPayment(kid, from, to, amount) {
+    const fromDmy = from.split('-').reverse().join('.');
+    const toDmy = to.split('-').reverse().join('.');
+    try {
+      const res = await window.addPaymentLogEntry(kid.id, kid.contract === 'tourist' ? 'tourist' : 'longterm', fromDmy, toDmy, amount);
+      Object.assign(kid, { paidFrom: res.paidFrom || '', paidUntil: res.paidUntil || '' });
+      setPayKid(null);
+    } catch (e) {
+      // same durable-queue reasoning as PaymentsGardenScreen's confirmPayment —
+      // it's saved locally and will retry on its own, don't let the manager
+      // think tapping Confirm again is the fix
+      window.showToast(L(
+        'Не удалось отправить сразу — сохранится автоматически, когда появится связь. Не нажимайте ещё раз.',
+        "Couldn't send right now — it's saved and will sync automatically once you're back online. Don't tap Confirm again."
+      ));
+      throw e;
+    }
+  }
+
+  async function deletePayment(kid, rowId) {
+    const res = await window.deletePaymentLogEntry(rowId);
+    Object.assign(kid, { paidFrom: res.paidFrom || '', paidUntil: res.paidUntil || '' });
+    setPayKid(null);
+  }
+
+  return (
+    <Portal>
+      <div onClick={() => setDismissed(true)} style={{ position: 'fixed', inset: 0, background: 'rgba(30,20,10,0.45)',
+        zIndex: 60, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+        <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg)', borderRadius: '24px 24px 0 0',
+          width: '100%', maxWidth: 402, maxHeight: '80vh', overflowY: 'auto', padding: '20px 20px 28px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+            <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>
+              {L('Есть неоплаченные', 'Unpaid today')}
+            </div>
+            <button onClick={() => setDismissed(true)} className="bk-press" style={{ border: 'none', background: 'none',
+              cursor: 'pointer', fontSize: 20, lineHeight: 1, color: 'var(--ink-faint)', padding: 6 }}>✕</button>
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--ink-soft)', fontWeight: 600, marginBottom: 14 }}>
+            {L('Отмечены как в саду сегодня, но оплата не внесена', 'Marked present today, but payment isn’t on record')}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+            {unpaidKids.map(kid => {
+              const grp = DATA.GROUPS.find(g => g.id === kid.group);
+              return (
+                <div key={kid.id} style={{ display: 'flex', alignItems: 'center', gap: 12,
+                  background: '#FBF7F2', borderRadius: 16, padding: '10px 12px' }}>
+                  <Avatar emoji={kid.emoji} color={grp ? grp.color : '#E7E1D9'} size={40} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}</div>
+                    {grp && <span style={{ background: grp.color, color: grp.ink, fontSize: 11, fontWeight: 700,
+                      padding: '2px 8px', borderRadius: 999 }}>{grp.emoji} {Lo(grp)}</span>}
+                  </div>
+                  <button onClick={() => setPayKid(kid)} className="bk-press" style={{
+                    border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 800,
+                    color: '#fff', background: '#B07848', borderRadius: 999, padding: '8px 14px', flexShrink: 0 }}>
+                    {L('Отметить', 'Mark paid')}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {payKid && (
+        <Portal>
+          <PayRangeSheet kid={payKid} tariff={payKid.contract === 'tourist' ? 'tourist' : 'longterm'}
+            legacyCoverage={{ from: payKid.paidFrom || today, until: payKid.paidUntil }}
+            loadHistory={() => window.loadPaymentLog(payKid.id)}
+            onConfirm={(from, to, amount) => confirmPayment(payKid, from, to, amount)}
+            onDelete={(rowId) => deletePayment(payKid, rowId)}
+            onClose={() => setPayKid(null)} />
+        </Portal>
+      )}
+    </Portal>
   );
 }
 
@@ -7469,6 +7576,9 @@ function App() {
           ) : renderScreen()}
         </div>
       </div>
+
+      {/* ── unpaid-today alert (director/manager only) ── */}
+      {childrenReady && <UnpaidTodayAlert statuses={statuses} />}
 
       {/* ── toast ── */}
       {toast && (
