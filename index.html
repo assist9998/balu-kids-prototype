@@ -4624,35 +4624,72 @@ function PaymentsClubsScreen() {
 // attendance. So this doesn't live inside AttendanceScreen or the bottom
 // notification feed (which any staff member sees) — it's a separate overlay,
 // mounted once at App level, that only ever shows itself to those two roles,
-// listing kids marked "in sad" today with no active payment coverage, so
-// entering the missing payment is one tap away instead of something you'd
-// have to remember to go check in Оплаты → Садик → Не оплачено.
+// listing kids marked present today (garden or a club) with no active
+// payment coverage, so entering the missing payment is one tap away instead
+// of something you'd have to remember to go check in Оплаты.
+//
+// Garden items come straight from `statuses`, already loaded once per app
+// load at App level. Clubs don't meet every day though, so there's no
+// equivalent already-loaded snapshot to read — each club's today-attendance
+// is fetched here directly. That's not wasted work on a non-club day: with
+// nothing marked for today, the fetch just comes back empty and the club
+// contributes nothing to the list, so this never nags about a club on a day
+// it didn't meet.
 function UnpaidTodayAlert({ statuses }) {
   const canSeePayments = window.__isDirector || window.__isManager;
   const today = todayStr();
-  const unpaidKids = canSeePayments
+
+  const gardenItems = canSeePayments
     ? activeKids().filter(k => statuses[k.id] === 'present' && !isPaidCoveredOn(k, today))
+        .map(kid => ({ kid, club: null, allowedWeekdays: null }))
     : [];
 
-  const [dismissed, setDismissed] = React.useState(false);
-  const [payKid,    setPayKid]    = React.useState(null);
+  const [clubItems, setClubItems] = React.useState([]);
+  React.useEffect(() => {
+    if (!canSeePayments) { setClubItems([]); return; }
+    let cancelled = false;
+    Promise.all((DATA.CLUBS || []).map(club =>
+      Promise.all([
+        withRetry(() => window.loadClubAttendance(club.id, today)).catch(() => ({})),
+        withRetry(() => window.loadClubPaymentLog(club.id)).catch(() => []),
+      ]).then(([att, log]) => {
+        const allowedWeekdays = clubWeekdaysJS(club);
+        return Object.entries(att)
+          .filter(([, status]) => status === 'present')
+          .map(([kidId]) => activeKids().find(k => k.id === kidId))
+          .filter(Boolean)
+          .filter(kid => {
+            const cov = bestCoverage(log.filter(e => e.child === kid.id));
+            return !(cov.until && normDate(cov.until) >= today && (!cov.from || normDate(cov.from) <= today));
+          })
+          .map(kid => ({ kid, club, allowedWeekdays }));
+      })
+    )).then(results => { if (!cancelled) setClubItems(results.flat()); });
+    return () => { cancelled = true; };
+  }, [canSeePayments, today]);
 
-  // A newly-unpaid kid (someone else just marked them present) should
-  // re-open the alert even if it was dismissed earlier — keyed off the
-  // actual set of ids, not just its length, so it also re-opens if the set
-  // changes composition without changing size.
-  const idsKey = unpaidKids.map(k => k.id).sort().join(',');
+  const unpaidItems = [...gardenItems, ...clubItems];
+
+  const [dismissed, setDismissed] = React.useState(false);
+  const [payItem,   setPayItem]   = React.useState(null);
+
+  // A newly-unpaid item (someone else just marked attendance, or the club
+  // fetch above just resolved) should re-open the alert even if it was
+  // dismissed earlier — keyed off the actual set of kid+club pairs, not
+  // just its length, so it also re-opens if the set changes composition
+  // without changing size.
+  const idsKey = unpaidItems.map(x => `${x.kid.id}:${x.club ? x.club.id : 'g'}`).sort().join(',');
   React.useEffect(() => { setDismissed(false); }, [idsKey]);
 
-  if (!canSeePayments || unpaidKids.length === 0 || dismissed) return null;
+  if (!canSeePayments || unpaidItems.length === 0 || dismissed) return null;
 
-  async function confirmPayment(kid, from, to, amount) {
+  async function confirmGarden(kid, from, to, amount) {
     const fromDmy = from.split('-').reverse().join('.');
     const toDmy = to.split('-').reverse().join('.');
     try {
       const res = await window.addPaymentLogEntry(kid.id, kid.contract === 'tourist' ? 'tourist' : 'longterm', fromDmy, toDmy, amount);
       Object.assign(kid, { paidFrom: res.paidFrom || '', paidUntil: res.paidUntil || '' });
-      setPayKid(null);
+      setPayItem(null);
     } catch (e) {
       // same durable-queue reasoning as PaymentsGardenScreen's confirmPayment —
       // it's saved locally and will retry on its own, don't let the manager
@@ -4665,10 +4702,31 @@ function UnpaidTodayAlert({ statuses }) {
     }
   }
 
-  async function deletePayment(kid, rowId) {
+  async function deleteGarden(kid, rowId) {
     const res = await window.deletePaymentLogEntry(rowId);
     Object.assign(kid, { paidFrom: res.paidFrom || '', paidUntil: res.paidUntil || '' });
-    setPayKid(null);
+    setPayItem(null);
+  }
+
+  async function confirmClub(kid, club, from, to, amount) {
+    const fromDmy = from.split('-').reverse().join('.');
+    const toDmy = to.split('-').reverse().join('.');
+    try {
+      await window.addClubPaymentLogEntry(kid.id, club.id, fromDmy, toDmy, amount);
+      setClubItems(items => items.filter(x => !(x.kid.id === kid.id && x.club.id === club.id)));
+      setPayItem(null);
+    } catch (e) {
+      window.showToast(L(
+        'Не удалось отправить сразу — сохранится автоматически, когда появится связь. Не нажимайте ещё раз.',
+        "Couldn't send right now — it's saved and will sync automatically once you're back online. Don't tap Confirm again."
+      ));
+      throw e;
+    }
+  }
+
+  async function deleteClub(rowId) {
+    await window.deleteClubPaymentLogEntry(rowId);
+    setPayItem(null);
   }
 
   return (
@@ -4685,21 +4743,26 @@ function UnpaidTodayAlert({ statuses }) {
               cursor: 'pointer', fontSize: 20, lineHeight: 1, color: 'var(--ink-faint)', padding: 6 }}>✕</button>
           </div>
           <div style={{ fontSize: 13, color: 'var(--ink-soft)', fontWeight: 600, marginBottom: 14 }}>
-            {L('Отмечены как в саду сегодня, но оплата не внесена', 'Marked present today, but payment isn’t on record')}
+            {L('Отмечены как пришедшие сегодня, но оплата не внесена', 'Marked present today, but payment isn’t on record')}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-            {unpaidKids.map(kid => {
+            {unpaidItems.map(item => {
+              const kid = item.kid;
               const grp = DATA.GROUPS.find(g => g.id === kid.group);
               return (
-                <div key={kid.id} style={{ display: 'flex', alignItems: 'center', gap: 12,
+                <div key={`${kid.id}:${item.club ? item.club.id : 'g'}`} style={{ display: 'flex', alignItems: 'center', gap: 12,
                   background: '#FBF7F2', borderRadius: 16, padding: '10px 12px' }}>
                   <Avatar emoji={kid.emoji} color={grp ? grp.color : '#E7E1D9'} size={40} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--ink)' }}>{Lo(kid)}</div>
-                    {grp && <span style={{ background: grp.color, color: grp.ink, fontSize: 11, fontWeight: 700,
-                      padding: '2px 8px', borderRadius: 999 }}>{grp.emoji} {Lo(grp)}</span>}
+                    <div style={{ display: 'flex', gap: 4, marginTop: 2, flexWrap: 'wrap' }}>
+                      {grp && <span style={{ background: grp.color, color: grp.ink, fontSize: 11, fontWeight: 700,
+                        padding: '2px 8px', borderRadius: 999 }}>{grp.emoji} {Lo(grp)}</span>}
+                      {item.club && <span style={{ background: item.club.color, color: item.club.ink, fontSize: 11, fontWeight: 700,
+                        padding: '2px 8px', borderRadius: 999 }}>{item.club.emoji} {Lo(item.club)}</span>}
+                    </div>
                   </div>
-                  <button onClick={() => setPayKid(kid)} className="bk-press" style={{
+                  <button onClick={() => setPayItem(item)} className="bk-press" style={{
                     border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 800,
                     color: '#fff', background: '#B07848', borderRadius: 999, padding: '8px 14px', flexShrink: 0 }}>
                     {L('Отметить', 'Mark paid')}
@@ -4711,14 +4774,24 @@ function UnpaidTodayAlert({ statuses }) {
         </div>
       </div>
 
-      {payKid && (
+      {payItem && (
         <Portal>
-          <PayRangeSheet kid={payKid} tariff={payKid.contract === 'tourist' ? 'tourist' : 'longterm'}
-            legacyCoverage={{ from: payKid.paidFrom || today, until: payKid.paidUntil }}
-            loadHistory={() => window.loadPaymentLog(payKid.id)}
-            onConfirm={(from, to, amount) => confirmPayment(payKid, from, to, amount)}
-            onDelete={(rowId) => deletePayment(payKid, rowId)}
-            onClose={() => setPayKid(null)} />
+          {payItem.club ? (
+            <PayRangeSheet kid={payItem.kid} tariff="club" price={payItem.club.price ?? null}
+              allowedWeekdays={payItem.allowedWeekdays}
+              loadHistory={() => window.loadClubPaymentLog(payItem.club.id).then(l => l.filter(e => e.child === payItem.kid.id))}
+              loadAttendanceHistory={() => window.loadClubAttendanceHistory(payItem.club.id, payItem.kid.id)}
+              onConfirm={(from, to, amount) => confirmClub(payItem.kid, payItem.club, from, to, amount)}
+              onDelete={(rowId) => deleteClub(rowId)}
+              onClose={() => setPayItem(null)} />
+          ) : (
+            <PayRangeSheet kid={payItem.kid} tariff={payItem.kid.contract === 'tourist' ? 'tourist' : 'longterm'}
+              legacyCoverage={{ from: payItem.kid.paidFrom || today, until: payItem.kid.paidUntil }}
+              loadHistory={() => window.loadPaymentLog(payItem.kid.id)}
+              onConfirm={(from, to, amount) => confirmGarden(payItem.kid, from, to, amount)}
+              onDelete={(rowId) => deleteGarden(payItem.kid, rowId)}
+              onClose={() => setPayItem(null)} />
+          )}
         </Portal>
       )}
     </Portal>
