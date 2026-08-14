@@ -6174,9 +6174,22 @@ function StaffMonthlyScreen({ go, staff }) {
               {/* Calendar mini-grid — one person fills the whole screen now,
                   so this can be noticeably bigger than when it had to share
                   space with everyone else's card in a scrolling list. */}
+              {/* Weekday header + leading blanks (same Monday-first alignment
+                  as MiniCalendar's) — day 1 lands in its real weekday column
+                  instead of always starting at the grid's left edge, so
+                  Saturday/Sunday consistently fall in the rightmost two
+                  columns every week instead of drifting depending on which
+                  weekday the month happens to start on. */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, marginBottom: 4 }}>
+                {(window.__lang === 'en' ? WEEKDAY_LABELS_EN : WEEKDAY_LABELS_RU).map((lbl, i) => (
+                  <div key={lbl} style={{ textAlign: 'center', fontSize: 11, fontWeight: 700,
+                    color: i >= 5 ? '#C09080' : 'var(--ink-faint)', padding: '3px 0' }}>{lbl}</div>
+                ))}
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, marginBottom: 14 }}>
-                {Array.from({ length: daysInMonth }, (_, i) => {
-                  const d = String(i + 1).padStart(2, '0');
+                {monthCalendarCells(yr, mo, daysInMonth).map((dayNum, i) => {
+                  if (!dayNum) return <div key={`e${i}`} />;
+                  const d = String(dayNum).padStart(2, '0');
                   const key = `${month}-${d}`;
                   const rec = allDays[key];
                   const st = rec?.status;
@@ -6195,7 +6208,7 @@ function StaffMonthlyScreen({ go, staff }) {
                       padding: '10px 2px',
                       background: st ? (SSTAFF_COLOR[st] || '#EDE8E0') : '#F5F2EE',
                       color: st ? (SSTAFF_INK[st] || '#5a4a30') : '#C8BEB0' }}>
-                      <span>{i + 1}</span>
+                      <span>{dayNum}</span>
                       {time && <span style={{ fontSize: 11, lineHeight: 1.2, opacity: 0.85 }}>{time.slice(0,5)}</span>}
                       {stickers.map((emoji, si) => (
                         <span key={emoji} style={{ position: 'absolute',
@@ -6271,6 +6284,17 @@ const TITLES = {
 
 const WEEKDAY_LABELS_RU = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
 const WEEKDAY_LABELS_EN = ['Mo','Tu','We','Th','Fr','Sa','Su'];
+
+// Monday-first grid cells for a given year/month — leading `null`s so day 1
+// lands in its real weekday column (same alignment as MiniCalendar's own
+// `startDow` logic), instead of always starting at the grid's left edge.
+// Shared by StaffMonthlyScreen and MyScheduleScreen's day-grids.
+function monthCalendarCells(yr, mo, daysInMonth) {
+  let startDow = new Date(yr, mo - 1, 1).getDay();
+  if (startDow === 0) startDow = 7;
+  startDow -= 1;
+  return [...Array(startDow).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+}
 
 // Same idea as Lo(), for a task's title specifically — titleEn is only
 // ever set once Ольга actually taps translate (see TaskFormSheet/
@@ -6815,9 +6839,18 @@ function MyScheduleScreen() {
 
           {!loading && (
             <Card pad={14}>
+              {/* Same Monday-first alignment as StaffMonthlyScreen's grid —
+                  see monthCalendarCells. */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, marginBottom: 4 }}>
+                {(window.__lang === 'en' ? WEEKDAY_LABELS_EN : WEEKDAY_LABELS_RU).map((lbl, i) => (
+                  <div key={lbl} style={{ textAlign: 'center', fontSize: 11, fontWeight: 700,
+                    color: i >= 5 ? '#C09080' : 'var(--ink-faint)', padding: '3px 0' }}>{lbl}</div>
+                ))}
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, marginBottom: 14 }}>
-                {Array.from({ length: daysInMonth }, (_, i) => {
-                  const d = String(i + 1).padStart(2, '0');
+                {monthCalendarCells(yr, mo, daysInMonth).map((dayNum, i) => {
+                  if (!dayNum) return <div key={`e${i}`} />;
+                  const d = String(dayNum).padStart(2, '0');
                   const key = `${month}-${d}`;
                   const rec = allDays[key];
                   const st = rec?.status;
@@ -6832,7 +6865,7 @@ function MyScheduleScreen() {
                       padding: '10px 2px',
                       background: st ? (SSTAFF_COLOR[st] || '#EDE8E0') : '#F5F2EE',
                       color: st ? (SSTAFF_INK[st] || '#5a4a30') : '#C8BEB0' }}>
-                      <span>{i + 1}</span>
+                      <span>{dayNum}</span>
                       {time && <span style={{ fontSize: 11, lineHeight: 1.2, opacity: 0.85 }}>{time.slice(0,5)}</span>}
                       {stickers.map((emoji, si) => (
                         <span key={emoji} style={{ position: 'absolute',
