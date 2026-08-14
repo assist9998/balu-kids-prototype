@@ -1989,15 +1989,6 @@ function HomeScreen({ go, statuses, feed, homeStyle }) {
       badge: `${kids.length} ${t('kids')}` },
     { key: 'attendance',    emoji: '📋', color: '#CDE8FB', colorLight: '#E8F4FD', colorDark: '#A4BCE9', ink: '#1f5f86', go: 'attendance',
       badge: `${present}/${kids.length}` },
-    // Was banner-only until now (see myScheduleNext above) — no way to open
-    // "Мой график" at all on an ordinary day with nothing notable marked.
-    // Director isn't tracked here (_NON_TRACKED_POSITIONS on the backend),
-    // so the tile follows the same "has a personal identity" condition
-    // already used for greetName above, not director.
-    ...(((window.__isTeacher || window.__isStaff || window.__isManager) && window.__teacherName) ? [
-      { key: 'my-schedule', emoji: '🗓️', color: '#F0E4D4', colorLight: '#F8F1E8', colorDark: '#C9B896', ink: '#8a6438', go: 'my-schedule',
-        badge: myScheduleNext ? staffStatusLabel(myScheduleNext.status) : null },
-    ] : []),
     // teachers don't handle money — director/staff only. Managers don't
     // either, for now — whether they should is still an open question
     // (Ольга), so left off until that's decided. See also the route guard
@@ -2028,11 +2019,24 @@ function HomeScreen({ go, statuses, feed, homeStyle }) {
     : ((window.__isTeacher || window.__isStaff || window.__isManager) && window.__teacherName) ? window.__teacherName
     : L('Команда', 'Team');
 
+  // Director isn't tracked in staff attendance at all (_NON_TRACKED_POSITIONS
+  // on the backend), so there's nothing for her "Мой график" to show.
+  const showMySchedule = (window.__isTeacher || window.__isStaff || window.__isManager) && window.__teacherName;
+
   return (
     <div style={{ padding: '8px 20px 28px' }}>
-      {/* greeting hero */}
-      <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 26, padding: 16, margin: '4px 0 22px',
-        background: '#fde6df',
+      {/* greeting hero — doubles as the entry point into "Мой график" for
+          whoever has one (see showMySchedule): tapping anywhere on the card
+          opens it, not just the myScheduleNext banner below (which only
+          renders at all when something's already notable) — otherwise
+          there'd be no way in on an ordinary day. myTasksToday/myScheduleNext
+          are real <button>s inside this div and stop their own click from
+          bubbling up here, so tapping either still goes to its own screen
+          instead of double-navigating. */}
+      <div onClick={showMySchedule ? () => go('my-schedule') : undefined}
+        className={showMySchedule ? 'bk-press' : undefined}
+        style={{ position: 'relative', overflow: 'hidden', borderRadius: 26, padding: 16, margin: '4px 0 22px',
+        background: '#fde6df', cursor: showMySchedule ? 'pointer' : 'default',
         boxShadow: '0 1px 2px rgba(60,40,20,0.04), 0 16px 32px -24px rgba(60,40,20,0.55)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
           <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'var(--card)',
@@ -2057,7 +2061,7 @@ function HomeScreen({ go, statuses, feed, homeStyle }) {
         </div>
 
         {myTasksToday && (
-          <button onClick={() => go('my-tasks')} className="bk-press" style={{
+          <button onClick={e => { e.stopPropagation(); go('my-tasks'); }} className="bk-press" style={{
             display: 'flex', alignItems: 'center', gap: 10, width: '100%', marginTop: 8,
             border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
             background: '#FBD9E1', borderRadius: 16, padding: '10px 12px' }}>
@@ -2090,7 +2094,7 @@ function HomeScreen({ go, statuses, feed, homeStyle }) {
           const dateLabel = L(`${dd} ${SHORT_RU[dm-1]}`, `${SHORT_EN[dm-1]} ${dd}`);
           const label = staffStatusLabel(myScheduleNext.status);
           return (
-            <button onClick={() => go('my-schedule')} className="bk-press" style={{
+            <button onClick={e => { e.stopPropagation(); go('my-schedule'); }} className="bk-press" style={{
               display: 'flex', alignItems: 'center', gap: 10, width: '100%', marginTop: 8,
               border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
               background: bg, borderRadius: 16, padding: '10px 12px' }}>
