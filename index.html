@@ -1989,6 +1989,15 @@ function HomeScreen({ go, statuses, feed, homeStyle }) {
       badge: `${kids.length} ${t('kids')}` },
     { key: 'attendance',    emoji: '📋', color: '#CDE8FB', colorLight: '#E8F4FD', colorDark: '#A4BCE9', ink: '#1f5f86', go: 'attendance',
       badge: `${present}/${kids.length}` },
+    // Was banner-only until now (see myScheduleNext above) — no way to open
+    // "Мой график" at all on an ordinary day with nothing notable marked.
+    // Director isn't tracked here (_NON_TRACKED_POSITIONS on the backend),
+    // so the tile follows the same "has a personal identity" condition
+    // already used for greetName above, not director.
+    ...(((window.__isTeacher || window.__isStaff || window.__isManager) && window.__teacherName) ? [
+      { key: 'my-schedule', emoji: '🗓️', color: '#F0E4D4', colorLight: '#F8F1E8', colorDark: '#C9B896', ink: '#8a6438', go: 'my-schedule',
+        badge: myScheduleNext ? staffStatusLabel(myScheduleNext.status) : null },
+    ] : []),
     // teachers don't handle money — director/staff only. Managers don't
     // either, for now — whether they should is still an open question
     // (Ольга), so left off until that's decided. See also the route guard
@@ -5812,7 +5821,14 @@ function StaffDailyScreen({ params, go }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {staff.map(s => {
         const rec      = records[s.name] || {};
-        const status   = rec.status || 'present';
+        // No fallback to 'present' — an untouched person must show with no
+        // pill highlighted at all, not look pre-marked. This was purely a
+        // display default (setStatus/save() only ever write what's actually
+        // tapped, see save()'s delta comment), but visually it made every
+        // unmarked person look already confirmed present, indistinguishable
+        // from someone actually marked — exactly the blind spot that let
+        // whole days go by with staff attendance never actually saved.
+        const status   = rec.status || null;
         const isLate   = status === 'late';
         const transfer = rec.transfer || 0;
         const extra    = !!rec.extra;
