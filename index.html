@@ -4873,6 +4873,12 @@ function ClubScreen({ params }) {
   // Оплаты block, never from here.
   const [payLog,      setPayLog]      = React.useState([]);
   const [selectedKid, setSelectedKid] = React.useState(null);
+  // Removing a kid from a club used to fire straight from one tap on ✕ —
+  // Ольга hit it by accident on a real kid while testing. Now the first
+  // tap just arms a "Удалить? Да/Нет" confirm on that row; a second tap
+  // on Да (or navigating away, which resets this) is needed to remove.
+  const [pendingRemoveId, setPendingRemoveId] = React.useState(null);
+  React.useEffect(() => { setPendingRemoveId(null); }, [tab, club?.id]);
 
   React.useEffect(() => {
     if (!club) return;
@@ -5010,10 +5016,26 @@ function ClubScreen({ params }) {
                     {paid ? L('Оплачено', 'Paid') : L('Не оплачено', 'Unpaid')}
                   </span>
                 )}
-                <button onClick={(e) => { e.stopPropagation(); handleRemove(kid.id); }} className="bk-press" style={{
-                  border: 'none', background: '#FBE8E8', color: '#C04040', borderRadius: 10,
-                  padding: '6px 10px', fontSize: 15, cursor: 'pointer',
-                }}>✕</button>
+                {pendingRemoveId === kid.id ? (
+                  <div style={{ display: 'flex', gap: 6 }} onClick={e => e.stopPropagation()}>
+                    <span style={{ fontSize: 12.5, fontWeight: 700, color: '#C04040', whiteSpace: 'nowrap' }}>
+                      {L('Удалить?', 'Delete?')}
+                    </span>
+                    <button onClick={() => { setPendingRemoveId(null); handleRemove(kid.id); }} className="bk-press" style={{
+                      border: 'none', background: '#C04040', color: '#fff', borderRadius: 10,
+                      padding: '6px 10px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                    }}>{L('Да', 'Yes')}</button>
+                    <button onClick={() => setPendingRemoveId(null)} className="bk-press" style={{
+                      border: 'none', background: '#EDE8E0', color: 'var(--ink-soft)', borderRadius: 10,
+                      padding: '6px 10px', fontSize: 13, cursor: 'pointer',
+                    }}>{L('Нет', 'No')}</button>
+                  </div>
+                ) : (
+                  <button onClick={(e) => { e.stopPropagation(); setPendingRemoveId(kid.id); }} className="bk-press" style={{
+                    border: 'none', background: '#FBE8E8', color: '#C04040', borderRadius: 10,
+                    padding: '6px 10px', fontSize: 15, cursor: 'pointer',
+                  }}>✕</button>
+                )}
               </Card>
             );
           })}
