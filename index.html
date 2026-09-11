@@ -349,6 +349,12 @@ window.API_BASE = "https://rmxois1uv0a24xrbi2dfcfac.95.179.188.141.sslip.io";
     if (!res.ok) throw new Error(`POST /meal-attendance failed: ${res.status}`);
   };
 
+  window.loadMealAttendanceHistory = async function (kidId) {
+    const res = await fetch(`${window.API_BASE}/meal-attendance-history/${encodeURIComponent(kidId)}`);
+    if (!res.ok) throw new Error(`GET /meal-attendance-history failed: ${res.status}`);
+    return res.json();
+  };
+
   window.loadAttendanceHistory = async function (kidId) {
     const res = await fetch(`${window.API_BASE}/attendance-history/${encodeURIComponent(kidId)}`);
     if (!res.ok) throw new Error(`GET /attendance-history failed: ${res.status}`);
@@ -3185,6 +3191,21 @@ function PaidBadge({ muted }) {
   );
 }
 
+// Stacks directly under PaidBadge (same corner, top pushed down by one
+// badge's height) rather than its own corner, so a kid with both a paid
+// mark and a meal mark on the same day reads as one grouped cluster.
+function MealBadge() {
+  return (
+    <span style={{
+      position: 'absolute', top: 10, right: -6, width: 16, height: 16, borderRadius: '50%',
+      background: 'linear-gradient(135deg, #8FCB9E, #4C9A6A)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: 9, lineHeight: 1,
+      boxShadow: '0 2px 3px rgba(20,60,30,0.35), 0 0 0 2px var(--bg)',
+      transform: 'rotate(6deg)' }}>🍽</span>
+  );
+}
+
 // A transient failure (a network blip, a cold connection) on one of these
 // read-only GETs used to leave the calendar/history silently blank forever
 // — nothing re-fetches until the sheet fully unmounts and remounts (closing
@@ -3518,12 +3539,14 @@ function AttendanceHistorySheet({ kid, onClose }) {
   const [history,   setHistory]   = React.useState(null);
   const [log,       setLog]       = React.useState([]);
   const [pending,   setPending]   = React.useState(null);
+  const [mealDays,  setMealDays]  = React.useState({});
 
   React.useEffect(() => {
     Promise.all([
       withRetry(() => window.loadAttendanceHistory(kid.id)),
       withRetry(() => window.loadPaymentLog(kid.id)).catch(() => []),
-    ]).then(([h, l]) => { setHistory(h); setLog(l); }).catch(() => setHistory({}));
+      kid.mealsIncluded ? withRetry(() => window.loadMealAttendanceHistory(kid.id)).catch(() => ({})) : Promise.resolve({}),
+    ]).then(([h, l, m]) => { setHistory(h); setLog(l); setMealDays(m); }).catch(() => setHistory({}));
   }, [kid.id]);
 
   // most real kids have no Paid-from on record — default the start to today,
@@ -3625,6 +3648,7 @@ function AttendanceHistorySheet({ kid, onClose }) {
             const isTdy    = dateStr === today;
             const isPresent = history[dateStr] === 'present';
             const isPaidDay = paidDays.has(dateStr);
+            const isMealDay = kid.mealsIncluded && mealDays[dateStr] === 'present';
             const { background, color } = calendarCellVisual({ isWknd, isPresent, isTdy });
             return (
               <button key={d} onClick={() => toggleDay(dateStr)} disabled={isFuture}
@@ -3634,6 +3658,7 @@ function AttendanceHistorySheet({ kid, onClose }) {
                   background, color }}>
                 {d}
                 {isPaidDay && !isWknd && <PaidBadge />}
+                {isMealDay && <MealBadge />}
               </button>
             );
           })}
@@ -3645,6 +3670,12 @@ function AttendanceHistorySheet({ kid, onClose }) {
             <span style={{ position: 'relative', width: 12, height: 12, display: 'inline-block' }}><PaidBadge /></span>
             {L('оплачено', 'paid')}
           </span>
+          {kid.mealsIncluded && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ position: 'relative', width: 12, height: 12, display: 'inline-block' }}><MealBadge /></span>
+              {L('поел', 'ate')}
+            </span>
+          )}
           <span><span style={{ display:'inline-block', width:9, height:9, borderRadius:3, background:'#FBD9E1', marginRight:4 }} />{L('выходной', 'weekend')}</span>
         </div>
         </>
