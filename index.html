@@ -3195,17 +3195,17 @@ function PaidBadge({ muted }) {
 // badge's height) rather than its own corner, so a kid with both a paid
 // mark and a meal mark on the same day reads as one grouped cluster.
 function MealBadge({ top = 10 }) {
-  // Orange, not green — a present day's cell background is already the
+  // Blue, not green — a present day's cell background is already the
   // same green PaidBadge sits on fine (#8FCB9E), so a green badge on top
-  // of it just disappeared. Orange reads clearly on green, pink (weekend)
-  // and the plain cream background alike.
+  // of it just disappeared. Grey was tried too, but the 🍽 emoji is itself
+  // a white/grey plate and blended right back into it.
   return (
     <span style={{
       position: 'absolute', top, right: -6, width: 16, height: 16, borderRadius: '50%',
-      background: 'linear-gradient(135deg, #F0A868, #C2701A)',
+      background: 'linear-gradient(135deg, #7EC8E3, #2E7EA6)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontSize: 9, lineHeight: 1,
-      boxShadow: '0 2px 3px rgba(60,30,10,0.35), 0 0 0 2px var(--bg)',
+      boxShadow: '0 2px 3px rgba(15,45,65,0.35), 0 0 0 2px var(--bg)',
       transform: 'rotate(6deg)' }}>🍽</span>
   );
 }
