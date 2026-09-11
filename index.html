@@ -3195,13 +3195,17 @@ function PaidBadge({ muted }) {
 // badge's height) rather than its own corner, so a kid with both a paid
 // mark and a meal mark on the same day reads as one grouped cluster.
 function MealBadge({ top = 10 }) {
+  // Orange, not green — a present day's cell background is already the
+  // same green PaidBadge sits on fine (#8FCB9E), so a green badge on top
+  // of it just disappeared. Orange reads clearly on green, pink (weekend)
+  // and the plain cream background alike.
   return (
     <span style={{
       position: 'absolute', top, right: -6, width: 16, height: 16, borderRadius: '50%',
-      background: 'linear-gradient(135deg, #8FCB9E, #4C9A6A)',
+      background: 'linear-gradient(135deg, #F0A868, #C2701A)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontSize: 9, lineHeight: 1,
-      boxShadow: '0 2px 3px rgba(20,60,30,0.35), 0 0 0 2px var(--bg)',
+      boxShadow: '0 2px 3px rgba(60,30,10,0.35), 0 0 0 2px var(--bg)',
       transform: 'rotate(6deg)' }}>🍽</span>
   );
 }
@@ -3892,7 +3896,7 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
                   {kid.mealsIncluded && (
                     <button onClick={() => toggleMeal(kid.id)} disabled={st !== 'present'} className="bk-press"
                       title={L('Питание', 'Meal')} style={{
-                        border:'none', borderRadius:10, width:34, height:34, fontSize:16,
+                        border:'none', borderRadius:'50%', width:34, height:34, fontSize:16,
                         cursor: st !== 'present' ? 'default' : 'pointer',
                         opacity: st !== 'present' ? 0.3 : 1,
                         background: mealLocal[kid.id] === 'present' ? '#D4F0DF' : '#EDE8E0' }}>🍽️</button>
