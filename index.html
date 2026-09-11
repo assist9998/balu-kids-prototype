@@ -3194,10 +3194,10 @@ function PaidBadge({ muted }) {
 // Stacks directly under PaidBadge (same corner, top pushed down by one
 // badge's height) rather than its own corner, so a kid with both a paid
 // mark and a meal mark on the same day reads as one grouped cluster.
-function MealBadge() {
+function MealBadge({ top = 10 }) {
   return (
     <span style={{
-      position: 'absolute', top: 10, right: -6, width: 16, height: 16, borderRadius: '50%',
+      position: 'absolute', top, right: -6, width: 16, height: 16, borderRadius: '50%',
       background: 'linear-gradient(135deg, #8FCB9E, #4C9A6A)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontSize: 9, lineHeight: 1,
@@ -3576,6 +3576,14 @@ function AttendanceHistorySheet({ kid, onClose }) {
     return set;
   }, [log, kid.paidFrom, kid.paidUntil]);
 
+  // How many days this month the meal badge above actually landed on —
+  // the count Ольга bills питание by, so it belongs right where she's
+  // already looking at the marks themselves instead of a separate screen.
+  const mealCountThisMonth = React.useMemo(() => {
+    const prefix = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-`;
+    return Object.entries(mealDays).filter(([d, st]) => st === 'present' && d.startsWith(prefix)).length;
+  }, [mealDays, viewYear, viewMonth]);
+
   const MR = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
   const ME = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   const DH = [L('Пн','Mo'),L('Вт','Tu'),L('Ср','We'),L('Чт','Th'),L('Пт','Fr'),L('Сб','Sa'),L('Вс','Su')];
@@ -3672,12 +3680,17 @@ function AttendanceHistorySheet({ kid, onClose }) {
           </span>
           {kid.mealsIncluded && (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ position: 'relative', width: 12, height: 12, display: 'inline-block' }}><MealBadge /></span>
+              <span style={{ position: 'relative', width: 12, height: 12, display: 'inline-block' }}><MealBadge top={-6} /></span>
               {L('поел', 'ate')}
             </span>
           )}
           <span><span style={{ display:'inline-block', width:9, height:9, borderRadius:3, background:'#FBD9E1', marginRight:4 }} />{L('выходной', 'weekend')}</span>
         </div>
+        {kid.mealsIncluded && (
+          <div style={{ textAlign: 'center', marginTop: 8, fontSize: 12.5, fontWeight: 700, color: 'var(--ink-soft)' }}>
+            🍽 {L('Питание в этом месяце', 'Meals this month')}: {mealCountThisMonth}
+          </div>
+        )}
         </>
         )}
       </div>
