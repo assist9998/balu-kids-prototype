@@ -3898,8 +3898,9 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
                       title={L('Питание', 'Meal')} style={{
                         border:'none', borderRadius:'50%', width:34, height:34, fontSize:16,
                         cursor: st !== 'present' ? 'default' : 'pointer',
-                        opacity: st !== 'present' ? 0.3 : 1,
-                        background: mealLocal[kid.id] === 'present' ? '#D4F0DF' : '#EDE8E0' }}>🍽️</button>
+                        background: mealLocal[kid.id] === 'present' ? '#D4F0DF' : '#EDE8E0' }}>
+                      <span style={{ opacity: st !== 'present' ? 0.35 : 1 }}>🍽️</span>
+                    </button>
                   )}
                   <StatusChip status={st} onClick={() => setStatus(kid.id, CYCLE[st])} />
                 </div>
