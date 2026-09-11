@@ -3758,7 +3758,15 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
     }
   }
 
-  const kids   = activeKids().filter(k => filter === 'meals' ? k.mealsIncluded : (filter === 'all' || k.group === filter));
+  // "Питание" isn't another group filter — it's a dedicated mode: garden
+  // attendance is already marked from the other tabs, so this one only
+  // shows kids who both have mealsIncluded and are already present today,
+  // with just the plate toggle per row (no status chip, nothing to mark
+  // twice).
+  const isMealsTab = filter === 'meals';
+  const kids   = activeKids().filter(k => isMealsTab
+    ? (k.mealsIncluded && local[k.id] === 'present')
+    : (filter === 'all' || k.group === filter));
   const counts = {
     present: activeKids().filter(k => local[k.id] === 'present').length,
     absent:  activeKids().filter(k => local[k.id] !== 'present').length,
@@ -3893,16 +3901,15 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
                   )}
                 </div>
                 <div onClick={e => e.stopPropagation()} style={{ padding:6, display:'flex', alignItems:'center', gap:7 }}>
-                  {kid.mealsIncluded && (
-                    <button onClick={() => toggleMeal(kid.id)} disabled={st !== 'present'} className="bk-press"
+                  {isMealsTab ? (
+                    <button onClick={() => toggleMeal(kid.id)} className="bk-press"
                       title={L('Питание', 'Meal')} style={{
                         border:'none', borderRadius:'50%', width:34, height:34, fontSize:16,
-                        cursor: st !== 'present' ? 'default' : 'pointer',
-                        background: mealLocal[kid.id] === 'present' ? '#D4F0DF' : '#EDE8E0' }}>
-                      <span style={{ opacity: st !== 'present' ? 0.35 : 1 }}>🍽️</span>
-                    </button>
+                        cursor: 'pointer',
+                        background: mealLocal[kid.id] === 'present' ? '#D4F0DF' : '#EDE8E0' }}>🍽️</button>
+                  ) : (
+                    <StatusChip status={st} onClick={() => setStatus(kid.id, CYCLE[st])} />
                   )}
-                  <StatusChip status={st} onClick={() => setStatus(kid.id, CYCLE[st])} />
                 </div>
               </Card>
             );
