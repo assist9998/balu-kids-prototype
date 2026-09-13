@@ -3822,7 +3822,10 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
     { id: 'meals', label: L('Питание', 'Meals'), emoji: '🍽️' }];
 
   const selDateObj = new Date(selDate + 'T12:00:00');
-  const selIsWeekend = isWeekend(selDateObj);
+  // Director (Ольга) can open the journal on weekends too — she asked to
+  // check features live without waiting for a weekday; everyone else still
+  // sees the weekend placeholder since the daycare itself is closed then.
+  const selIsWeekend = isWeekend(selDateObj) && !window.__isDirector;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
@@ -3978,7 +3981,8 @@ function SummaryScreen({ statuses, go }) {
     .filter(k => k.paidUntil && normDate(k.paidUntil) >= today)
     .reduce((s, k) => s + (parseFloat(String(k.price).replace(/[^0-9.]/g, '')) || 0), 0);
 
-  const weekend = isWeekend();
+  // Same director-only exception as AttendanceScreen — see there for why.
+  const weekend = isWeekend() && !window.__isDirector;
 
   return (
     <div style={{ padding: '4px 20px 30px', display: 'flex', flexDirection: 'column', gap: 16 }}>
