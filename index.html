@@ -3764,8 +3764,11 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
   // with just the plate toggle per row (no status chip, nothing to mark
   // twice).
   const isMealsTab = filter === 'meals';
+  // Kindergarten meals are already bundled into the garden fee — only
+  // Primary School kids opt in/out separately, so Питание only ever shows
+  // that group even though it's visually attached to the Primary School chip.
   const kids   = activeKids().filter(k => isMealsTab
-    ? (k.mealsIncluded && local[k.id] === 'present')
+    ? (k.group === 'primary' && k.mealsIncluded && local[k.id] === 'present')
     : (filter === 'all' || k.group === filter));
   const counts = {
     present: activeKids().filter(k => local[k.id] === 'present').length,
@@ -3818,8 +3821,10 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
     }
   }
 
-  const chips = [{ id: 'all', label: t('all'), emoji: '🗂️' }, ...DATA.GROUPS.map(g => ({ id: g.id, label: Lo(g), emoji: g.emoji })),
-    { id: 'meals', label: L('Питание', 'Meals'), emoji: '🍽️' }];
+  // Primary School and Питание render as one attached pair below (see the
+  // combined block after this row) rather than as separate chips here.
+  const chips = [{ id: 'all', label: t('all'), emoji: '🗂️' }, ...DATA.GROUPS.filter(g => g.id !== 'primary').map(g => ({ id: g.id, label: Lo(g), emoji: g.emoji }))];
+  const primaryGroup = DATA.GROUPS.find(g => g.id === 'primary');
 
   const selDateObj = new Date(selDate + 'T12:00:00');
   // Director (Ольга) can open the journal on weekends too — she asked to
@@ -3857,6 +3862,35 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
               {c.emoji} {c.label}
             </button>
           ))}
+          {/* Primary School + Питание: one attached pair, not two separate
+              chips — Primary School keeps its own full round shape and sits
+              on top (higher z-index, pulled left over Питание's edge), so
+              its rounded body visibly bulges into Питание rather than the
+              other way round. Питание's near corner is left square so
+              nothing fights that curve, and its far corners stay rounded so
+              the pair still reads as one capsule. The overlap is a fixed
+              12px — comfortably short of Питание's emoji, which sits well
+              past that thanks to its own extra left padding below. */}
+          <div style={{ display:'flex', flexShrink:0 }}>
+            <button onClick={() => setFilter('primary')} className="bk-press" style={{
+              position:'relative', zIndex:2, marginRight:-12,
+              border:'none', cursor:'pointer', fontFamily:'inherit',
+              padding:'8px 14px', borderRadius:999, fontSize:13.5, fontWeight:700,
+              background: filter==='primary' ? '#B07848' : '#FBF7F2',
+              color: filter==='primary' ? '#fff' : 'var(--ink-soft)',
+              boxShadow: filter==='primary' ? '0 6px 14px -6px #B07848' : '0 2px 4px rgba(60,40,20,0.15)' }}>
+              {primaryGroup.emoji} {Lo(primaryGroup)}
+            </button>
+            <button onClick={() => setFilter('meals')} className="bk-press" style={{
+              position:'relative', zIndex:1,
+              border:'none', cursor:'pointer', fontFamily:'inherit',
+              padding:'8px 14px 8px 22px', borderRadius:'0 999px 999px 0', fontSize:13.5, fontWeight:700,
+              background: filter==='meals' ? '#C2941A' : '#FBF7F2',
+              color: filter==='meals' ? '#fff' : 'var(--ink-soft)',
+              boxShadow: filter==='meals' ? '0 6px 14px -6px #C2941A' : '0 1px 2px rgba(60,40,20,0.05)' }}>
+              🍽️ {L('Питание', 'Meals')}
+            </button>
+          </div>
         </div>
 
         {/* count strip */}
