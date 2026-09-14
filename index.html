@@ -3942,9 +3942,11 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
               position:'relative', zIndex:1,
               border:'none', cursor:'pointer', fontFamily:'inherit',
               padding:'8px 14px 8px 22px', borderRadius:'0 999px 999px 0', fontSize:13.5, fontWeight:700,
-              background: filter==='meals' ? '#C2941A' : '#FBF7F2',
-              color: filter==='meals' ? '#fff' : 'var(--ink-soft)',
-              boxShadow: filter==='meals' ? '0 6px 14px -6px #C2941A' : '0 1px 2px rgba(60,40,20,0.05)' }}>
+              // Same honey as SaveBar's "Сохранено ✓" state, not a plain gold —
+              // that's the pleasant warm tone already established elsewhere.
+              background: filter==='meals' ? '#F2A81D' : '#FBF7F2',
+              color: filter==='meals' ? '#3E2510' : 'var(--ink-soft)',
+              boxShadow: filter==='meals' ? '0 6px 14px -6px rgba(242,168,29,0.55)' : '0 1px 2px rgba(60,40,20,0.05)' }}>
               🍽️ {L('Питание', 'Meals')}
             </button>
           </div>
