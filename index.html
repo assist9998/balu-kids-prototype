@@ -65,15 +65,8 @@
   @keyframes toastIn { from { opacity: 0; transform: translate(-50%, 14px); } to { opacity: 1; transform: translate(-50%, 0); } }
   .bk-toast { animation: toastIn .3s cubic-bezier(.22,1,.36,1); }
 
-  /* Primary School + Питание orbit trail — dashoffset swept by a fixed
-     amount per rect (see --peri, set inline from the pair's real measured
-     perimeter), so several staggered copies chase each other around the
-     exact rendered outline instead of an approximate hand-picked shape. */
-  @keyframes bk-orbit-dash { from { stroke-dashoffset: 0; } to { stroke-dashoffset: var(--peri); } }
-
   @media (prefers-reduced-motion: reduce) {
     .scr-fwd, .scr-back, .bk-toast { animation: none; }
-    .bk-orbit-rect { animation: none; }
   }
 </style>
 </head>
@@ -3832,23 +3825,9 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
   // combined block after this row) rather than as separate chips here.
   const chips = [{ id: 'all', label: t('all'), emoji: '🗂️' }, ...DATA.GROUPS.filter(g => g.id !== 'primary').map(g => ({ id: g.id, label: Lo(g), emoji: g.emoji }))];
   const primaryGroup = DATA.GROUPS.find(g => g.id === 'primary');
-
-  // Golden orbit trail traced around the real, measured outline of the
-  // Primary School + Питание pair (not a guessed shape) — re-measured via
-  // ResizeObserver so it stays exact if the pill's width changes (ru/en
-  // label length, font load, etc).
-  const pairRef = React.useRef(null);
-  const [pairSize, setPairSize] = React.useState({ w: 0, h: 0 });
-  React.useEffect(() => {
-    const el = pairRef.current;
-    if (!el || typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver(([entry]) => {
-      const { width, height } = entry.contentRect;
-      setPairSize({ w: width, h: height });
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+  // Питание is a subset of Primary School, not a separate group — selecting
+  // it keeps Primary School's own chip highlighted too.
+  const primaryActive = filter === 'primary' || filter === 'meals';
 
   const selDateObj = new Date(selDate + 'T12:00:00');
   // Director (Ольга) can open the journal on weekends too — she asked to
@@ -3895,47 +3874,14 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
               the pair still reads as one capsule. The overlap is a fixed
               12px — comfortably short of Питание's emoji, which sits well
               past that thanks to its own extra left padding below. */}
-          <div ref={pairRef} style={{ position:'relative', display:'flex', flexShrink:0 }}>
-            {pairSize.w > 0 && pairSize.h > 0 && (() => {
-              // Trail traced on the pair's own measured rounded-rect outline
-              // (4px outside it, like trim) — several dashes chasing the
-              // same stroke-dashoffset sweep with staggered delay and
-              // falling opacity read as one dot with a fading tail.
-              const margin = 4;
-              const w = pairSize.w, h = pairSize.h, r = h / 2;
-              const peri = 2 * Math.max(w - h, 0) + Math.PI * h;
-              const dashLen = 7;
-              // Most-negative delay = furthest already advanced along the
-              // sweep, i.e. furthest ahead — that has to be the brightest
-              // (the head), with dimmer echoes trailing behind it.
-              const echoes = [
-                { delay: -0.36, opacity: 1,    sw: 5   },
-                { delay: -0.27, opacity: 0.6,  sw: 4.5 },
-                { delay: -0.18, opacity: 0.35, sw: 4   },
-                { delay: -0.09, opacity: 0.18, sw: 3.5 },
-                { delay: 0,     opacity: 0.08, sw: 3   },
-              ];
-              return (
-                <svg width={w + margin * 2} height={h + margin * 2} style={{
-                  position:'absolute', top:-margin, left:-margin, zIndex:3, pointerEvents:'none', overflow:'visible' }}>
-                  {echoes.map((e, i) => (
-                    <rect key={i} x={margin} y={margin} width={w} height={h} rx={r} ry={r}
-                      fill="none" stroke="#F0D060" strokeLinecap="round"
-                      strokeWidth={e.sw} opacity={e.opacity}
-                      strokeDasharray={`${dashLen} ${Math.max(peri - dashLen, 0)}`}
-                      className="bk-orbit-rect"
-                      style={{ '--peri': peri, animation: 'bk-orbit-dash 4.5s linear infinite', animationDelay: `${e.delay}s` }} />
-                  ))}
-                </svg>
-              );
-            })()}
+          <div style={{ display:'flex', flexShrink:0 }}>
             <button onClick={() => setFilter('primary')} className="bk-press" style={{
               position:'relative', zIndex:2, marginRight:-12,
               border:'none', cursor:'pointer', fontFamily:'inherit',
               padding:'8px 14px', borderRadius:999, fontSize:13.5, fontWeight:700,
-              background: filter==='primary' ? '#B07848' : '#FBF7F2',
-              color: filter==='primary' ? '#fff' : 'var(--ink-soft)',
-              boxShadow: filter==='primary' ? '0 6px 14px -6px #B07848' : '0 2px 4px rgba(60,40,20,0.15)' }}>
+              background: primaryActive ? '#B07848' : '#FBF7F2',
+              color: primaryActive ? '#fff' : 'var(--ink-soft)',
+              boxShadow: primaryActive ? '0 6px 14px -6px #B07848' : '0 2px 4px rgba(60,40,20,0.15)' }}>
               {primaryGroup.emoji} {Lo(primaryGroup)}
             </button>
             <button onClick={() => setFilter('meals')} className="bk-press" style={{
