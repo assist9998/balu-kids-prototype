@@ -3905,12 +3905,15 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
               const w = pairSize.w, h = pairSize.h, r = h / 2;
               const peri = 2 * Math.max(w - h, 0) + Math.PI * h;
               const dashLen = 7;
+              // Most-negative delay = furthest already advanced along the
+              // sweep, i.e. furthest ahead — that has to be the brightest
+              // (the head), with dimmer echoes trailing behind it.
               const echoes = [
-                { delay: 0,     opacity: 1,    sw: 5   },
-                { delay: -0.09, opacity: 0.6,  sw: 4.5 },
+                { delay: -0.36, opacity: 1,    sw: 5   },
+                { delay: -0.27, opacity: 0.6,  sw: 4.5 },
                 { delay: -0.18, opacity: 0.35, sw: 4   },
-                { delay: -0.27, opacity: 0.18, sw: 3.5 },
-                { delay: -0.36, opacity: 0.08, sw: 3   },
+                { delay: -0.09, opacity: 0.18, sw: 3.5 },
+                { delay: 0,     opacity: 0.08, sw: 3   },
               ];
               return (
                 <svg width={w + margin * 2} height={h + margin * 2} style={{
