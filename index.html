@@ -3875,7 +3875,7 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
       ) : (
         <>
         {/* group filter */}
-        <div style={{ display:'flex', gap:8, overflowX:'auto', padding:'0 20px 10px', scrollbarWidth:'none' }}>
+        <div style={{ display:'flex', gap:8, overflowX:'auto', padding:'8px 20px 10px', scrollbarWidth:'none' }}>
           {chips.map(c => (
             <button key={c.id} onClick={() => setFilter(c.id)} className="bk-press" style={{
               flexShrink:0, border:'none', cursor:'pointer', fontFamily:'inherit',
@@ -3917,7 +3917,7 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
               ];
               return (
                 <svg width={w + margin * 2} height={h + margin * 2} style={{
-                  position:'absolute', top:-margin, left:-margin, pointerEvents:'none', overflow:'visible' }}>
+                  position:'absolute', top:-margin, left:-margin, zIndex:3, pointerEvents:'none', overflow:'visible' }}>
                   {echoes.map((e, i) => (
                     <rect key={i} x={margin} y={margin} width={w} height={h} rx={r} ry={r}
                       fill="none" stroke="#F0D060" strokeLinecap="round"
