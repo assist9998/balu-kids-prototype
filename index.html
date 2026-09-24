@@ -3714,14 +3714,12 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
   const makeLocal = (src) => {
     const m = {}; activeKids().forEach(k => { m[k.id] = (src||{})[k.id] || 'absent'; }); return m;
   };
-  const [local,      setLocal]      = React.useState(() => makeLocal(statuses));
-  const [savedLocal, setSavedLocal] = React.useState(() => makeLocal(statuses));
+  const [local, setLocal] = React.useState(() => makeLocal(statuses));
 
   // sync today statuses when they change externally
   React.useEffect(() => {
     if (!isToday) return;
-    const m = makeLocal(statuses);
-    setLocal(m); setSavedLocal(m);
+    setLocal(makeLocal(statuses));
   }, [statuses, isToday]);
 
   // load past date from API
@@ -3729,15 +3727,15 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
     if (isToday) return;
     setLoading(true); setAllMarked(false);
     withRetry(() => window.loadAttendance(selDate))
-      .then(data => { const m = makeLocal(data); setLocal(m); setSavedLocal(m); })
-      .catch(()  => { const m = makeLocal({});   setLocal(m); setSavedLocal(m); })
+      .then(data => setLocal(makeLocal(data)))
+      .catch(()  => setLocal(makeLocal({})))
       .finally(() => setLoading(false));
   }, [selDate]);
 
   // Meal marking — a day-by-day mark, separate from garden attendance and
-  // saved immediately per tap (like AttendanceHistorySheet.toggleDay), not
-  // batched into the Save button below. Reloaded whenever the viewed date
-  // changes, same as garden attendance for a past date.
+  // saved immediately per tap (like AttendanceHistorySheet.toggleDay).
+  // Reloaded whenever the viewed date changes, same as garden attendance
+  // for a past date.
   const [mealLocal, setMealLocal] = React.useState({});
   React.useEffect(() => {
     withRetry(() => window.loadMealAttendance(selDate))
@@ -3774,18 +3772,51 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
     present: activeKids().filter(k => local[k.id] === 'present').length,
     absent:  activeKids().filter(k => local[k.id] !== 'present').length,
   };
-  const hasChanges = activeKids().some(k => local[k.id] !== savedLocal[k.id]);
 
-  function toggleMarkAll() {
-    if (!allMarked) {
-      snapRef.current = { ...local };
-      const all = {}; activeKids().forEach(k => { all[k.id] = 'present'; });
-      setLocal(all); setAllMarked(true);
+  // Garden attendance — saved immediately per tap, same as meal marking
+  // above (toggleMeal). Used to only update local state, requiring a
+  // separate "Save" button below the roster; that step was silently
+  // skippable (switch tabs, close the app before tapping it) with no
+  // warning at all, so a teacher's tap could flip the chip on screen and
+  // just never reach the server. Sends only what actually changed (see
+  // the old handleSave's reasoning, still true here): the backend records
+  // who marked each kid, and a kid nobody touched gets an explicit row
+  // from the end-of-day sweep instead of from whoever happens to tap
+  // last.
+  async function persist(next, delta) {
+    if (isToday) {
+      await actions.saveStatuses(next, delta);
     } else {
-      setLocal(snapRef.current || makeLocal(statuses)); setAllMarked(false);
+      await window.saveAttendance(selDate, delta);
     }
   }
-  function setStatus(id, st) {
+
+  async function toggleMarkAll() {
+    const prevSnap = { ...local };
+    if (!allMarked) {
+      snapRef.current = prevSnap;
+      const all = {}; activeKids().forEach(k => { all[k.id] = 'present'; });
+      setLocal(all); setAllMarked(true);
+      const delta = {}; activeKids().forEach(k => { if (prevSnap[k.id] !== 'present') delta[k.id] = 'present'; });
+      try {
+        await persist(all, delta);
+      } catch (e) {
+        setLocal(prevSnap); setAllMarked(false);
+        actions.toast(L('Не удалось сохранить: ', 'Failed to save: ') + String(e));
+      }
+    } else {
+      const restore = snapRef.current || makeLocal(statuses);
+      setLocal(restore); setAllMarked(false);
+      const delta = {}; activeKids().forEach(k => { if (prevSnap[k.id] !== restore[k.id]) delta[k.id] = restore[k.id]; });
+      try {
+        await persist(restore, delta);
+      } catch (e) {
+        setLocal(prevSnap); setAllMarked(true);
+        actions.toast(L('Не удалось сохранить: ', 'Failed to save: ') + String(e));
+      }
+    }
+  }
+  async function setStatus(id, st) {
     if (st === 'present' && local[id] !== 'present') {
       const kid = activeKids().find(k => k.id === id);
       const covered = kid && kid.paidUntil && normDate(kid.paidUntil) >= selDate;
@@ -3793,31 +3824,14 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
         actions.toast(L('Не оплачено — обратитесь к бухгалтеру/директору', 'Not paid — contact the accountant/director'));
       }
     }
-    setLocal(m => ({ ...m, [id]: st }));
-    setAllMarked(false);
-  }
-  const [saveErr, setSaveErr] = React.useState(null);
-  async function handleSave() {
-    setSaveErr(null);
-    if (!hasChanges) return;
-    // Only send what this user actually changed since the last save — not
-    // everyone's status. The backend now records who marked each kid
-    // (Marked by), and a kid who stays "absent" all day untouched gets an
-    // explicit row from the end-of-day sweep instead of from us resending
-    // the whole roster. Sending everyone here would (a) wrongly attribute
-    // kids nobody touched to whoever happens to hit Save, and (b) let two
-    // people editing different kids at once stomp each other's changes.
-    const delta = {};
-    activeKids().forEach(k => { if (local[k.id] !== savedLocal[k.id]) delta[k.id] = local[k.id]; });
+    const prev = local[id];
+    const next = { ...local, [id]: st };
+    setLocal(next); setAllMarked(false);
     try {
-      if (isToday) {
-        await actions.saveStatuses(local, delta);
-      } else {
-        await window.saveAttendance(selDate, delta);
-      }
-      setSavedLocal({ ...local });
+      await persist(next, { [id]: st });
     } catch (e) {
-      setSaveErr(L('Ошибка сохранения', 'Save failed'));
+      setLocal(m => ({ ...m, [id]: prev }));
+      actions.toast(L('Не удалось сохранить: ', 'Failed to save: ') + String(e));
     }
   }
 
@@ -3958,8 +3972,7 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
           })}
         </div>
 
-        {saveErr && <div style={{ textAlign:'center', color:'var(--no)', fontSize:13, fontWeight:600, padding:'6px 0' }}>{saveErr}</div>}
-        <SaveBar hasChanges={hasChanges} onSave={handleSave} />
+        <div style={{ height: 30 }} />
         </>
       )}
 
