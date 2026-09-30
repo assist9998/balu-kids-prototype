@@ -4867,6 +4867,18 @@ function UnpaidTodayAlert({ statuses }) {
     try {
       const res = await window.addPaymentLogEntry(kid.id, kid.contract === 'tourist' ? 'tourist' : 'longterm', fromDmy, toDmy, amount);
       Object.assign(kid, { paidFrom: res.paidFrom || '', paidUntil: res.paidUntil || '' });
+      // Долгосрочный тариф — оплата помесячная, а не за число дней (в
+      // отличие от tourist, где amount = ставка × дни) — держим "Цена" в
+      // карточке ребёнка синхронной с фактически введённой суммой. Иначе
+      // подсказка при следующей оплате (и "Ожидаемый доход" на главном
+      // экране) продолжают показывать старую цену даже после того, как
+      // реальная сумма изменилась — карточка ребёнка и история платежей
+      // расходятся молча (см. случай Amadeus, 30.09.2026).
+      if (kid.contract !== 'tourist' && String(amount) !== String(kid.price || '')) {
+        const prevPrice = kid.price;
+        kid.price = amount;
+        window.updateChild(kid.id, { price: amount }).catch(() => { kid.price = prevPrice; });
+      }
       setPayItem(null);
     } catch (e) {
       // same durable-queue reasoning as PaymentsGardenScreen's confirmPayment —
