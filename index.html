@@ -5442,6 +5442,11 @@ function StaffFormSheet({ member, onClose, onSaved }) {
     try {
       const payload = { ...form, name: form.name.trim() };
       if (isEdit && !form.password.trim()) delete payload.password;
+      // Salary/contract are director-only — the backend already ignores
+      // these fields from a non-director caller, but never even send them
+      // so a manager's unrelated save (e.g. phone) can't look like it's
+      // trying to touch pay data.
+      if (!window.__isDirector) { delete payload.contractEnd; delete payload.rate; }
       if (isEdit) {
         await window.updateStaff(member.name, payload);
       } else {
@@ -5496,19 +5501,23 @@ function StaffFormSheet({ member, onClose, onSaved }) {
               <label style={LBL}>{L('Должность', 'Position')}</label>
               <input style={INP} value={form.position} onChange={set('position')} placeholder={L('Воспитатель', 'Teacher')} />
             </div>
-            <div>
-              <label style={LBL}>{L('Договор до', 'Contract until')}</label>
-              <input style={INP} value={form.contractEnd} onChange={set('contractEnd')} placeholder="31.12.2026" />
-            </div>
+            {window.__isDirector && (
+              <div>
+                <label style={LBL}>{L('Договор до', 'Contract until')}</label>
+                <input style={INP} value={form.contractEnd} onChange={set('contractEnd')} placeholder="31.12.2026" />
+              </div>
+            )}
             <div>
               <label style={LBL}>{L('Телефон', 'Phone')}</label>
               <input style={INP} type="tel" value={form.phone} onChange={set('phone')} placeholder="+7 999 000 00 00" />
             </div>
-            <div>
-              <label style={LBL}>{L('Ставка в день', 'Daily rate')}</label>
-              <input style={INP} type="number" inputMode="numeric" value={form.rate} onChange={set('rate')}
-                placeholder="0" />
-            </div>
+            {window.__isDirector && (
+              <div>
+                <label style={LBL}>{L('Ставка в день', 'Daily rate')}</label>
+                <input style={INP} type="number" inputMode="numeric" value={form.rate} onChange={set('rate')}
+                  placeholder="0" />
+              </div>
+            )}
             <div>
               <label style={LBL}>{L('Пароль для входа', 'Login password')}</label>
               <input style={INP} type="password" value={form.password} onChange={set('password')}
