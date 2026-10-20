@@ -7461,7 +7461,7 @@ function App() {
     // because the network was briefly gone while backgrounded.
     window.flushPendingWrites().catch(() => {});
     return Promise.all([
-      window.loadChildren(),
+      withRetry(window.loadChildren),
       window.loadClubs().catch(() => {}),
       window.loadFeed().then(() => setFeed(DATA.FEED.map(f => ({ ...f })))).catch(() => {}),
       withRetry(window.loadStaff).then(setStaff).catch(() => {}),
