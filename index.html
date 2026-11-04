@@ -3791,13 +3791,20 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
     }
   }
 
+  // Scoped to the currently filtered roster (`kids`, the same list the
+  // chips above already narrow down to), never the whole school — a stray
+  // tap here used to flip every child in every group to "present" at once
+  // (2026-11-04 incident), because it read/wrote activeKids() regardless of
+  // which tab was open. `all`/`restore` start from a copy of `local` so
+  // kids outside the current filter are left exactly as they were, not
+  // wiped out by the full-state setLocal() below.
   async function toggleMarkAll() {
     const prevSnap = { ...local };
     if (!allMarked) {
       snapRef.current = prevSnap;
-      const all = {}; activeKids().forEach(k => { all[k.id] = 'present'; });
+      const all = { ...local }; kids.forEach(k => { all[k.id] = 'present'; });
       setLocal(all); setAllMarked(true);
-      const delta = {}; activeKids().forEach(k => { if (prevSnap[k.id] !== 'present') delta[k.id] = 'present'; });
+      const delta = {}; kids.forEach(k => { if (prevSnap[k.id] !== 'present') delta[k.id] = 'present'; });
       try {
         await persist(all, delta);
       } catch (e) {
@@ -3805,9 +3812,10 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
         actions.toast(L('Не удалось сохранить: ', 'Failed to save: ') + String(e));
       }
     } else {
-      const restore = snapRef.current || makeLocal(statuses);
+      const snap = snapRef.current || {};
+      const restore = { ...local }; kids.forEach(k => { restore[k.id] = snap[k.id] || 'absent'; });
       setLocal(restore); setAllMarked(false);
-      const delta = {}; activeKids().forEach(k => { if (prevSnap[k.id] !== restore[k.id]) delta[k.id] = restore[k.id]; });
+      const delta = {}; kids.forEach(k => { if (prevSnap[k.id] !== restore[k.id]) delta[k.id] = restore[k.id]; });
       try {
         await persist(restore, delta);
       } catch (e) {
@@ -3816,6 +3824,10 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
       }
     }
   }
+  // allMarked reflects only the group it was pressed for — without this,
+  // marking one group present and switching tabs left the button showing
+  // "✓ Все в саду" for a group that was never touched.
+  React.useEffect(() => { setAllMarked(false); }, [filter]);
   async function setStatus(id, st) {
     if (st === 'present' && local[id] !== 'present') {
       const kid = activeKids().find(k => k.id === id);
