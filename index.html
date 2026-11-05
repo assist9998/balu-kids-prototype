@@ -2420,8 +2420,10 @@ function ChildScreen({ params, statuses, back }) {
   ];
   return (
     <div style={{ padding: '4px 20px 30px' }}>
-      {/* hero */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, margin: '4px 0 22px' }}>
+      {/* hero — extra top margin vs the original 4px: with a star sitting
+          above the 92px avatar's own top edge (AvatarStarRim), 4px left it
+          poking up under the app header; this gives it room to clear it. */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, margin: '26px 0 22px' }}>
         <div style={{ position: 'relative' }}>
           <Avatar emoji={kid.emoji} color={kidColor} size={92} onClick={() => setPickerOpen(true)} />
           {kid.group === 'primary' && <AvatarStarRim count={todayStars} size={92} />}
