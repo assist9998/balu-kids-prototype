@@ -1810,20 +1810,20 @@ function Avatar({ emoji, color = '#eee', size = 46, ring, onClick }) {
 }
 
 // Up to 3 reward stars arranged along the top rim of an avatar circle —
-// 1 centered, 2 split evenly either side of center, 3 centered plus two
-// further out. Angles are measured from straight up (0°), so each star
-// sits right on the circle's edge rather than floating free of it.
-// Smaller than the compact allergy-tag emoji (10px) deliberately — these
-// sit on a photo/illustration, a tag-sized star would crowd it.
-const STAR_RIM_ANGLES = { 1: [0], 2: [-26, 26], 3: [-46, 0, 46] };
+// 1 centered, 2 split either side of center, 3 centered plus two further
+// out. Angles are measured from straight up (0°), so each star sits right
+// on the circle's edge rather than floating free of it. Kept fairly
+// tight together (not spread wide) so 2-3 stars still read as one
+// cluster rather than scattering around the whole rim.
+const STAR_RIM_ANGLES = { 1: [0], 2: [-18, 18], 3: [-30, 0, 30] };
 
 function AvatarStarRim({ count, size }) {
   if (!count) return null;
   const r = size / 2;
-  // Scales with the avatar instead of a fixed 8px — the same star on the
+  // Scales with the avatar instead of a fixed size — the same star on the
   // 44px Journal avatar and the 92px card hero would otherwise look
   // correctly sized on one and lost on the other.
-  const fontSize = Math.max(7, Math.round(size * 0.19));
+  const fontSize = Math.max(10, Math.round(size * 0.27));
   const half = fontSize / 2;
   const angles = STAR_RIM_ANGLES[Math.min(count, 3)] || [];
   return (
@@ -3294,22 +3294,28 @@ function MealBadge({ top = 10 }) {
   );
 }
 
-// Primary School reward stars for one day — opposite corner from
-// PaidBadge/MealBadge (top-left, not top-right) so a day that has both
-// never overlaps: gold stays its own cluster, this is a separate one.
-// Shows the count as a digit rather than literal stars — three tiny ⭐ at
-// 9px would just blur into one blob in a 16px circle, a number reads at
-// a glance instead.
-function StarBadge({ count }) {
+// Primary School reward stars for one day — same corner and same size as
+// PaidBadge/MealBadge, stacked into that one cluster (top prop works the
+// same way MealBadge's does) rather than a corner of its own, so it reads
+// as "a third thing that happened today" alongside paid/ate instead of a
+// separate, competing badge. The count rides as a small badge-on-badge in
+// its own top-right corner instead of being the star's main content —
+// keeps the ⭐ itself legible at this size, the digit sits beside it.
+function StarBadge({ count, top = 10 }) {
   if (!count) return null;
   return (
     <span style={{
-      position: 'absolute', top: -6, left: -6, width: 16, height: 16, borderRadius: '50%',
+      position: 'absolute', top, right: -6, width: 16, height: 16, borderRadius: '50%',
       background: 'linear-gradient(135deg, #C9A0F0, #6B3FA0)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: 9.5, fontWeight: 900, color: '#fff', lineHeight: 1,
+      fontSize: 9, lineHeight: 1,
       boxShadow: '0 2px 3px rgba(60,20,80,0.35), 0 0 0 2px var(--bg)',
-      transform: 'rotate(-6deg)' }}>⭐{count}</span>
+      transform: 'rotate(-6deg)' }}>⭐
+      <span style={{
+        position: 'absolute', top: -4, right: -4, width: 9, height: 9, borderRadius: '50%',
+        background: '#fff', color: '#6B3FA0', fontSize: 7, fontWeight: 900, lineHeight: '9px',
+        textAlign: 'center', boxShadow: '0 0 0 1.5px #6B3FA0' }}>{count}</span>
+    </span>
   );
 }
 
@@ -3777,7 +3783,7 @@ function AttendanceHistorySheet({ kid, onClose }) {
                 {d}
                 {isPaidDay && !isWknd && <PaidBadge />}
                 {isMealDay && <MealBadge />}
-                <StarBadge count={starCount} />
+                <StarBadge count={starCount} top={kid.mealsIncluded ? 26 : 10} />
               </button>
             );
           })}
@@ -3797,7 +3803,7 @@ function AttendanceHistorySheet({ kid, onClose }) {
           )}
           {kid.group === 'primary' && (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ position: 'relative', width: 12, height: 12, display: 'inline-block' }}><StarBadge count={1} /></span>
+              <span style={{ position: 'relative', width: 12, height: 12, display: 'inline-block' }}><StarBadge count={3} top={-6} /></span>
               {L('звёзды за цель', 'reward stars')}
             </span>
           )}
