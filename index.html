@@ -3304,7 +3304,7 @@ function StarBadge({ count }) {
   if (!count) return null;
   return (
     <span style={{
-      position: 'absolute', top: -6, right: 12, width: 16, height: 16, borderRadius: '50%',
+      position: 'absolute', top: -6, right: 8, width: 16, height: 16, borderRadius: '50%',
       background: 'linear-gradient(135deg, #C9A0F0, #6B3FA0)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontSize: 9, lineHeight: 1,
@@ -3780,9 +3780,13 @@ function AttendanceHistorySheet({ kid, onClose }) {
                   opacity: isFuture ? 0.35 : (pending === dateStr ? 0.5 : 1),
                   background, color }}>
                 {d}
+                {/* Star painted before the checkmark so the gold slightly
+                    overlapping it (by design, see StarBadge) sits on top,
+                    not the other way round — later siblings paint over
+                    earlier ones here, nothing to do with reading order. */}
+                <StarBadge count={starCount} />
                 {isPaidDay && !isWknd && <PaidBadge />}
                 {isMealDay && <MealBadge />}
-                <StarBadge count={starCount} />
               </button>
             );
           })}
