@@ -61,6 +61,15 @@
   /* pull-to-refresh spinner */
   @keyframes bk-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
+  /* reward star appearing on an avatar — a quick pop + settle, not a loop,
+     since it should read as "you just got one", not draw the eye forever */
+  @keyframes bk-star-pop {
+    0%   { transform: translate(var(--sx), var(--sy)) scale(0) rotate(-20deg); opacity: 0; }
+    55%  { transform: translate(var(--sx), var(--sy)) scale(1.35) rotate(8deg); opacity: 1; }
+    100% { transform: translate(var(--sx), var(--sy)) scale(1) rotate(0deg); opacity: 1; }
+  }
+  .bk-star-pop { animation: bk-star-pop .42s cubic-bezier(.22,1.4,.36,1) both; }
+
   /* toast */
   @keyframes toastIn { from { opacity: 0; transform: translate(-50%, 14px); } to { opacity: 1; transform: translate(-50%, 0); } }
   .bk-toast { animation: toastIn .3s cubic-bezier(.22,1,.36,1); }
@@ -358,6 +367,30 @@ window.API_BASE = "https://rmxois1uv0a24xrbi2dfcfac.95.179.188.141.sslip.io";
   window.loadAttendanceHistory = async function (kidId) {
     const res = await fetch(`${window.API_BASE}/attendance-history/${encodeURIComponent(kidId)}`);
     if (!res.ok) throw new Error(`GET /attendance-history failed: ${res.status}`);
+    return res.json();
+  };
+
+  // Primary School reward stars (0-3/day, tapped on a present kid's avatar
+  // in the Journal) — same day-mark shape as meals above, kept forever
+  // rather than reset, so the only history needed is this per-kid fetch.
+  window.loadChildStars = async function (date) {
+    const res = await fetch(`${window.API_BASE}/child-stars/${encodeURIComponent(date)}`);
+    if (!res.ok) throw new Error(`GET /child-stars failed: ${res.status}`);
+    return res.json();
+  };
+
+  window.saveChildStars = async function (date, counts) {
+    const res = await fetch(`${window.API_BASE}/child-stars`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date, counts }),
+    });
+    if (!res.ok) throw new Error(`POST /child-stars failed: ${res.status}`);
+  };
+
+  window.loadChildStarsHistory = async function (kidId) {
+    const res = await fetch(`${window.API_BASE}/child-stars-history/${encodeURIComponent(kidId)}`);
+    if (!res.ok) throw new Error(`GET /child-stars-history failed: ${res.status}`);
     return res.json();
   };
 
@@ -1776,6 +1809,40 @@ function Avatar({ emoji, color = '#eee', size = 46, ring, onClick }) {
   );
 }
 
+// Up to 3 reward stars arranged along the top rim of an avatar circle —
+// 1 centered, 2 split evenly either side of center, 3 centered plus two
+// further out. Angles are measured from straight up (0°), so each star
+// sits right on the circle's edge rather than floating free of it.
+// Smaller than the compact allergy-tag emoji (10px) deliberately — these
+// sit on a photo/illustration, a tag-sized star would crowd it.
+const STAR_RIM_ANGLES = { 1: [0], 2: [-26, 26], 3: [-46, 0, 46] };
+
+function AvatarStarRim({ count, size }) {
+  if (!count) return null;
+  const r = size / 2;
+  // Scales with the avatar instead of a fixed 8px — the same star on the
+  // 44px Journal avatar and the 92px card hero would otherwise look
+  // correctly sized on one and lost on the other.
+  const fontSize = Math.max(7, Math.round(size * 0.19));
+  const half = fontSize / 2;
+  const angles = STAR_RIM_ANGLES[Math.min(count, 3)] || [];
+  return (
+    <>
+      {angles.map((deg, i) => {
+        const rad = (deg * Math.PI) / 180;
+        const x = r * Math.sin(rad);
+        const y = -r * Math.cos(rad);
+        return (
+          <span key={i} className="bk-star-pop" style={{
+            position: 'absolute', left: '50%', top: '50%', fontSize, lineHeight: 1,
+            '--sx': `${x - half}px`, '--sy': `${y - half}px`, pointerEvents: 'none',
+            filter: 'drop-shadow(0 1px 1px rgba(60,20,80,0.4))' }}>⭐</span>
+        );
+      })}
+    </>
+  );
+}
+
 const AVATAR_BASES = ['🧒', '👦', '👧', '👶'];
 const AVATAR_TONES = ['', '🏻', '🏼', '🏽', '🏾', '🏿'];
 
@@ -2328,6 +2395,20 @@ function ChildScreen({ params, statuses, back }) {
   const [deleteConfirm, setDeleteConfirm] = React.useState(false);
   const [attHistOpen, setAttHistOpen] = React.useState(false);
   const kid = DATA.CHILDREN.find(k => k.id === params.childId);
+  // Today's reward stars, read-only here — tapping to award one lives on
+  // the Journal roster avatar, this is just "does this kid have any today".
+  // Declared before the `!kid` early return below (React's hooks must run
+  // in the same order every render, and forceUpdate above means this
+  // component can re-render after `kid` goes from found to not-found, e.g.
+  // archived while this screen is still open — a hook placed after that
+  // guard would then fire on some renders and not others).
+  const [todayStars, setTodayStars] = React.useState(0);
+  React.useEffect(() => {
+    if (!kid || kid.group !== 'primary') return;
+    withRetry(() => window.loadChildStars(todayStr()))
+      .then(data => setTodayStars((data || {})[kid.id] || 0))
+      .catch(() => setTodayStars(0));
+  }, [kid && kid.id, kid && kid.group]);
   if (!kid) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--ink-faint)' }}>—</div>;
   const grp = DATA.GROUPS.find(g => g.id === kid.group);
   const st = statuses[kid.id];
@@ -2341,7 +2422,10 @@ function ChildScreen({ params, statuses, back }) {
     <div style={{ padding: '4px 20px 30px' }}>
       {/* hero */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, margin: '4px 0 22px' }}>
-        <Avatar emoji={kid.emoji} color={kidColor} size={92} onClick={() => setPickerOpen(true)} />
+        <div style={{ position: 'relative' }}>
+          <Avatar emoji={kid.emoji} color={kidColor} size={92} onClick={() => setPickerOpen(true)} />
+          {kid.group === 'primary' && <AvatarStarRim count={todayStars} size={92} />}
+        </div>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{Lo(kid)}</div>
         </div>
@@ -3210,6 +3294,25 @@ function MealBadge({ top = 10 }) {
   );
 }
 
+// Primary School reward stars for one day — opposite corner from
+// PaidBadge/MealBadge (top-left, not top-right) so a day that has both
+// never overlaps: gold stays its own cluster, this is a separate one.
+// Shows the count as a digit rather than literal stars — three tiny ⭐ at
+// 9px would just blur into one blob in a 16px circle, a number reads at
+// a glance instead.
+function StarBadge({ count }) {
+  if (!count) return null;
+  return (
+    <span style={{
+      position: 'absolute', top: -6, left: -6, width: 16, height: 16, borderRadius: '50%',
+      background: 'linear-gradient(135deg, #C9A0F0, #6B3FA0)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: 9.5, fontWeight: 900, color: '#fff', lineHeight: 1,
+      boxShadow: '0 2px 3px rgba(60,20,80,0.35), 0 0 0 2px var(--bg)',
+      transform: 'rotate(-6deg)' }}>⭐{count}</span>
+  );
+}
+
 // A transient failure (a network blip, a cold connection) on one of these
 // read-only GETs used to leave the calendar/history silently blank forever
 // — nothing re-fetches until the sheet fully unmounts and remounts (closing
@@ -3544,13 +3647,15 @@ function AttendanceHistorySheet({ kid, onClose }) {
   const [log,       setLog]       = React.useState([]);
   const [pending,   setPending]   = React.useState(null);
   const [mealDays,  setMealDays]  = React.useState({});
+  const [starDays,  setStarDays]  = React.useState({});
 
   React.useEffect(() => {
     Promise.all([
       withRetry(() => window.loadAttendanceHistory(kid.id)),
       withRetry(() => window.loadPaymentLog(kid.id)).catch(() => []),
       kid.mealsIncluded ? withRetry(() => window.loadMealAttendanceHistory(kid.id)).catch(() => ({})) : Promise.resolve({}),
-    ]).then(([h, l, m]) => { setHistory(h); setLog(l); setMealDays(m); }).catch(() => setHistory({}));
+      kid.group === 'primary' ? withRetry(() => window.loadChildStarsHistory(kid.id)).catch(() => ({})) : Promise.resolve({}),
+    ]).then(([h, l, m, s]) => { setHistory(h); setLog(l); setMealDays(m); setStarDays(s); }).catch(() => setHistory({}));
   }, [kid.id]);
 
   // most real kids have no Paid-from on record — default the start to today,
@@ -3661,6 +3766,7 @@ function AttendanceHistorySheet({ kid, onClose }) {
             const isPresent = history[dateStr] === 'present';
             const isPaidDay = paidDays.has(dateStr);
             const isMealDay = kid.mealsIncluded && mealDays[dateStr] === 'present';
+            const starCount = kid.group === 'primary' ? (starDays[dateStr] || 0) : 0;
             const { background, color } = calendarCellVisual({ isWknd, isPresent, isTdy });
             return (
               <button key={d} onClick={() => toggleDay(dateStr)} disabled={isFuture}
@@ -3671,6 +3777,7 @@ function AttendanceHistorySheet({ kid, onClose }) {
                 {d}
                 {isPaidDay && !isWknd && <PaidBadge />}
                 {isMealDay && <MealBadge />}
+                <StarBadge count={starCount} />
               </button>
             );
           })}
@@ -3686,6 +3793,12 @@ function AttendanceHistorySheet({ kid, onClose }) {
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               <span style={{ position: 'relative', width: 12, height: 12, display: 'inline-block' }}><MealBadge top={-6} /></span>
               {L('поел', 'ate')}
+            </span>
+          )}
+          {kid.group === 'primary' && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ position: 'relative', width: 12, height: 12, display: 'inline-block' }}><StarBadge count={1} /></span>
+              {L('звёзды за цель', 'reward stars')}
             </span>
           )}
           <span><span style={{ display:'inline-block', width:9, height:9, borderRadius:3, background:'#FBD9E1', marginRight:4 }} />{L('выходной', 'weekend')}</span>
@@ -3753,6 +3866,29 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
     } catch (e) {
       setMealLocal(m => ({ ...m, [kidId]: cur }));
       actions.toast(L('Не удалось сохранить питание: ', 'Failed to save meal: ') + String(e));
+    }
+  }
+
+  // Primary School reward stars — same day-mark pattern as meals above
+  // (loaded per viewed date, saved immediately per tap), kept forever
+  // rather than reset (see child's own calendar for the running history).
+  const [starLocal, setStarLocal] = React.useState({});
+  React.useEffect(() => {
+    withRetry(() => window.loadChildStars(selDate))
+      .then(data => setStarLocal(data || {}))
+      .catch(()  => setStarLocal({}));
+  }, [selDate]);
+
+  async function tapStar(kidId) {
+    if (local[kidId] !== 'present') return; // only a present kid can earn one
+    const cur  = starLocal[kidId] || 0;
+    const next = (cur + 1) % 4; // 0 → 1 → 2 → 3 → 0
+    setStarLocal(s => ({ ...s, [kidId]: next }));
+    try {
+      await window.saveChildStars(selDate, { [kidId]: next });
+    } catch (e) {
+      setStarLocal(s => ({ ...s, [kidId]: cur }));
+      actions.toast(L('Не удалось сохранить звёздочку: ', 'Failed to save star: ') + String(e));
     }
   }
 
@@ -3959,7 +4095,17 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
               // Payments does. Profile is one tap away from Дети if needed.
               <Card key={kid.id} pad={12} onClick={() => setCalKid(kid)}
                 style={{ display:'flex', alignItems:'center', gap:13, background:'#FBF7F2' }}>
-                <Avatar emoji={kid.emoji} color={PALETTE[kidIndex % PALETTE.length]} size={44} />
+                {/* Tapping the avatar itself awards a star (Primary School,
+                    present kids only) — a cycle 0→1→2→3→0, same gesture
+                    spot every time, rather than opening the day calendar
+                    like the rest of the row does. Everyone else's avatar
+                    behaves exactly as before (just part of the row tap). */}
+                <div style={{ position: 'relative' }}
+                  onClick={kid.group === 'primary' && st === 'present'
+                    ? (e) => { e.stopPropagation(); tapStar(kid.id); } : undefined}>
+                  <Avatar emoji={kid.emoji} color={PALETTE[kidIndex % PALETTE.length]} size={44} />
+                  {kid.group === 'primary' && <AvatarStarRim count={starLocal[kid.id] || 0} size={44} />}
+                </div>
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ fontSize:15.5, fontWeight:700, color:'var(--ink)' }}>{Lo(kid)}</div>
                   {badges.length > 0 && (
