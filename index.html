@@ -61,32 +61,23 @@
   /* pull-to-refresh spinner */
   @keyframes bk-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
-  /* reward star lighting up on an avatar — starts from the ghost's own
-     dim opacity (not from invisible/scale-0) so the star brightens in
-     place rather than vanishing and popping back in; a quick glow +
-     settle, not a loop, since it should read as "you just got one". */
+  /* a reward star popping onto the avatar's row of stars — genuinely
+     mounting from nothing now (no pre-rendered ghost star sits there
+     when the week has none yet), so it pops in from scale 0 rather than
+     brightening in place. */
   @keyframes bk-star-pop {
-    0%   { transform: scale(1) rotate(0deg); opacity: .32; filter: drop-shadow(0 0 0 rgba(255,200,60,0)); }
-    45%  { transform: scale(1.35) rotate(8deg); opacity: 1; filter: drop-shadow(0 0 5px rgba(255,200,60,.9)); }
-    100% { transform: scale(1) rotate(0deg); opacity: 1; filter: drop-shadow(0 1px 1px rgba(60,20,80,.4)); }
+    0%   { transform: scale(0) rotate(-20deg); opacity: 0; }
+    55%  { transform: scale(1.35) rotate(8deg); opacity: 1; }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
   }
-  .bk-star-pop { animation: bk-star-pop .5s cubic-bezier(.22,1.4,.36,1) both; }
-
-  /* same beat for the little weekly-count badge riding on the star, so
-     the digit brightens in sync instead of just snapping to full opacity. */
-  @keyframes bk-star-badge-pop {
-    0%   { transform: scale(1); opacity: .32; box-shadow: 0 0 0 1.5px #6B3FA0; }
-    45%  { transform: scale(1.3); opacity: 1; box-shadow: 0 0 0 1.5px #6B3FA0, 0 0 4px rgba(107,63,160,.8); }
-    100% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 1.5px #6B3FA0; }
-  }
-  .bk-star-badge-pop { animation: bk-star-badge-pop .5s cubic-bezier(.22,1.4,.36,1) both; }
+  .bk-star-pop { animation: bk-star-pop .42s cubic-bezier(.22,1.4,.36,1) both; }
 
   /* toast */
   @keyframes toastIn { from { opacity: 0; transform: translate(-50%, 14px); } to { opacity: 1; transform: translate(-50%, 0); } }
   .bk-toast { animation: toastIn .3s cubic-bezier(.22,1,.36,1); }
 
   @media (prefers-reduced-motion: reduce) {
-    .scr-fwd, .scr-back, .bk-toast, .bk-star-pop, .bk-star-badge-pop { animation: none; }
+    .scr-fwd, .scr-back, .bk-toast, .bk-star-pop { animation: none; }
   }
 </style>
 </head>
@@ -1828,57 +1819,41 @@ function Avatar({ emoji, color = '#eee', size = 46, ring, onClick }) {
   );
 }
 
-// A reward star sitting on the top rim of an avatar circle — always
-// present for a Primary School kid, not just on days they earned one.
-// Ghosted (faded, no fill) when today has no star, full color when it
-// does, so the weekly total badge riding on it stays visible either way
-// — Ольга wants to see at a glance how the week's going even on a day
-// with nothing new, not just on the days something happened.
+// A row of small reward stars sitting on the avatar's top rim, one per
+// day earned this week (capped at 5 — a working week) — counted by eye,
+// overlapping like a hand of cards, instead of one star plus a digit
+// badge (that badge kept reading as "too much space for a 1 or 2", and a
+// ghosted placeholder star for an empty week read as "basically nothing
+// there" either way). Renders nothing at all when the week has no stars
+// yet, not a dim placeholder — nothing earned, nothing shown.
 function AvatarStar({ hasStar, weeklyCount, size }) {
+  if (!weeklyCount) return null;
   const r = size / 2;
-  // Scales with the avatar instead of a fixed size — the same star on the
-  // 44px Journal avatar and the 92px card hero would otherwise look
-  // correctly sized on one and lost on the other.
-  const fontSize = Math.max(12, Math.round(size * 0.28));
-  // The emoji itself sits in a fixed, explicitly-centered box rather than
-  // being positioned by its own glyph metrics — those vary a lot between
-  // platforms (Apple's color emoji vs. Chrome desktop's), and badge/star
-  // ended up visibly stacked instead of corner-overlapping on some phones
-  // because the badge was anchored to whatever box the raw glyph happened
-  // to claim. A fixed box makes the corner math the same everywhere.
-  const box = fontSize + 4;
-  const badge = Math.max(12, Math.round(box * 0.52));
+  const n = Math.min(weeklyCount, 5);
+  // Scales with the avatar instead of a fixed size — the same stars on
+  // the 44px Journal avatar and the 92px card hero would otherwise look
+  // correctly sized on one and crowd five across on the other.
+  const fontSize = Math.max(9, Math.round(size * 0.2));
+  const box = fontSize + 2;
+  const overlap = box * 0.55; // how much each star tucks under its neighbor
+  const rowWidth = box + (n - 1) * overlap;
+  // Only the most-recently-added star — today's, when hasStar is true —
+  // pops in; the rest are already-earned days sitting there quietly. Its
+  // key changes only on that actual false→true flip (n and hasStar move
+  // together in tapStar), so it doesn't replay on unrelated re-renders.
+  const justAdded = n - 1;
   return (
     <span style={{
-      position: 'absolute', left: '50%', top: '50%', width: box, height: box,
-      transform: `translate(${-box / 2}px, ${-r - box / 2}px)`, pointerEvents: 'none' }}>
-      {/* Keyed on hasStar so the pop animation replays exactly when a star
-          is actually given (false→true), not on every unrelated re-render. */}
-      <span key={hasStar ? 'on' : 'off'} className={hasStar ? 'bk-star-pop' : ''} style={{
-        position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize, lineHeight: 1,
-        // Ghosted used to read as "basically invisible" at 0.32 — raised to
-        // 0.6 and dropped the desaturating filter in favor of just opacity,
-        // so the shape stays recognizable as a star rather than a grey blob.
-        opacity: hasStar ? 1 : 0.6,
-        filter: hasStar ? 'drop-shadow(0 1px 1px rgba(60,20,80,0.4))' : 'none' }}>⭐</span>
-      {weeklyCount > 0 && (
-        // width/height on a plain inline span are ignored by CSS (they only
-        // apply to block/flex/replaced boxes) — without display:flex here
-        // the badge sized itself to its text + padding instead of the
-        // intended round circle, so border-radius:50% drew an oval/
-        // rectangle rather than a round badge. Same flex-center shape
-        // StarBadge/PaidBadge/MealBadge already use.
-        // Ghosted in sync with the star itself (not a fixed full opacity)
-        // so a day with no star yet still reads as "part of the dim
-        // state", and keyed on hasStar to replay the light-up beat
-        // together with the star rather than just snapping brighter.
-        <span key={hasStar ? 'on' : 'off'} className={hasStar ? 'bk-star-badge-pop' : ''} style={{
-          position: 'absolute', bottom: -badge * 0.35, right: -badge * 0.4, width: badge, height: badge, borderRadius: '50%',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: '#fff', color: '#6B3FA0', fontSize: Math.round(badge * 0.58), fontWeight: 900, lineHeight: 1,
-          opacity: hasStar ? 1 : 0.6, boxShadow: '0 0 0 1.5px #6B3FA0' }}>{weeklyCount}</span>
-      )}
+      position: 'absolute', left: '50%', top: '50%', width: rowWidth, height: box,
+      transform: `translate(${-rowWidth / 2}px, ${-r - box / 2}px)`, pointerEvents: 'none' }}>
+      {Array.from({ length: n }).map((_, i) => (
+        <span key={hasStar && i === justAdded ? `new-${n}` : `fixed-${i}`}
+          className={hasStar && i === justAdded ? 'bk-star-pop' : ''} style={{
+            position: 'absolute', left: i * overlap, top: 0, width: box, height: box,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize, lineHeight: 1, zIndex: i,
+            filter: 'drop-shadow(0 1px 1px rgba(60,20,80,0.4))' }}>⭐</span>
+      ))}
     </span>
   );
 }
