@@ -61,12 +61,15 @@
   /* pull-to-refresh spinner */
   @keyframes bk-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
-  /* reward star appearing on an avatar — a quick pop + settle, not a loop,
-     since it should read as "you just got one", not draw the eye forever */
+  /* reward star lighting up on an avatar — a quick pop + settle, not a
+     loop, since it should read as "you just got one", not draw the eye
+     forever. Position is handled by the wrapping element now (the star
+     itself stays in place, ghosted, even with no star today), so this
+     only scales/rotates in place rather than also translating. */
   @keyframes bk-star-pop {
-    0%   { transform: translate(var(--sx), var(--sy)) scale(0) rotate(-20deg); opacity: 0; }
-    55%  { transform: translate(var(--sx), var(--sy)) scale(1.35) rotate(8deg); opacity: 1; }
-    100% { transform: translate(var(--sx), var(--sy)) scale(1) rotate(0deg); opacity: 1; }
+    0%   { transform: scale(0) rotate(-20deg); opacity: 0; }
+    55%  { transform: scale(1.35) rotate(8deg); opacity: 1; }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
   }
   .bk-star-pop { animation: bk-star-pop .42s cubic-bezier(.22,1.4,.36,1) both; }
 
@@ -1817,13 +1820,13 @@ function Avatar({ emoji, color = '#eee', size = 46, ring, onClick }) {
   );
 }
 
-// One reward star sitting on the top rim of an avatar circle, with the
-// week's running total riding as a small badge-on-the-star at its own
-// bottom-right corner — only one star is ever given per day now, so the
-// thing worth showing at a glance here is the weekly count, not a cluster
-// of stars.
+// A reward star sitting on the top rim of an avatar circle — always
+// present for a Primary School kid, not just on days they earned one.
+// Ghosted (faded, no fill) when today has no star, full color when it
+// does, so the weekly total badge riding on it stays visible either way
+// — Ольга wants to see at a glance how the week's going even on a day
+// with nothing new, not just on the days something happened.
 function AvatarStar({ hasStar, weeklyCount, size }) {
-  if (!hasStar) return null;
   const r = size / 2;
   // Scales with the avatar instead of a fixed size — the same star on the
   // 44px Journal avatar and the 92px card hero would otherwise look
@@ -1831,10 +1834,14 @@ function AvatarStar({ hasStar, weeklyCount, size }) {
   const fontSize = Math.max(9, Math.round(size * 0.23));
   const half = fontSize / 2;
   return (
-    <span className="bk-star-pop" style={{
+    <span style={{
       position: 'absolute', left: '50%', top: '50%', fontSize, lineHeight: 1,
-      '--sx': `${-half}px`, '--sy': `${-r - half}px`, pointerEvents: 'none' }}>
-      <span style={{ filter: 'drop-shadow(0 1px 1px rgba(60,20,80,0.4))' }}>⭐</span>
+      transform: `translate(${-half}px, ${-r - half}px)`, pointerEvents: 'none' }}>
+      {/* Keyed on hasStar so the pop animation replays exactly when a star
+          is actually given (false→true), not on every unrelated re-render. */}
+      <span key={hasStar ? 'on' : 'off'} className={hasStar ? 'bk-star-pop' : ''} style={{
+        display: 'inline-block', opacity: hasStar ? 1 : 0.32,
+        filter: hasStar ? 'drop-shadow(0 1px 1px rgba(60,20,80,0.4))' : 'none' }}>⭐</span>
       {weeklyCount > 0 && (
         <span style={{
           position: 'absolute', bottom: -4, right: -6, minWidth: 11, height: 11, borderRadius: '50%',
