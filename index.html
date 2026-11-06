@@ -1819,7 +1819,7 @@ function Avatar({ emoji, color = '#eee', size = 46, ring, onClick }) {
   );
 }
 
-// A row of small reward stars sitting on the avatar's top rim, one per
+// A crown of small reward stars tracing the avatar's own rim, one per
 // day earned this week (capped at 5 — a working week) — counted by eye,
 // overlapping like a hand of cards, instead of one star plus a digit
 // badge (that badge kept reading as "too much space for a 1 or 2", and a
@@ -1835,26 +1835,37 @@ function AvatarStar({ hasStar, weeklyCount, size }) {
   // correctly sized on one and crowd five across on the other.
   const fontSize = Math.max(9, Math.round(size * 0.2));
   const box = fontSize + 2;
-  const overlap = box * 0.55; // how much each star tucks under its neighbor
-  const rowWidth = box + (n - 1) * overlap;
+  // Each star sits on its own point around the avatar's circle (not in a
+  // flat row) — centered over the top, curving down a touch on either
+  // side as the row grows, so it reads as sitting on the avatar's rim
+  // rather than floating above it on a straight shelf.
+  const orbitR = r + box * 0.45;
+  const angleStep = (box * 0.55) / orbitR; // radians between neighbors, same overlap feel regardless of avatar size
+  const startAngle = -((n - 1) * angleStep) / 2;
   // Only the most-recently-added star — today's, when hasStar is true —
   // pops in; the rest are already-earned days sitting there quietly. Its
   // key changes only on that actual false→true flip (n and hasStar move
   // together in tapStar), so it doesn't replay on unrelated re-renders.
   const justAdded = n - 1;
   return (
-    <span style={{
-      position: 'absolute', left: '50%', top: '50%', width: rowWidth, height: box,
-      transform: `translate(${-rowWidth / 2}px, ${-r - box / 2}px)`, pointerEvents: 'none' }}>
-      {Array.from({ length: n }).map((_, i) => (
-        <span key={hasStar && i === justAdded ? `new-${n}` : `fixed-${i}`}
-          className={hasStar && i === justAdded ? 'bk-star-pop' : ''} style={{
-            position: 'absolute', left: i * overlap, top: 0, width: box, height: box,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize, lineHeight: 1, zIndex: i,
-            filter: 'drop-shadow(0 1px 1px rgba(60,20,80,0.4))' }}>⭐</span>
-      ))}
-    </span>
+    <>
+      {Array.from({ length: n }).map((_, i) => {
+        const angle = startAngle + i * angleStep;
+        const dx = orbitR * Math.sin(angle);
+        const dy = -orbitR * Math.cos(angle);
+        return (
+          <span key={i} style={{
+            position: 'absolute', left: '50%', top: '50%', width: box, height: box, zIndex: i,
+            transform: `translate(${dx - box / 2}px, ${dy - box / 2}px)`, pointerEvents: 'none' }}>
+            <span key={hasStar && i === justAdded ? `new-${n}` : `fixed-${i}`}
+              className={hasStar && i === justAdded ? 'bk-star-pop' : ''} style={{
+                display: 'flex', width: box, height: box, alignItems: 'center', justifyContent: 'center',
+                fontSize, lineHeight: 1,
+                filter: 'drop-shadow(0 1px 1px rgba(60,20,80,0.4))' }}>⭐</span>
+          </span>
+        );
+      })}
+    </>
   );
 }
 
