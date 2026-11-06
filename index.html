@@ -1843,10 +1843,17 @@ function AvatarStar({ hasStar, weeklyCount, size }) {
         display: 'inline-block', opacity: hasStar ? 1 : 0.32,
         filter: hasStar ? 'drop-shadow(0 1px 1px rgba(60,20,80,0.4))' : 'none' }}>⭐</span>
       {weeklyCount > 0 && (
+        // width/height on a plain inline span are ignored by CSS (they only
+        // apply to block/flex/replaced boxes) — without display:flex here
+        // the badge sized itself to its text + padding instead of the
+        // intended 11x11 circle, so border-radius:50% drew an oval/
+        // rectangle rather than a round badge. Same flex-center shape
+        // StarBadge/PaidBadge/MealBadge already use.
         <span style={{
           position: 'absolute', bottom: -4, right: -6, minWidth: 11, height: 11, borderRadius: '50%',
-          background: '#fff', color: '#6B3FA0', fontSize: 7, fontWeight: 900, lineHeight: '11px',
-          textAlign: 'center', padding: '0 1px', boxShadow: '0 0 0 1.5px #6B3FA0' }}>{weeklyCount}</span>
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: '#fff', color: '#6B3FA0', fontSize: 7, fontWeight: 900, lineHeight: 1,
+          padding: '0 1px', boxShadow: '0 0 0 1.5px #6B3FA0' }}>{weeklyCount}</span>
       )}
     </span>
   );
