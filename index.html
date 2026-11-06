@@ -5585,6 +5585,10 @@ const SSTAFF_INK = {
 // The two "extras" — independent of status, can both be true the same day,
 // shown as small stickers on the day cell rather than as a status pill.
 const EXTRA_COLOR = '#CDE8FB', EXTRA_INK = '#1f5f86';
+// Поощрение — director's recognition mark, same "extra" shape as transfer/
+// overtime above but kept visually separate (purple, matching the kids'
+// reward star) since it's praise, not a logistics/pay thing.
+const STAR_COLOR = '#F3E3FF', STAR_INK = '#6B3FA0';
 
 function staffStatusLabel(id) {
   const s = STAFF_STATUSES.find(x => x.id === id);
@@ -6056,6 +6060,10 @@ function StaffDailyScreen({ params, go }) {
     const cur = !!(records[name] || {}).extra;
     setRecords(r => ({ ...r, [name]: { ...(r[name] || {}), extra: !cur } }));
   }
+  function toggleStar(name) {
+    const cur = !!(records[name] || {}).star;
+    setRecords(r => ({ ...r, [name]: { ...(r[name] || {}), star: !cur } }));
+  }
 
   const [saveErr, setSaveErr] = React.useState(null);
   async function save() {
@@ -6232,6 +6240,7 @@ function StaffDailyScreen({ params, go }) {
         const isLate   = status === 'late';
         const transfer = rec.transfer || 0;
         const extra    = !!rec.extra;
+        const star     = !!rec.star;
         return (
           <Card key={s.name} pad={14}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
@@ -6254,10 +6263,11 @@ function StaffDailyScreen({ params, go }) {
                 </button>
               ))}
             </div>
-            {/* Extras — transfer (bus escort) and overtime, both
+            {/* Extras — transfer (bus escort), overtime and Поощрение, all
                 independent of status: someone can be "present" AND have
-                done either (or both) that same day, it's extra-paid on
-                top of their regular work. */}
+                any combination of these that same day. Transfer/overtime
+                are extra-paid; Поощрение is the director's recognition
+                mark, not tied to pay. */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 8 }}>
               <button onClick={() => toggleTransfer(s.name)} className="bk-press" style={{
                 border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700,
@@ -6274,6 +6284,14 @@ function StaffDailyScreen({ params, go }) {
                 color: extra ? EXTRA_INK : 'var(--ink-soft)',
                 transition: 'all 0.12s' }}>
                 ⏰ {L('Переработка', 'Overtime')}
+              </button>
+              <button onClick={() => toggleStar(s.name)} className="bk-press" style={{
+                border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700,
+                padding: '6px 12px', borderRadius: 999,
+                background: star ? STAR_COLOR : '#F0EBE3',
+                color: star ? STAR_INK : 'var(--ink-soft)',
+                transition: 'all 0.12s' }}>
+                ⭐ {L('Поощрение', 'Recognition')}
               </button>
             </div>
             {/* Time picker for late */}
@@ -6368,6 +6386,7 @@ function StaffDailyScreen({ params, go }) {
                     const stickers = [];
                     if (rec?.transfer) stickers.push('🚌');
                     if (rec?.extra) stickers.push('⏰');
+                    if (rec?.star) stickers.push('⭐');
                     return (
                       <button key={i} onClick={() => openPicker(s.name, d)} className="bk-press"
                         style={{ position: 'relative', width: CELL_W, height: CELL_H, flexShrink: 0, marginRight: 4,
@@ -6375,9 +6394,13 @@ function StaffDailyScreen({ params, go }) {
                           background: bg, fontSize: 19, fontFamily: 'inherit',
                           display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         {ss?.emoji || ''}
+                        {/* Up to 3 now (transfer/overtime/star) — top-right,
+                            bottom-right, then bottom-left for the third
+                            rather than stacking two under one corner. */}
                         {stickers.map((emoji, si) => (
                           <span key={emoji} style={{ position: 'absolute',
-                            [si === 0 ? 'top' : 'bottom']: -4, right: -4, fontSize: 12 }}>{emoji}</span>
+                            [si === 0 ? 'top' : 'bottom']: -4,
+                            [si === 2 ? 'left' : 'right']: -4, fontSize: 12 }}>{emoji}</span>
                         ))}
                       </button>
                     );
@@ -6405,6 +6428,10 @@ function StaffDailyScreen({ params, go }) {
         <span style={{ fontSize: 11, fontWeight: 600, background: EXTRA_COLOR, color: EXTRA_INK,
           padding: '3px 8px', borderRadius: 999 }}>
           ⏰ {L('Переработка', 'Overtime')}
+        </span>
+        <span style={{ fontSize: 11, fontWeight: 600, background: STAR_COLOR, color: STAR_INK,
+          padding: '3px 8px', borderRadius: 999 }}>
+          ⭐ {L('Поощрение', 'Recognition')}
         </span>
       </div>
 
@@ -6535,6 +6562,10 @@ function StaffMonthlyScreen({ go, staff }) {
           .filter(([, rec]) => rec.extra)
           .map(([date]) => Number(date.slice(-2)))
           .sort((a, b) => a - b);
+        const starDays = Object.entries(allDays)
+          .filter(([, rec]) => rec.star)
+          .map(([date]) => Number(date.slice(-2)))
+          .sort((a, b) => a - b);
 
         return (
           <>
@@ -6597,6 +6628,7 @@ function StaffMonthlyScreen({ go, staff }) {
                   const stickers = [];
                   if (rec?.transfer) stickers.push('🚌');
                   if (rec?.extra) stickers.push('⏰');
+                  if (rec?.star) stickers.push('⭐');
                   return (
                     <div key={d} style={{
                       position: 'relative', borderRadius: 11, fontSize: 16, fontWeight: 800,
@@ -6608,7 +6640,8 @@ function StaffMonthlyScreen({ go, staff }) {
                       {time && <span style={{ fontSize: 11, lineHeight: 1.2, opacity: 0.85 }}>{time.slice(0,5)}</span>}
                       {stickers.map((emoji, si) => (
                         <span key={emoji} style={{ position: 'absolute',
-                          [si === 0 ? 'top' : 'bottom']: -5, right: -5, fontSize: 12 }}>{emoji}</span>
+                          [si === 0 ? 'top' : 'bottom']: -5,
+                          [si === 2 ? 'left' : 'right']: -5, fontSize: 12 }}>{emoji}</span>
                       ))}
                     </div>
                   );
@@ -6659,6 +6692,17 @@ function StaffMonthlyScreen({ go, staff }) {
                   </span>
                   <span style={{ fontSize: 11.5, color: '#1f5f86', opacity: 0.85 }}>
                     ({extraDays.join(', ')})
+                  </span>
+                </div>
+              )}
+              {starDays.length > 0 && (
+                <div style={{ marginTop: 8, background: STAR_COLOR, borderRadius: 12, padding: '8px 11px',
+                  display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: STAR_INK }}>
+                    ⭐ {L('Поощрение', 'Recognition')}: {starDays.length} {L('дн', 'd')}
+                  </span>
+                  <span style={{ fontSize: 11.5, color: STAR_INK, opacity: 0.85 }}>
+                    ({starDays.join(', ')})
                   </span>
                 </div>
               )}
@@ -7206,6 +7250,10 @@ function MyScheduleScreen() {
     .filter(([, rec]) => rec.extra)
     .map(([date]) => Number(date.slice(-2)))
     .sort((a, b) => a - b);
+  const starDays = Object.entries(allDays)
+    .filter(([, rec]) => rec.star)
+    .map(([date]) => Number(date.slice(-2)))
+    .sort((a, b) => a - b);
 
   return (
     <div style={{ padding: '4px 20px 28px' }}>
@@ -7254,6 +7302,7 @@ function MyScheduleScreen() {
                   const stickers = [];
                   if (rec?.transfer) stickers.push('🚌');
                   if (rec?.extra) stickers.push('⏰');
+                  if (rec?.star) stickers.push('⭐');
                   return (
                     <div key={d} style={{
                       position: 'relative', borderRadius: 11, fontSize: 16, fontWeight: 800,
@@ -7265,7 +7314,8 @@ function MyScheduleScreen() {
                       {time && <span style={{ fontSize: 11, lineHeight: 1.2, opacity: 0.85 }}>{time.slice(0,5)}</span>}
                       {stickers.map((emoji, si) => (
                         <span key={emoji} style={{ position: 'absolute',
-                          [si === 0 ? 'top' : 'bottom']: -5, right: -5, fontSize: 12 }}>{emoji}</span>
+                          [si === 0 ? 'top' : 'bottom']: -5,
+                          [si === 2 ? 'left' : 'right']: -5, fontSize: 12 }}>{emoji}</span>
                       ))}
                     </div>
                   );
@@ -7309,6 +7359,17 @@ function MyScheduleScreen() {
                   </span>
                   <span style={{ fontSize: 11.5, color: '#1f5f86', opacity: 0.85 }}>
                     ({extraDays.join(', ')})
+                  </span>
+                </div>
+              )}
+              {starDays.length > 0 && (
+                <div style={{ marginTop: 8, background: STAR_COLOR, borderRadius: 12, padding: '8px 11px',
+                  display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: STAR_INK }}>
+                    ⭐ {L('Поощрение', 'Recognition')}: {starDays.length} {L('дн', 'd')}
+                  </span>
+                  <span style={{ fontSize: 11.5, color: STAR_INK, opacity: 0.85 }}>
+                    ({starDays.join(', ')})
                   </span>
                 </div>
               )}
