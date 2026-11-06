@@ -370,7 +370,7 @@ window.API_BASE = "https://rmxois1uv0a24xrbi2dfcfac.95.179.188.141.sslip.io";
     return res.json();
   };
 
-  // Primary School reward stars (0-3/day, tapped on a present kid's avatar
+  // Primary School reward stars (one/day, tapped on a present kid's avatar
   // in the Journal) — same day-mark shape as meals above, kept forever
   // rather than reset, so the only history needed is this per-kid fetch.
   window.loadChildStars = async function (date) {
@@ -391,6 +391,14 @@ window.API_BASE = "https://rmxois1uv0a24xrbi2dfcfac.95.179.188.141.sslip.io";
   window.loadChildStarsHistory = async function (kidId) {
     const res = await fetch(`${window.API_BASE}/child-stars-history/${encodeURIComponent(kidId)}`);
     if (!res.ok) throw new Error(`GET /child-stars-history failed: ${res.status}`);
+    return res.json();
+  };
+
+  // {kid_id: weekly total} for the whole group in one call — the badge
+  // riding on the star itself (see AvatarStar), Mon-Sun, not a reset.
+  window.loadChildStarsWeekly = async function (date) {
+    const res = await fetch(`${window.API_BASE}/child-stars-weekly/${encodeURIComponent(date)}`);
+    if (!res.ok) throw new Error(`GET /child-stars-weekly failed: ${res.status}`);
     return res.json();
   };
 
@@ -1809,37 +1817,31 @@ function Avatar({ emoji, color = '#eee', size = 46, ring, onClick }) {
   );
 }
 
-// Up to 3 reward stars arranged along the top rim of an avatar circle —
-// 1 centered, 2 split either side of center, 3 centered plus two further
-// out. Angles are measured from straight up (0°), so each star sits right
-// on the circle's edge rather than floating free of it. Kept fairly
-// tight together (not spread wide) so 2-3 stars still read as one
-// cluster rather than scattering around the whole rim.
-const STAR_RIM_ANGLES = { 1: [0], 2: [-18, 18], 3: [-30, 0, 30] };
-
-function AvatarStarRim({ count, size }) {
-  if (!count) return null;
+// One reward star sitting on the top rim of an avatar circle, with the
+// week's running total riding as a small badge-on-the-star at its own
+// bottom-right corner — only one star is ever given per day now, so the
+// thing worth showing at a glance here is the weekly count, not a cluster
+// of stars.
+function AvatarStar({ hasStar, weeklyCount, size }) {
+  if (!hasStar) return null;
   const r = size / 2;
   // Scales with the avatar instead of a fixed size — the same star on the
   // 44px Journal avatar and the 92px card hero would otherwise look
   // correctly sized on one and lost on the other.
   const fontSize = Math.max(9, Math.round(size * 0.23));
   const half = fontSize / 2;
-  const angles = STAR_RIM_ANGLES[Math.min(count, 3)] || [];
   return (
-    <>
-      {angles.map((deg, i) => {
-        const rad = (deg * Math.PI) / 180;
-        const x = r * Math.sin(rad);
-        const y = -r * Math.cos(rad);
-        return (
-          <span key={i} className="bk-star-pop" style={{
-            position: 'absolute', left: '50%', top: '50%', fontSize, lineHeight: 1,
-            '--sx': `${x - half}px`, '--sy': `${y - half}px`, pointerEvents: 'none',
-            filter: 'drop-shadow(0 1px 1px rgba(60,20,80,0.4))' }}>⭐</span>
-        );
-      })}
-    </>
+    <span className="bk-star-pop" style={{
+      position: 'absolute', left: '50%', top: '50%', fontSize, lineHeight: 1,
+      '--sx': `${-half}px`, '--sy': `${-r - half}px`, pointerEvents: 'none' }}>
+      <span style={{ filter: 'drop-shadow(0 1px 1px rgba(60,20,80,0.4))' }}>⭐</span>
+      {weeklyCount > 0 && (
+        <span style={{
+          position: 'absolute', bottom: -4, right: -6, minWidth: 11, height: 11, borderRadius: '50%',
+          background: '#fff', color: '#6B3FA0', fontSize: 7, fontWeight: 900, lineHeight: '11px',
+          textAlign: 'center', padding: '0 1px', boxShadow: '0 0 0 1.5px #6B3FA0' }}>{weeklyCount}</span>
+      )}
+    </span>
   );
 }
 
@@ -2395,19 +2397,25 @@ function ChildScreen({ params, statuses, back }) {
   const [deleteConfirm, setDeleteConfirm] = React.useState(false);
   const [attHistOpen, setAttHistOpen] = React.useState(false);
   const kid = DATA.CHILDREN.find(k => k.id === params.childId);
-  // Today's reward stars, read-only here — tapping to award one lives on
-  // the Journal roster avatar, this is just "does this kid have any today".
-  // Declared before the `!kid` early return below (React's hooks must run
-  // in the same order every render, and forceUpdate above means this
-  // component can re-render after `kid` goes from found to not-found, e.g.
-  // archived while this screen is still open — a hook placed after that
-  // guard would then fire on some renders and not others).
-  const [todayStars, setTodayStars] = React.useState(0);
+  // Today's reward star + this week's total, read-only here — tapping to
+  // award one lives on the Journal roster avatar, this is just "does this
+  // kid have one today, and how many so far this week". Declared before
+  // the `!kid` early return below (React's hooks must run in the same
+  // order every render, and forceUpdate above means this component can
+  // re-render after `kid` goes from found to not-found, e.g. archived
+  // while this screen is still open — a hook placed after that guard
+  // would then fire on some renders and not others).
+  const [todayStar, setTodayStar] = React.useState(0);
+  const [weekStars, setWeekStars] = React.useState(0);
   React.useEffect(() => {
     if (!kid || kid.group !== 'primary') return;
-    withRetry(() => window.loadChildStars(todayStr()))
-      .then(data => setTodayStars((data || {})[kid.id] || 0))
-      .catch(() => setTodayStars(0));
+    Promise.all([
+      withRetry(() => window.loadChildStars(todayStr())),
+      withRetry(() => window.loadChildStarsWeekly(todayStr())),
+    ]).then(([today, week]) => {
+      setTodayStar((today || {})[kid.id] || 0);
+      setWeekStars((week || {})[kid.id] || 0);
+    }).catch(() => { setTodayStar(0); setWeekStars(0); });
   }, [kid && kid.id, kid && kid.group]);
   if (!kid) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--ink-faint)' }}>—</div>;
   const grp = DATA.GROUPS.find(g => g.id === kid.group);
@@ -2421,12 +2429,12 @@ function ChildScreen({ params, statuses, back }) {
   return (
     <div style={{ padding: '4px 20px 30px' }}>
       {/* hero — extra top margin vs the original 4px: with a star sitting
-          above the 92px avatar's own top edge (AvatarStarRim), 4px left it
+          above the 92px avatar's own top edge (AvatarStar), 4px left it
           poking up under the app header; this gives it room to clear it. */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, margin: '26px 0 22px' }}>
         <div style={{ position: 'relative' }}>
           <Avatar emoji={kid.emoji} color={kidColor} size={92} onClick={() => setPickerOpen(true)} />
-          {kid.group === 'primary' && <AvatarStarRim count={todayStars} size={92} />}
+          {kid.group === 'primary' && <AvatarStar hasStar={todayStar} weeklyCount={weekStars} size={92} />}
         </div>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{Lo(kid)}</div>
@@ -3296,12 +3304,12 @@ function MealBadge({ top = 10 }) {
   );
 }
 
-// Primary School reward stars for one day — same row as PaidBadge, just
+// Primary School reward star for one day — same row as PaidBadge, just
 // to its left, not stacked under MealBadge (that pairing was never the
 // idea, Ольга's teacher may not even use meals). Same badge size as
-// Paid/Meal, with the count riding as a small badge-on-badge on the
-// star's own top-LEFT corner — top-right would point back at the
-// checkmark and the two would visually touch at this spacing.
+// Paid/Meal. No count to show here any more — one star a day, max — the
+// weekly running total lives on the avatar's own star (see AvatarStar),
+// not in this per-day calendar cell.
 function StarBadge({ count }) {
   if (!count) return null;
   return (
@@ -3311,12 +3319,7 @@ function StarBadge({ count }) {
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontSize: 9, lineHeight: 1,
       boxShadow: '0 2px 3px rgba(60,20,80,0.35), 0 0 0 2px var(--bg)',
-      transform: 'rotate(6deg)' }}>⭐
-      <span style={{
-        position: 'absolute', top: -4, left: -4, width: 9, height: 9, borderRadius: '50%',
-        background: '#fff', color: '#6B3FA0', fontSize: 7, fontWeight: 900, lineHeight: '9px',
-        textAlign: 'center', boxShadow: '0 0 0 1.5px #6B3FA0' }}>{count}</span>
-    </span>
+      transform: 'rotate(6deg)' }}>⭐</span>
   );
 }
 
@@ -3811,16 +3814,11 @@ function AttendanceHistorySheet({ kid, onClose }) {
               {/* Same visual as StarBadge, drawn flat here rather than via
                   that component — StarBadge positions itself relative to
                   PaidBadge on a real cell, which this swatch doesn't have. */}
-              <span style={{ position: 'relative', width: 16, height: 16, borderRadius: '50%',
+              <span style={{ width: 16, height: 16, borderRadius: '50%',
                 background: 'linear-gradient(135deg, #C9A0F0, #6B3FA0)', display: 'flex',
                 alignItems: 'center', justifyContent: 'center', fontSize: 9,
-                boxShadow: '0 2px 3px rgba(60,20,80,0.35)' }}>⭐
-                <span style={{ position: 'absolute', top: -4, left: -4, width: 9, height: 9,
-                  borderRadius: '50%', background: '#fff', color: '#6B3FA0', fontSize: 7,
-                  fontWeight: 900, lineHeight: '9px', textAlign: 'center',
-                  boxShadow: '0 0 0 1.5px #6B3FA0' }}>3</span>
-              </span>
-              {L('звёзды за цель', 'reward stars')}
+                boxShadow: '0 2px 3px rgba(60,20,80,0.35)' }}>⭐</span>
+              {L('звезда за день', 'reward star')}
             </span>
           )}
           <span><span style={{ display:'inline-block', width:9, height:9, borderRadius:3, background:'#FBD9E1', marginRight:4 }} />{L('выходной', 'weekend')}</span>
@@ -3894,22 +3892,31 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
   // Primary School reward stars — same day-mark pattern as meals above
   // (loaded per viewed date, saved immediately per tap), kept forever
   // rather than reset (see child's own calendar for the running history).
+  // weekLocal is a read-side rollup (Mon-Sun sum) shown as a badge riding
+  // on the star itself — it's adjusted optimistically alongside starLocal
+  // on every tap rather than refetched, same rollback-on-failure shape.
   const [starLocal, setStarLocal] = React.useState({});
+  const [weekLocal, setWeekLocal] = React.useState({});
   React.useEffect(() => {
-    withRetry(() => window.loadChildStars(selDate))
-      .then(data => setStarLocal(data || {}))
-      .catch(()  => setStarLocal({}));
+    Promise.all([
+      withRetry(() => window.loadChildStars(selDate)),
+      withRetry(() => window.loadChildStarsWeekly(selDate)),
+    ]).then(([today, week]) => { setStarLocal(today || {}); setWeekLocal(week || {}); })
+      .catch(() => { setStarLocal({}); setWeekLocal({}); });
   }, [selDate]);
 
   async function tapStar(kidId) {
     if (local[kidId] !== 'present') return; // only a present kid can earn one
     const cur  = starLocal[kidId] || 0;
-    const next = (cur + 1) % 4; // 0 → 1 → 2 → 3 → 0
+    const next = cur ? 0 : 1; // one star a day, tap to give/undo it
+    const weekCur = weekLocal[kidId] || 0;
     setStarLocal(s => ({ ...s, [kidId]: next }));
+    setWeekLocal(w => ({ ...w, [kidId]: weekCur + (next - cur) }));
     try {
       await window.saveChildStars(selDate, { [kidId]: next });
     } catch (e) {
       setStarLocal(s => ({ ...s, [kidId]: cur }));
+      setWeekLocal(w => ({ ...w, [kidId]: weekCur }));
       actions.toast(L('Не удалось сохранить звёздочку: ', 'Failed to save star: ') + String(e));
     }
   }
@@ -4118,15 +4125,16 @@ function AttendanceScreen({ statuses, actions, go, selDate, setSelDate, calOpen,
               <Card key={kid.id} pad={12} onClick={() => setCalKid(kid)}
                 style={{ display:'flex', alignItems:'center', gap:13, background:'#FBF7F2' }}>
                 {/* Tapping the avatar itself awards a star (Primary School,
-                    present kids only) — a cycle 0→1→2→3→0, same gesture
-                    spot every time, rather than opening the day calendar
-                    like the rest of the row does. Everyone else's avatar
-                    behaves exactly as before (just part of the row tap). */}
+                    present kids only) — one star a day, tap to give/undo
+                    it, same gesture spot every time, rather than opening
+                    the day calendar like the rest of the row does.
+                    Everyone else's avatar behaves exactly as before (just
+                    part of the row tap). */}
                 <div style={{ position: 'relative' }}
                   onClick={kid.group === 'primary' && st === 'present'
                     ? (e) => { e.stopPropagation(); tapStar(kid.id); } : undefined}>
                   <Avatar emoji={kid.emoji} color={PALETTE[kidIndex % PALETTE.length]} size={44} />
-                  {kid.group === 'primary' && <AvatarStarRim count={starLocal[kid.id] || 0} size={44} />}
+                  {kid.group === 'primary' && <AvatarStar hasStar={starLocal[kid.id] || 0} weeklyCount={weekLocal[kid.id] || 0} size={44} />}
                 </div>
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ fontSize:15.5, fontWeight:700, color:'var(--ink)' }}>{Lo(kid)}</div>
