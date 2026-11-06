@@ -1831,7 +1831,7 @@ function AvatarStar({ hasStar, weeklyCount, size }) {
   // Scales with the avatar instead of a fixed size — the same star on the
   // 44px Journal avatar and the 92px card hero would otherwise look
   // correctly sized on one and lost on the other.
-  const fontSize = Math.max(9, Math.round(size * 0.23));
+  const fontSize = Math.max(10, Math.round(size * 0.26));
   const half = fontSize / 2;
   return (
     <span style={{
@@ -5592,7 +5592,7 @@ const SSTAFF_INK = {
 // The two "extras" — independent of status, can both be true the same day,
 // shown as small stickers on the day cell rather than as a status pill.
 const EXTRA_COLOR = '#CDE8FB', EXTRA_INK = '#1f5f86';
-// Поощрение — director's recognition mark, same "extra" shape as transfer/
+// Достижение — director's recognition mark, same "extra" shape as transfer/
 // overtime above but kept visually separate (purple, matching the kids'
 // reward star) since it's praise, not a logistics/pay thing.
 const STAR_COLOR = '#F3E3FF', STAR_INK = '#6B3FA0';
@@ -6270,10 +6270,10 @@ function StaffDailyScreen({ params, go }) {
                 </button>
               ))}
             </div>
-            {/* Extras — transfer (bus escort), overtime and Поощрение, all
+            {/* Extras — transfer (bus escort), overtime and Достижение, all
                 independent of status: someone can be "present" AND have
                 any combination of these that same day. Transfer/overtime
-                are extra-paid; Поощрение is the director's recognition
+                are extra-paid; Достижение is the director's recognition
                 mark, not tied to pay. */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 8 }}>
               <button onClick={() => toggleTransfer(s.name)} className="bk-press" style={{
@@ -6298,7 +6298,7 @@ function StaffDailyScreen({ params, go }) {
                 background: star ? STAR_COLOR : '#F0EBE3',
                 color: star ? STAR_INK : 'var(--ink-soft)',
                 transition: 'all 0.12s' }}>
-                ⭐ {L('Поощрение', 'Recognition')}
+                ⭐ {L('Достижение', 'Achievement')}
               </button>
             </div>
             {/* Time picker for late */}
@@ -6438,7 +6438,7 @@ function StaffDailyScreen({ params, go }) {
         </span>
         <span style={{ fontSize: 11, fontWeight: 600, background: STAR_COLOR, color: STAR_INK,
           padding: '3px 8px', borderRadius: 999 }}>
-          ⭐ {L('Поощрение', 'Recognition')}
+          ⭐ {L('Достижение', 'Achievement')}
         </span>
       </div>
 
@@ -6706,7 +6706,7 @@ function StaffMonthlyScreen({ go, staff }) {
                 <div style={{ marginTop: 8, background: STAR_COLOR, borderRadius: 12, padding: '8px 11px',
                   display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 12, fontWeight: 800, color: STAR_INK }}>
-                    ⭐ {L('Поощрение', 'Recognition')}: {starDays.length} {L('дн', 'd')}
+                    ⭐ {L('Достижение', 'Achievement')}: {starDays.length} {L('дн', 'd')}
                   </span>
                   <span style={{ fontSize: 11.5, color: STAR_INK, opacity: 0.85 }}>
                     ({starDays.join(', ')})
@@ -7373,7 +7373,7 @@ function MyScheduleScreen() {
                 <div style={{ marginTop: 8, background: STAR_COLOR, borderRadius: 12, padding: '8px 11px',
                   display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 12, fontWeight: 800, color: STAR_INK }}>
-                    ⭐ {L('Поощрение', 'Recognition')}: {starDays.length} {L('дн', 'd')}
+                    ⭐ {L('Достижение', 'Achievement')}: {starDays.length} {L('дн', 'd')}
                   </span>
                   <span style={{ fontSize: 11.5, color: STAR_INK, opacity: 0.85 }}>
                     ({starDays.join(', ')})
